@@ -2,8 +2,8 @@
 agp = "8.8.0"
 googleAuthLibraryOauth2Http = "1.30.0"
 gson = "2.13.1"
-kotlin = "1.9.22"
-composeCompiler = "1.5.10"
+kotlin = "2.0.20"
+composeCompiler = "1.5.15"
 coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -56,3 +56,4 @@ google-api-services-calendar = { group = "com.google.apis", name = "google-api-s
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 #kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

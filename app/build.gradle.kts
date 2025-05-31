@@ -3,7 +3,8 @@ import org.gradle.api.JavaVersion
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    //alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.20"
 }
 
 android {
@@ -32,6 +33,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
@@ -39,25 +41,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-
-        composeOptions {
-            kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
-        }
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
     packaging {
         resources {
             excludes.add("META-INF/INDEX.LIST")
             excludes.add("META-INF/DEPENDENCIES")
-            // Es ist auch üblich, weitere generische META-INF Dateien auszuschließen,
-            // die oft Konflikte verursachen, falls weitere Fehler dieser Art auftreten:
-            // excludes.add("META-INF/LICENSE")
-            // excludes.add("META-INF/LICENSE.txt")
-            // excludes.add("META-INF/license.txt")
-            // excludes.add("META-INF/NOTICE")
-            // excludes.add("META-INF/NOTICE.txt")
-            // excludes.add("META-INF/notice.txt")
-            // excludes.add("META-INF/ASL2.0")
-            // excludes.add("META-INF/*.kotlin_module") // Falls Kotlin-Modul-Deskriptoren Probleme machen
         }
     }
 
@@ -79,30 +70,22 @@ android {
         debugImplementation(libs.androidx.ui.tooling)
         debugImplementation(libs.androidx.ui.test.manifest)
 
-        implementation(platform(libs.androidx.compose.bom))
-        implementation(libs.androidx.ui)
-        implementation(libs.androidx.ui.graphics)
-        implementation(libs.androidx.ui.tooling.preview)
-        implementation(libs.androidx.material3)
-
-
-        // Credential Manager (Korrigierte Referenzen!)
+        // Credential Manager
         implementation(libs.androidx.credentials)
         implementation(libs.androidx.credentials.gpsAuth)
 
         // ViewModel
         implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
-        // Lifecycle Runtime Compose (wird oft mit ViewModel benötigt) - Prüfe, ob Alias existiert/nötig ist
-        // implementation(libs.androidx.lifecycle.runtime.compose)
-
-        // Alte Google Sign-In Bibliothek (ist korrekt auskommentiert)
+        // Google Sign-In
         implementation(libs.play.services.auth)
 
         implementation(libs.timber)
         implementation(libs.googleid)
 
         implementation(libs.androidx.datastore.preferences)
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
         implementation(libs.google.api.client.android)
         implementation(libs.google.api.services.calendar)

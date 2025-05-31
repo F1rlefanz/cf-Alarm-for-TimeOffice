@@ -12,6 +12,10 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.CredentialAuthManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.CalendarEvent
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftRecognitionEngine
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
@@ -37,7 +41,13 @@ data class AuthState(
     val calendarsLoading: Boolean = false,
     val calendarPermissionDenied: Boolean = false,
     val androidCalendarPermissionGranted: Boolean = false,
-    val showAndroidCalendarPermissionRationale: Boolean = false
+    val showAndroidCalendarPermissionRationale: Boolean = false,
+    val nextShiftAlarm: ShiftMatch? = null,
+    val calendarEventsLoaded: Boolean = false,
+    // Schicht-Konfiguration
+    val shiftDefinitions: List<com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftDefinition> = emptyList(),
+    val autoAlarmEnabled: Boolean = true,
+    val shiftConfigLoading: Boolean = false
 )
 
 class AuthViewModel(
@@ -50,6 +60,8 @@ class AuthViewModel(
 
     private val authDataStoreRepository = AuthDataStoreRepository(application)
     private val calendarRepository = CalendarRepository()
+    private val shiftConfigRepository = ShiftConfigRepository(application)
+    private val shiftRecognitionEngine = ShiftRecognitionEngine(shiftConfigRepository)
 
     private val _calendars = MutableStateFlow<List<CalendarItem>>(emptyList())
     val calendars: StateFlow<List<CalendarItem>> = _calendars.asStateFlow()
@@ -65,6 +77,28 @@ class AuthViewModel(
     init {
         Timber.d("AuthViewModel init")
         viewModelScope.launch {
+            // Beobachte Schicht-Konfiguration
+            launch {
+                combine(
+                    shiftConfigRepository.shiftDefinitions,
+                    shiftConfigRepository.autoAlarmEnabled
+                ) { definitions, autoEnabled ->
+                    Pair(definitions, autoEnabled)
+                }.collectLatest { (definitions, autoEnabled) ->
+                    Timber.d("ShiftConfig updated: ${definitions.size} definitions, autoEnabled=$autoEnabled")
+                    definitions.forEach { def ->
+                        Timber.d("ShiftDefinition: ${def.name} (${def.id}) - enabled=${def.isEnabled}")
+                    }
+                    _authState.update { currentState ->
+                        currentState.copy(
+                            shiftDefinitions = definitions,
+                            autoAlarmEnabled = autoEnabled
+                        )
+                    }
+                }
+            }
+            
+            // Beobachte Auth-Daten
             authDataStoreRepository.loginStatus
                 .combine(authDataStoreRepository.userEmail) { isLoggedInDs, emailDs -> Pair(isLoggedInDs, emailDs) }
                 .combine(authDataStoreRepository.userId) { loginEmailPair, userIdDs -> Triple(loginEmailPair.first, loginEmailPair.second, userIdDs) }
@@ -259,6 +293,13 @@ class AuthViewModel(
                     Timber.w("loadCalendarsUsingToken: Keine Kalender gefunden (API-Call ok, aber Liste leer).")
                 }
                 _authState.update { it.copy(calendarsLoading = false) }
+                
+                // Load calendar events if a calendar is already selected
+                val selectedCalendarId = persistedCalendarId.first()
+                if (selectedCalendarId.isNotBlank()) {
+                    loadCalendarEvents(selectedCalendarId)
+                }
+                
             } catch (e: com.google.api.client.googleapis.json.GoogleJsonResponseException) {
                 Timber.e(e, "loadCalendarsUsingToken: GoogleJsonResponseException. Status: ${e.statusCode}")
                 if (e.statusCode == 401 || e.statusCode == 403) {
@@ -274,6 +315,42 @@ class AuthViewModel(
                 Timber.e(e, "loadCalendarsUsingToken: Allgemeiner Fehler beim Abrufen der Kalender.")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Unbekannter Fehler beim Laden der Kalender: ${e.localizedMessage}", calendarPermissionDenied = true) }
                 _calendars.value = emptyList()
+            }
+        }
+    }
+    
+    private fun loadCalendarEvents(calendarId: String) {
+        val token = _authState.value.accessToken
+        if (token.isNullOrBlank()) {
+            Timber.e("loadCalendarEvents: Access Token ist null oder leer.")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Timber.d("Loading calendar events for calendar: $calendarId")
+                val events = calendarRepository.getCalendarEventsWithToken(token, calendarId)
+                
+                // Process shift recognition
+                val nextShift = shiftRecognitionEngine.findNextShiftAlarm(events)
+                
+                _authState.update { currentState ->
+                    currentState.copy(
+                        nextShiftAlarm = nextShift,
+                        calendarEventsLoaded = true
+                    )
+                }
+                
+                Timber.i("Calendar events loaded: ${events.size} events, next shift: ${nextShift?.shiftDefinition?.name}")
+                
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading calendar events")
+                _authState.update { currentState ->
+                    currentState.copy(
+                        error = "Fehler beim Laden der Kalenderereignisse: ${e.localizedMessage}",
+                        calendarEventsLoaded = false
+                    )
+                }
             }
         }
     }
@@ -339,6 +416,9 @@ class AuthViewModel(
             if (idToSave.isNotBlank()) {
                 authDataStoreRepository.saveCalendarId(idToSave)
                 Timber.i("AuthViewModel: Kalender-ID '$idToSave' persistent gespeichert.")
+                
+                // Load calendar events for the selected calendar
+                loadCalendarEvents(idToSave)
             } else {
                 Timber.w("AuthViewModel: Versuch, eine leere Kalender-ID zu speichern.")
             }
@@ -386,5 +466,64 @@ class AuthViewModel(
 
     fun clearAuthorizationPendingIntent() {
         _authState.update { it.copy(authorizationPendingIntent = null) }
+    }
+
+    // Schicht-Konfiguration Methoden
+    fun toggleAutoAlarm() {
+        viewModelScope.launch {
+            val newState = !_authState.value.autoAlarmEnabled
+            shiftConfigRepository.saveAutoAlarmEnabled(newState)
+            Timber.d("Auto alarm toggled to: $newState")
+        }
+    }
+    
+    fun updateShiftDefinition(definition: com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftDefinition) {
+        viewModelScope.launch {
+            val currentDefinitions = _authState.value.shiftDefinitions.toMutableList()
+            val index = currentDefinitions.indexOfFirst { it.id == definition.id }
+            
+            if (index >= 0) {
+                currentDefinitions[index] = definition
+            } else {
+                currentDefinitions.add(definition)
+            }
+            
+            shiftConfigRepository.saveShiftDefinitions(currentDefinitions)
+            Timber.d("Updated shift definition: ${definition.name}")
+            
+            // Refresh shift recognition if calendar events are loaded
+            val selectedCalendarId = persistedCalendarId.first()
+            if (selectedCalendarId.isNotBlank() && _authState.value.accessToken != null) {
+                loadCalendarEvents(selectedCalendarId)
+            }
+        }
+    }
+    
+    fun deleteShiftDefinition(definitionId: String) {
+        viewModelScope.launch {
+            val currentDefinitions = _authState.value.shiftDefinitions.toMutableList()
+            currentDefinitions.removeAll { it.id == definitionId }
+            shiftConfigRepository.saveShiftDefinitions(currentDefinitions)
+            Timber.d("Deleted shift definition: $definitionId")
+            
+            // Refresh shift recognition if calendar events are loaded
+            val selectedCalendarId = persistedCalendarId.first()
+            if (selectedCalendarId.isNotBlank() && _authState.value.accessToken != null) {
+                loadCalendarEvents(selectedCalendarId)
+            }
+        }
+    }
+    
+    fun resetShiftConfigToDefaults() {
+        viewModelScope.launch {
+            shiftConfigRepository.resetToDefaults()
+            Timber.i("Shift configuration reset to defaults")
+            
+            // Refresh shift recognition if calendar events are loaded
+            val selectedCalendarId = persistedCalendarId.first()
+            if (selectedCalendarId.isNotBlank() && _authState.value.accessToken != null) {
+                loadCalendarEvents(selectedCalendarId)
+            }
+        }
     }
 }
