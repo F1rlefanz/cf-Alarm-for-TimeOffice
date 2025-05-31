@@ -1,18 +1,21 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel
 
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.Application
 import android.app.PendingIntent
-// import android.content.Intent // Sicherstellen, dass dieser Import nicht benötigt wird
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.activity.result.ActivityResult
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.f1rlefanz.cf_alarmfortimeoffice.AlarmReceiver
 import com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.CredentialAuthManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
-import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.CalendarEvent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftRecognitionEngine
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
@@ -24,6 +27,8 @@ import com.google.android.gms.common.Scopes // Enthält EMAIL, PROFILE Konstante
 import com.google.android.gms.tasks.OnSuccessListener
 import com.google.android.gms.tasks.OnFailureListener
 import com.google.api.services.calendar.CalendarScopes // Enthält CALENDAR_READONLY Konstante als String
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -47,7 +52,11 @@ data class AuthState(
     // Schicht-Konfiguration
     val shiftDefinitions: List<com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftDefinition> = emptyList(),
     val autoAlarmEnabled: Boolean = true,
-    val shiftConfigLoading: Boolean = false
+    val shiftConfigLoading: Boolean = false,
+    // AlarmManager Status
+    val systemAlarmSet: Boolean = false,
+    val canScheduleExactAlarms: Boolean = false,
+    val alarmStatusMessage: String? = null
 )
 
 class AuthViewModel(
@@ -179,10 +188,9 @@ class AuthViewModel(
         }
     }
 
-    // KORREKTUR: Hilfsfunktion angepasst, um mit List<String>? zu arbeiten
-    private fun checkScopeStringGranted(grantedScopeStrings: List<String>?, targetScopeString: String): Boolean {
-        // KORREKTUR für "Equality check can be used instead of elvis for nullable boolean check"
-        return grantedScopeStrings?.contains(targetScopeString) == true
+    // Spezialisierte Methode für Kalender-Scope-Prüfung
+    private fun checkCalendarScopeGranted(grantedScopeStrings: List<String>?): Boolean {
+        return grantedScopeStrings?.contains(targetCalendarScopeString) == true
     }
 
     fun requestCalendarScopes(activity: MainActivity) {
@@ -216,7 +224,7 @@ class AuthViewModel(
                 Timber.i("AuthorizationClient: Zugriffstoken direkt erhalten: ${authResult.accessToken?.take(10)}...")
                 _authState.update { currentState -> currentState.copy(accessToken = authResult.accessToken, calendarsLoading = false, error = null, calendarPermissionDenied = false) }
                 loadCalendarsUsingToken()
-            } else if (checkScopeStringGranted(authResult.grantedScopes, targetCalendarScopeString)) { // KORREKTUR: `grantedScopes` sind Strings
+            } else if (checkCalendarScopeGranted(authResult.grantedScopes)) { // Verwendung der spezialisierten Methode
                 Timber.w("AuthorizationClient: Scopes erteilt, aber kein direkter AccessToken.")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Kalenderberechtigung erteilt, aber Token-Abruf benötigt weitere Schritte.") }
             } else {
@@ -252,7 +260,7 @@ class AuthViewModel(
                 Timber.i("AuthorizationClient: Zugriffstoken nach Intent-Auflösung erhalten: ${authResult.accessToken?.take(10)}...")
                 _authState.update { currentState -> currentState.copy(accessToken = authResult.accessToken, error = null, calendarPermissionDenied = false, calendarsLoading = false) }
                 loadCalendarsUsingToken()
-            } else if (checkScopeStringGranted(authResult.grantedScopes, targetCalendarScopeString)) { // KORREKTUR: `grantedScopes` sind Strings
+            } else if (checkCalendarScopeGranted(authResult.grantedScopes)) { // Verwendung der spezialisierten Methode
                 Timber.w("AuthorizationClient: Scopes nach Intent erteilt, aber kein direkter AccessToken.")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Kalenderberechtigung erteilt, aber Token-Abruf benötigt weitere Schritte.") }
             } else {
@@ -342,6 +350,9 @@ class AuthViewModel(
                 }
                 
                 Timber.i("Calendar events loaded: ${events.size} events, next shift: ${nextShift?.shiftDefinition?.name}")
+                
+                // Update alarm if auto-alarm is enabled
+                updateAlarmIfNeeded()
                 
             } catch (e: Exception) {
                 Timber.e(e, "Error loading calendar events")
@@ -474,6 +485,9 @@ class AuthViewModel(
             val newState = !_authState.value.autoAlarmEnabled
             shiftConfigRepository.saveAutoAlarmEnabled(newState)
             Timber.d("Auto alarm toggled to: $newState")
+            
+            // Update alarm based on new state
+            updateAlarmIfNeeded()
         }
     }
     
@@ -525,5 +539,145 @@ class AuthViewModel(
                 loadCalendarEvents(selectedCalendarId)
             }
         }
+    }
+    
+    // ========== AlarmManager Integration ==========
+    
+    private fun checkAlarmPermissions(): Boolean {
+        val alarmManager = getApplication<Application>().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val canSchedule = alarmManager.canScheduleExactAlarms()
+            _authState.update { it.copy(canScheduleExactAlarms = canSchedule) }
+            canSchedule
+        } else {
+            _authState.update { it.copy(canScheduleExactAlarms = true) }
+            true // API < 31 needs no permission
+        }
+    }
+    
+    fun setAlarmFromShiftMatch() {
+        val currentState = _authState.value
+        
+        if (!currentState.autoAlarmEnabled) {
+            Timber.d("Auto-Alarm deaktiviert, setze keinen Alarm")
+            _authState.update { it.copy(
+                systemAlarmSet = false,
+                alarmStatusMessage = "Auto-Alarm deaktiviert"
+            )}
+            return
+        }
+        
+        val shiftMatch = currentState.nextShiftAlarm
+        if (shiftMatch == null) {
+            Timber.d("Keine Schicht gefunden, setze keinen Alarm")
+            _authState.update { it.copy(
+                systemAlarmSet = false,
+                alarmStatusMessage = "Keine Schicht in nächsten Tagen"
+            )}
+            return
+        }
+        
+        if (!checkAlarmPermissions()) {
+            Timber.w("Keine Berechtigung für exakte Alarme")
+            _authState.update { it.copy(
+                systemAlarmSet = false,
+                alarmStatusMessage = "Alarm-Berechtigung fehlt"
+            )}
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                val alarmManager = getApplication<Application>().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                
+                // Erstelle Intent für AlarmReceiver
+                val alarmIntent = Intent(getApplication<Application>(), AlarmReceiver::class.java).apply {
+                    putExtra("shift_name", shiftMatch.shiftDefinition.name)
+                    putExtra("alarm_time", formatAlarmTime(shiftMatch.calculatedAlarmTime))
+                }
+                
+                val pendingIntent = PendingIntent.getBroadcast(
+                    getApplication<Application>(),
+                    ALARM_REQUEST_CODE,
+                    alarmIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                
+                // Setze exakten Alarm
+                val alarmTimeMillis = shiftMatch.calculatedAlarmTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    alarmTimeMillis,
+                    pendingIntent
+                )
+                
+                val formattedTime = formatAlarmTime(shiftMatch.calculatedAlarmTime)
+                Timber.i("System-Alarm gesetzt für ${shiftMatch.shiftDefinition.name} um $formattedTime")
+                
+                _authState.update { it.copy(
+                    systemAlarmSet = true,
+                    alarmStatusMessage = "Alarm gesetzt für $formattedTime"
+                )}
+                
+            } catch (e: SecurityException) {
+                Timber.e(e, "SecurityException beim Setzen des Alarms")
+                _authState.update { it.copy(
+                    systemAlarmSet = false,
+                    alarmStatusMessage = "Alarm-Berechtigung verweigert"
+                )}
+            } catch (e: Exception) {
+                Timber.e(e, "Fehler beim Setzen des System-Alarms")
+                _authState.update { it.copy(
+                    systemAlarmSet = false,
+                    alarmStatusMessage = "Fehler beim Alarm setzen: ${e.localizedMessage}"
+                )}
+            }
+        }
+    }
+    
+    fun cancelSystemAlarm() {
+        try {
+            val alarmManager = getApplication<Application>().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val alarmIntent = Intent(getApplication<Application>(), AlarmReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                getApplication<Application>(),
+                ALARM_REQUEST_CODE,
+                alarmIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            
+            Timber.i("System-Alarm abgebrochen")
+            _authState.update { it.copy(
+                systemAlarmSet = false,
+                alarmStatusMessage = "Alarm abgebrochen"
+            )}
+            
+        } catch (e: Exception) {
+            Timber.e(e, "Fehler beim Abbrechen des System-Alarms")
+        }
+    }
+    
+    private fun formatAlarmTime(alarmTime: java.time.LocalDateTime): String {
+        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+        return alarmTime.format(formatter)
+    }
+    
+    // Trigger alarm setting when shift changes or auto-alarm is enabled
+    private fun updateAlarmIfNeeded() {
+        val currentState = _authState.value
+        if (currentState.autoAlarmEnabled && currentState.nextShiftAlarm != null) {
+            setAlarmFromShiftMatch()
+        } else if (!currentState.autoAlarmEnabled) {
+            cancelSystemAlarm()
+        }
+    }
+    
+    companion object {
+        private const val ALARM_REQUEST_CODE = 1001
     }
 }

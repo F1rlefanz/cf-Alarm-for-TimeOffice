@@ -287,6 +287,70 @@ private fun MainContent(
                 }
             }
         }
+        
+        // System Alarm Status
+        if (authState.autoAlarmEnabled) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (authState.systemAlarmSet) 
+                        MaterialTheme.colorScheme.secondaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            if (authState.systemAlarmSet) "🔔" else "⚠️",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            "System-Alarm:",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    Text(
+                        authState.alarmStatusMessage ?: if (authState.systemAlarmSet) "Aktiv" else "Nicht gesetzt",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    if (!authState.canScheduleExactAlarms && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    android.net.Uri.parse("package:${activity.packageName}")
+                                )
+                                activity.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Alarm-Berechtigung erteilen")
+                        }
+                    }
+                    
+                    if (authState.systemAlarmSet) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { authViewModel.cancelSystemAlarm() }
+                        ) {
+                            Text("Alarm abbrechen")
+                        }
+                    }
+                }
+            }
+        }
 
         // Error handling UI
         if (authState.isSignedIn) {
