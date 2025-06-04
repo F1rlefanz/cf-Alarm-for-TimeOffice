@@ -310,29 +310,84 @@ private fun MainContent(
             }
         }
 
-        // Next Shift Alarm Info
-        authState.nextShiftAlarm?.let { nextShift ->
-            item {
-                InfoCard(
-                    title = "Nächster Wecker",
-                    content = {
-                        Text(
-                            text = "Schicht: ${nextShift.shiftDefinition.name}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Termin: ${nextShift.calendarEventTitle}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Weckzeit: ${nextShift.calculatedAlarmTime}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    icon = Icons.Filled.Schedule
-                )
+        // Alarm display logic
+        when {
+            // Show countdown if we have a next shift alarm
+            authState.nextShiftAlarm != null -> {
+                item {
+                    CountdownTimer(
+                        targetTime = authState.nextShiftAlarm.calculatedAlarmTime,
+                        onTimeUp = {
+                            // This will be called when countdown reaches zero
+                            // The alarm should already be triggered by the system
+                        }
+                    )
+                }
+                
+                item {
+                    InfoCard(
+                        title = "Nächster Wecker",
+                        content = {
+                            Text(
+                                text = "Schicht: ${authState.nextShiftAlarm.shiftDefinition.name}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Termin: ${authState.nextShiftAlarm.calendarEventTitle}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Weckzeit: ${authState.nextShiftAlarm.formattedAlarmTime}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        icon = Icons.Filled.Schedule
+                    )
+                }
+            }
+            
+            // Show appropriate no alarm card based on state
+            persistedCalendarId.isBlank() -> {
+                item {
+                    NoAlarmCard(
+                        reason = NoCalendarSelected(),
+                        onActionClick = {
+                            authViewModel.triggerCalendarAccess(activity)
+                            if (calendars.isNotEmpty() || authState.calendarsLoading) {
+                                authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
+                                onShowCalendarSelection()
+                            }
+                        }
+                    )
+                }
+            }
+            
+            !authState.autoAlarmEnabled -> {
+                item {
+                    NoAlarmCard(
+                        reason = AutoAlarmDisabled(),
+                        onActionClick = onShowShiftConfig
+                    )
+                }
+            }
+            
+            authState.calendarsLoading || (authState.calendarEventsLoaded && authState.nextShiftAlarm == null) -> {
+                item {
+                    NoAlarmCard(
+                        reason = if (authState.calendarsLoading) LoadingShifts() else NoShiftFound(),
+                        onActionClick = if (!authState.calendarsLoading) {
+                            {
+                                authViewModel.triggerCalendarAccess(activity)
+                                if (calendars.isNotEmpty() || authState.calendarsLoading) {
+                                    authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
+                                    onShowCalendarSelection()
+                                }
+                            }
+                        } else null
+                    )
+                }
             }
         }
         
