@@ -62,6 +62,10 @@ android {
         implementation(libs.androidx.ui.graphics)
         implementation(libs.androidx.ui.tooling.preview)
         implementation(libs.androidx.material3)
+        
+        // Material Icons Extended for better icon support
+        implementation("androidx.compose.material:material-icons-extended:1.7.6")
+        
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
         androidTestImplementation(libs.androidx.espresso.core)

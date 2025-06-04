@@ -11,7 +11,7 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.*
-import androidx.annotation.RequiresApi
+
 import androidx.core.app.NotificationCompat
 import timber.log.Timber
 
@@ -89,25 +89,36 @@ class AlarmReceiver : BroadcastReceiver() {
     private fun startVibration(context: Context) {
         try {
             val vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000, 500)
-            val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1) // Repeat from index 1
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12+ (API 31+): Use VibratorManager
                 vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager?
                 vibratorManager?.defaultVibrator?.let { defaultVibrator ->
                     if (defaultVibrator.hasVibrator()) {
+                        val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
                         vibratorManager?.vibrate(CombinedVibration.createParallel(vibrationEffect))
                         Timber.d("Vibration gestartet (VibratorManager)")
                     }
                 }
-            } else {
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Android 8.0+ (API 26+): Use VibrationEffect with Vibrator
                 @Suppress("DEPRECATION")
                 vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
                 vibrator?.let {
                     if (it.hasVibrator()) {
-                        val audioAttributes = AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .build()
-                        it.vibrate(vibrationEffect, audioAttributes)
+                        val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
+                        it.vibrate(vibrationEffect)
+                        Timber.d("Vibration gestartet (VibrationEffect)")
+                    }
+                }
+            } else {
+                // Android 7.1 and below (API < 26): Use legacy vibrate method
+                @Suppress("DEPRECATION")
+                vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+                vibrator?.let {
+                    if (it.hasVibrator()) {
+                        @Suppress("DEPRECATION")
+                        it.vibrate(vibrationPattern, 1) // Repeat from index 1
                         Timber.d("Vibration gestartet (Legacy)")
                     }
                 }

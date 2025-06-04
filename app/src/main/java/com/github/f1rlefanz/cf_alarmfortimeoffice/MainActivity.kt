@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -13,7 +12,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -29,6 +35,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.CredentialAuthManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.CalendarSelectionScreen
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.LoginScreen
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.ShiftConfigScreen
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModelFactory
@@ -48,6 +55,15 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+    // Launcher für Notification-Berechtigung
+    private val requestNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            Timber.d("Notification permission result: $isGranted")
+            if (!isGranted) {
+                Toast.makeText(this, "Benachrichtigungsberechtigung ist für Alarme erforderlich!", Toast.LENGTH_LONG).show()
+            }
+        }
+
     // Launcher für das Ergebnis des AuthorizationClient Flows (Consent Screen)
     private val authorizationLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { activityResult: ActivityResult ->
@@ -64,6 +80,14 @@ class MainActivity : ComponentActivity() {
             AuthViewModelFactory(application, credentialAuthManager)
         )[AuthViewModel::class.java]
 
+        // Prüfe und fordere Notification-Berechtigung an
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         setContent {
             CFAlarmForTimeOfficeTheme {
                 Surface(
@@ -73,14 +97,7 @@ class MainActivity : ComponentActivity() {
                     val authState by authViewModel.authState.collectAsState()
 
                     if (authState.isLoading && !authState.isSignedIn) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator()
-                            Text("Lade Anmeldestatus...")
-                        }
+                        LoadingScreen()
                     } else if (authState.isSignedIn) {
                         MainAppScreen(
                             authViewModel = authViewModel,
@@ -126,6 +143,26 @@ class MainActivity : ComponentActivity() {
         val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent).build()
         authorizationLauncher.launch(intentSenderRequest)
         authViewModel.clearAuthorizationPendingIntent()
+    }
+}
+
+@Composable
+fun LoadingScreen() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            strokeWidth = 4.dp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Lade Anmeldestatus...",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -246,247 +283,249 @@ private fun MainContent(
 ) {
     val context = LocalContext.current
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Willkommen, ${authState.userName ?: authState.userEmailOrId ?: "Nutzer"}!")
+        // Welcome Header
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "CF-Alarm",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Willkommen, ${authState.userName ?: authState.userEmailOrId ?: "Nutzer"}!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         // Next Shift Alarm Info
         authState.nextShiftAlarm?.let { nextShift ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+            item {
+                InfoCard(
+                    title = "Nächster Wecker",
+                    content = {
+                        Text(
+                            text = "Schicht: ${nextShift.shiftDefinition.name}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Termin: ${nextShift.calendarEventTitle}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Weckzeit: ${nextShift.calculatedAlarmTime}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    icon = Icons.Filled.Schedule
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        "Nächster Wecker:",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Schicht: ${nextShift.shiftDefinition.name}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "Termin: ${nextShift.calendarEventTitle}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "Weckzeit: ${nextShift.calculatedAlarmTime}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
         }
         
         // System Alarm Status
         if (authState.autoAlarmEnabled) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (authState.systemAlarmSet) 
-                        MaterialTheme.colorScheme.secondaryContainer 
-                    else 
-                        MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            if (authState.systemAlarmSet) "🔔" else "⚠️",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            "System-Alarm:",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    
-                    Text(
-                        authState.alarmStatusMessage ?: if (authState.systemAlarmSet) "Aktiv" else "Nicht gesetzt",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    if (!authState.canScheduleExactAlarms && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                val intent = android.content.Intent(
-                                    android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                    android.net.Uri.parse("package:${activity.packageName}")
-                                )
-                                activity.startActivity(intent)
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
+            item {
+                StatusCard(
+                    title = "System-Alarm",
+                    subtitle = authState.alarmStatusMessage ?: if (authState.systemAlarmSet) "Aktiv" else "Nicht gesetzt",
+                    icon = if (authState.systemAlarmSet) Icons.Filled.NotificationsActive else Icons.Filled.NotificationsOff,
+                    isPositive = authState.systemAlarmSet,
+                    actionButton = {
+                        if (!authState.canScheduleExactAlarms && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            ActionButton(
+                                text = "Alarm-Berechtigung erteilen",
+                                icon = Icons.Filled.Settings,
+                                onClick = {
+                                    val intent = Intent(
+                                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                        "package:${activity.packageName}".toUri()
+                                    )
+                                    activity.startActivity(intent)
+                                },
+                                variant = ButtonVariant.Error
                             )
-                        ) {
-                            Text("Alarm-Berechtigung erteilen")
+                        } else if (authState.systemAlarmSet) {
+                            ActionButton(
+                                text = "Alarm abbrechen",
+                                icon = Icons.Filled.Cancel,
+                                onClick = { authViewModel.cancelSystemAlarm() },
+                                variant = ButtonVariant.Secondary
+                            )
                         }
                     }
-                    
-                    if (authState.systemAlarmSet) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = { authViewModel.cancelSystemAlarm() }
-                        ) {
-                            Text("Alarm abbrechen")
-                        }
-                    }
-                }
+                )
             }
         }
 
-        // Error handling UI
-        if (authState.isSignedIn) {
-            val currentError = authState.error
-
+        // Error handling cards
+        item {
             when {
                 !authState.androidCalendarPermissionGranted && authState.showAndroidCalendarPermissionRationale -> {
-                    ErrorCard(
+                    StatusCard(
                         title = "Kalenderberechtigung erforderlich",
-                        message = "Diese App benötigt Zugriff auf deine Kalender, um Dienstpläne zu lesen. Bitte erteile die Berechtigung.",
-                        buttonText = "Kalenderberechtigung erneut anfordern",
-                        onButtonClick = { activity.checkAndRequestCalendarPermission() }
+                        subtitle = "Diese App benötigt Zugriff auf deine Kalender, um Dienstpläne zu lesen.",
+                        icon = Icons.Filled.CalendarMonth,
+                        isPositive = false,
+                        actionButton = {
+                            ActionButton(
+                                text = "Kalenderberechtigung erneut anfordern",
+                                icon = Icons.Filled.CalendarMonth,
+                                onClick = { activity.checkAndRequestCalendarPermission() },
+                                variant = ButtonVariant.Error
+                            )
+                        }
                     )
                 }
 
-                !authState.androidCalendarPermissionGranted && authState.calendarPermissionDenied && currentError?.contains(
-                    "Android Kalenderberechtigung"
-                ) == true -> {
-                    ErrorCard(
+                !authState.androidCalendarPermissionGranted && authState.calendarPermissionDenied && authState.error?.contains("Android Kalenderberechtigung") == true -> {
+                    StatusCard(
                         title = "Kalenderberechtigung verweigert",
-                        message = currentError,
-                        buttonText = "App-Einstellungen öffnen",
-                        onButtonClick = {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                            val uri = Uri.fromParts("package", activity.packageName, null)
-                            intent.data = uri
-                            activity.startActivity(intent)
+                        subtitle = authState.error,
+                        icon = Icons.Filled.CalendarMonth,
+                        isPositive = false,
+                        actionButton = {
+                            ActionButton(
+                                text = "App-Einstellungen öffnen",
+                                icon = Icons.Filled.Settings,
+                                onClick = {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    val uri = "package:${activity.packageName}".toUri()
+                                    intent.data = uri
+                                    activity.startActivity(intent)
+                                },
+                                variant = ButtonVariant.Error
+                            )
                         }
                     )
                 }
 
                 authState.accessToken.isNullOrBlank() && !authState.calendarsLoading && authState.calendarPermissionDenied -> {
-                    ErrorCard(
+                    StatusCard(
                         title = "Google Kalender Autorisierung fehlgeschlagen",
-                        message = currentError
-                            ?: "Autorisierung für Google Kalender fehlgeschlagen.",
-                        buttonText = "Google Kalender Autorisierung erneut versuchen",
-                        onButtonClick = { authViewModel.requestCalendarScopes(activity) }
+                        subtitle = authState.error ?: "Autorisierung für Google Kalender fehlgeschlagen.",
+                        icon = Icons.Filled.Error,
+                        isPositive = false,
+                        actionButton = {
+                            ActionButton(
+                                text = "Google Kalender Autorisierung erneut versuchen",
+                                icon = Icons.Filled.Refresh,
+                                onClick = { authViewModel.requestCalendarScopes(activity) },
+                                variant = ButtonVariant.Error
+                            )
+                        }
                     )
                 }
 
-                currentError != null && (currentError.contains("Kalender") || currentError.contains(
-                    "Authentifizierung"
-                )) -> {
-                    ErrorCard(
+                authState.error != null && (authState.error.contains("Kalender") || authState.error.contains("Authentifizierung")) -> {
+                    StatusCard(
                         title = "Fehler",
-                        message = currentError,
-                        buttonText = "Erneut versuchen",
-                        onButtonClick = { authViewModel.retryCalendarAccessOrReAuth(activity) }
+                        subtitle = authState.error,
+                        icon = Icons.Filled.Error,
+                        isPositive = false,
+                        actionButton = {
+                            ActionButton(
+                                text = "Erneut versuchen",
+                                icon = Icons.Filled.Refresh,
+                                onClick = { authViewModel.retryCalendarAccessOrReAuth(activity) },
+                                variant = ButtonVariant.Error
+                            )
+                        }
                     )
                 }
             }
         }
 
-        Text("Ausgewählter Dienstplan: ${persistedCalendarId.ifBlank { "Keiner" }}")
+        // Calendar Selection Status
+        item {
+            StatusCard(
+                title = "Dienstplan-Kalender",
+                subtitle = if (persistedCalendarId.isNotBlank()) persistedCalendarId else "Kein Kalender ausgewählt",
+                icon = Icons.Outlined.CalendarMonth,
+                isPositive = persistedCalendarId.isNotBlank()
+            )
+        }
 
+        // Loading indicator
         if (authState.calendarsLoading) {
-            CircularProgressIndicator()
-            Text("Lade Kalenderliste...")
+            item {
+                InfoCard(
+                    title = "Lade Kalenderliste...",
+                    content = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "Kalender werden geladen...",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    },
+                    icon = Icons.Default.Refresh
+                )
+            }
         }
 
         // Main action buttons
-        Button(
-            onClick = onShowShiftConfig,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Schicht-Einstellungen")
-        }
-
-        Button(
-            onClick = {
-                if (authState.isSignedIn) {
-                    authViewModel.triggerCalendarAccess(activity)
-                    if (calendars.isNotEmpty() || authState.calendarsLoading) {
-                        authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
-                        onShowCalendarSelection()
-                        Timber.d("MainContent: 'Kalender auswählen' geklickt. Zeige Auswahl.")
-                    } else {
-                        Timber.d("MainContent: 'Kalender auswählen' geklickt, Flow wurde getriggert.")
-                    }
-                } else {
-                    Toast.makeText(context, "Bitte zuerst anmelden.", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (persistedCalendarId.isBlank()) "Dienstplan-Kalender auswählen" else "Dienstplan-Kalender ändern")
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = onSignOut,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Abmelden")
-        }
-    }
-}
-
-@Composable
-private fun ErrorCard(
-    title: String,
-    message: String,
-    buttonText: String,
-    onButtonClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Button(
-                onClick = onButtonClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+        item {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(buttonText)
+                ActionButton(
+                    text = "Schicht-Einstellungen",
+                    icon = Icons.Filled.Settings,
+                    onClick = onShowShiftConfig
+                )
+
+                ActionButton(
+                    text = if (persistedCalendarId.isBlank()) "Dienstplan-Kalender auswählen" else "Dienstplan-Kalender ändern",
+                    icon = Icons.Filled.CalendarMonth,
+                    onClick = {
+                        if (authState.isSignedIn) {
+                            authViewModel.triggerCalendarAccess(activity)
+                            if (calendars.isNotEmpty() || authState.calendarsLoading) {
+                                authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
+                                onShowCalendarSelection()
+                                Timber.d("MainContent: 'Kalender auswählen' geklickt. Zeige Auswahl.")
+                            } else {
+                                Timber.d("MainContent: 'Kalender auswählen' geklickt, Flow wurde getriggert.")
+                            }
+                        } else {
+                            Toast.makeText(context, "Bitte zuerst anmelden.", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    variant = ButtonVariant.Secondary
+                )
             }
+        }
+
+        // Sign out button
+        item {
+            Spacer(modifier = Modifier.height(32.dp))
+            ActionButton(
+                text = "Abmelden",
+                icon = Icons.AutoMirrored.Filled.Logout,
+                onClick = onSignOut,
+                variant = ButtonVariant.Error
+            )
         }
     }
 }
@@ -495,27 +534,56 @@ private fun ErrorCard(
 @Composable
 fun DefaultPreview() {
     CFAlarmForTimeOfficeTheme {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Willkommen, Test Nutzer!")
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { /* Preview Klick */ }) {
-                Text("Schicht-Einstellungen")
+            item {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "CF-Alarm",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Willkommen, Test Nutzer!",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { /* Preview Klick */ }) {
-                Text("Abmelden")
+            
+            item {
+                InfoCard(
+                    title = "Nächster Wecker",
+                    content = {
+                        Text("Schicht: Nachtdienst")
+                        Text("Termin: IMC Nachtdienst")
+                        Text("Weckzeit: 06.06.2025 19:45", fontWeight = FontWeight.Bold)
+                    },
+                    icon = Icons.Filled.Schedule
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Ausgewählter Dienstplan: Keiner")
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { /* Preview Klick */ }) {
-                Text("Dienstplan-Kalender auswählen")
+            
+            item {
+                StatusCard(
+                    title = "System-Alarm",
+                    subtitle = "Alarm gesetzt für 06.06.2025 19:45",
+                    icon = Icons.Filled.NotificationsActive,
+                    isPositive = true
+                )
+            }
+            
+            item {
+                ActionButton(
+                    text = "Schicht-Einstellungen",
+                    icon = Icons.Filled.Settings,
+                    onClick = { /* Preview */ }
+                )
             }
         }
     }

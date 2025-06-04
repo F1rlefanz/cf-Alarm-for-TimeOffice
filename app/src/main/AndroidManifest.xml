@@ -11,6 +11,10 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
+    <!-- Notification permissions -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    
     <!-- Multi-API Alarm Permissions Strategy -->
     <!-- For API 31-32 (Android 12-13) -->
     <uses-permission 
