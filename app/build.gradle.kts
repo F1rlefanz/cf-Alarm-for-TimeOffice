@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.20"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0"
 }
 
 android {
@@ -64,7 +64,7 @@ android {
         implementation(libs.androidx.material3)
         
         // Material Icons Extended for better icon support
-        implementation("androidx.compose.material:material-icons-extended:1.7.6")
+        implementation("androidx.compose.material:material-icons-extended:1.7.8")
         
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
@@ -89,7 +89,7 @@ android {
 
         implementation(libs.androidx.datastore.preferences)
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
         implementation(libs.google.api.client.android)
         implementation(libs.google.api.services.calendar)

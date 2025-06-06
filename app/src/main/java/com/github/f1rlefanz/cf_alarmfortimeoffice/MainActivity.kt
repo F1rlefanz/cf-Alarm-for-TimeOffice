@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                     val authState by authViewModel.authState.collectAsState()
 
                     if (authState.isLoading && !authState.isSignedIn) {
-                        LoadingScreen("Lade Anmeldestatus...")
+                        LoadingScreen(message = "Lade Anmeldestatus...")
                     } else if (authState.isSignedIn) {
                         MainScreen(
                             authViewModel = authViewModel,

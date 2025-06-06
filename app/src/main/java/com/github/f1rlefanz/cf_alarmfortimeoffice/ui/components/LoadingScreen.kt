@@ -9,8 +9,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun LoadingScreen(
-    message: String = "Laden...",
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String = "Laden..."
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
