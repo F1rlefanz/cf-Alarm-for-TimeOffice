@@ -1,6 +1,5 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +27,6 @@ import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 
 /**
  * Modern animated countdown timer component
@@ -67,7 +65,6 @@ fun CountdownTimer(
     val days = timeRemaining.toDays()
     val hours = timeRemaining.toHours() % 24
     val minutes = (timeRemaining.toMinutes() % 60)
-    val seconds = (timeRemaining.seconds % 60)
     
     // Animation states
     val pulseAnimation = rememberInfiniteTransition(label = "pulse")
@@ -169,16 +166,6 @@ fun CountdownTimer(
                             color = urgencyColor,
                             isHighlighted = days == 0L && hours == 0L
                         )
-                        
-                        TimeUnitSeparator()
-                        
-                        TimeUnit(
-                            value = seconds.toInt(),
-                            unit = "Sek",
-                            color = urgencyColor,
-                            isHighlighted = days == 0L && hours == 0L && minutes == 0L,
-                            showPulse = days == 0L && hours == 0L && minutes < 5
-                        )
                     }
                 } else {
                     // Expired state
@@ -226,31 +213,19 @@ private fun TimeUnit(
     value: Int,
     unit: String,
     color: Color,
-    isHighlighted: Boolean = false,
-    showPulse: Boolean = false
+    isHighlighted: Boolean = false
 ) {
     val displayValue = value.toString().padStart(2, '0')
     
-    val scale = if (showPulse) {
-        val pulseAnimation = rememberInfiniteTransition(label = "pulse")
-        pulseAnimation.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(500, easing = EaseInOutCubic),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulseScale"
-        ).value
-    } else 1f
-    
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.scale(scale)
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(if (isHighlighted) 72.dp else 64.dp)
+                .size(
+                    width = if (isHighlighted) 80.dp else 72.dp,
+                    height = if (isHighlighted) 80.dp else 72.dp
+                )
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     color = if (isHighlighted) 
@@ -258,24 +233,24 @@ private fun TimeUnit(
                     else 
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
-                .border(
-                    width = if (isHighlighted) 2.dp else 1.dp,
-                    color = if (isHighlighted) color else Color.Transparent,
-                    shape = RoundedCornerShape(16.dp)
+                .then(
+                    if (isHighlighted) 
+                        Modifier.border(2.dp, color, RoundedCornerShape(16.dp))
+                    else 
+                        Modifier
                 ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = displayValue,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = if (isHighlighted) 32.sp else 28.sp
-                ),
+                fontSize = if (isHighlighted) 28.sp else 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isHighlighted) color else MaterialTheme.colorScheme.onSurface
+                color = if (isHighlighted) color else MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
             )
         }
         
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         Text(
             text = unit,

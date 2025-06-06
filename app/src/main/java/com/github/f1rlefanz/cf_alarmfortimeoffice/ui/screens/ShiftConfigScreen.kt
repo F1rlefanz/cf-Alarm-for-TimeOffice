@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftDefinition
-import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +33,7 @@ fun ShiftConfigScreen(
                 title = { Text("Schicht-Konfiguration") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
@@ -248,7 +248,7 @@ fun ShiftEditDialog(
     var name by remember { mutableStateOf(shift?.name ?: "") }
     var keywords by remember { mutableStateOf(shift?.keywords?.joinToString(", ") ?: "") }
     var alarmTime by remember { mutableStateOf(shift?.alarmTime ?: "06:00") }
-    var isEnabled by remember { mutableStateOf(shift?.isEnabled ?: true) }
+    var isEnabled by remember { mutableStateOf(shift?.isEnabled != false) }
     
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -10,7 +10,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -67,39 +66,12 @@ class ShiftConfigRepository(private val context: Context) {
     }
     
     val autoAlarmEnabled: Flow<Boolean> = context.shiftDataStore.data.map { preferences ->
-        preferences[autoAlarmEnabledKey] ?: true
+        preferences[autoAlarmEnabledKey] != false
     }
-    
-    suspend fun getAutoAlarmEnabled(): Boolean {
-        return autoAlarmEnabled.first()
-    }
-    
+
     suspend fun resetToDefaults() {
         saveShiftDefinitions(DefaultShiftDefinitions.predefined)
         saveAutoAlarmEnabled(true)
         Timber.i("Shift configuration reset to defaults")
-    }
-    
-    suspend fun addShiftDefinition(definition: ShiftDefinition) {
-        val currentDefinitions = getShiftDefinitions().toMutableList()
-        // Remove existing definition with same ID if it exists
-        currentDefinitions.removeAll { it.id == definition.id }
-        currentDefinitions.add(definition)
-        saveShiftDefinitions(currentDefinitions)
-    }
-    
-    suspend fun updateShiftDefinition(definition: ShiftDefinition) {
-        val currentDefinitions = getShiftDefinitions().toMutableList()
-        val index = currentDefinitions.indexOfFirst { it.id == definition.id }
-        if (index >= 0) {
-            currentDefinitions[index] = definition
-            saveShiftDefinitions(currentDefinitions)
-        }
-    }
-    
-    suspend fun deleteShiftDefinition(definitionId: String) {
-        val currentDefinitions = getShiftDefinitions().toMutableList()
-        currentDefinitions.removeAll { it.id == definitionId }
-        saveShiftDefinitions(currentDefinitions)
     }
 }

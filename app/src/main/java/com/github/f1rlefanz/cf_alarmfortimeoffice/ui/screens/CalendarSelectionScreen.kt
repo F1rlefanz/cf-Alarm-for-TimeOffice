@@ -4,26 +4,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem // Korrekter Import!
+import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
 import timber.log.Timber
 
-@OptIn(ExperimentalMaterial3Api::class) // Für CenterAlignedTopAppBar, falls du es später hinzufügst
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarSelectionScreen(
     calendars: List<CalendarItem>,
     selectedCalendarId: String,
     onCalendarSelected: (String) -> Unit,
     onSaveClicked: () -> Unit,
-    onCancelClicked: () -> Unit, // Hinzugefügt für bessere UX
-    isLoading: Boolean // Um Ladezustand anzuzeigen
+    onCancelClicked: () -> Unit,
+    isLoading: Boolean
 ) {
     Scaffold(
         topBar = {
@@ -33,8 +30,8 @@ fun CalendarSelectionScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // paddingValues vom Scaffold übernehmen
-                .padding(16.dp) // Zusätzliches Padding für den Inhalt
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -48,7 +45,7 @@ fun CalendarSelectionScreen(
                 }
             } else {
                 Timber.d("CalendarSelectionScreen: Zeige ${calendars.size} Kalender. Ausgewählt: $selectedCalendarId")
-                LazyColumn(modifier = Modifier.weight(1.0f)) { // weight damit die Buttons unten bleiben
+                LazyColumn(modifier = Modifier.weight(1.0f)) {
                     items(calendars) { calendar ->
                         Row(
                             Modifier
@@ -60,7 +57,7 @@ fun CalendarSelectionScreen(
                                         onCalendarSelected(calendar.id)
                                     }
                                 )
-                                .padding(vertical = 8.dp), // Etwas mehr vertikales Padding
+                                .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -82,7 +79,7 @@ fun CalendarSelectionScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End // Buttons rechtsbündig
+                    horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = {
                         Timber.d("CalendarSelectionScreen: Abbrechen geklickt.")
@@ -96,7 +93,7 @@ fun CalendarSelectionScreen(
                             Timber.d("CalendarSelectionScreen: Speichern geklickt mit ID: $selectedCalendarId")
                             onSaveClicked()
                         },
-                        enabled = selectedCalendarId.isNotBlank() // Speichern nur aktiv, wenn etwas ausgewählt ist
+                        enabled = selectedCalendarId.isNotBlank()
                     ) {
                         Text("Auswahl speichern")
                     }

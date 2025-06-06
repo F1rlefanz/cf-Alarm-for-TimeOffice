@@ -15,14 +15,13 @@ data class SignInResult(
     val success: Boolean,
     val credentialResponse: GetCredentialResponse? = null,
     val error: String? = null,
-    val exception: Throwable? = null // Throwable, um spezifischere Exceptions zu fangen
+    val exception: Throwable? = null
 )
 
 class CredentialAuthManager(private val context: Context) {
 
     private val credentialManager = CredentialManager.create(context)
-    // WICHTIG: Ersetze dies mit deiner *Web* Client-ID aus der Google Cloud Console!
-    private val googleWebClientId = "931091152160-8s3nd7os2p61ac6ecm799gjhekkf0b4i.apps.googleusercontent.com" // DEINE WEB CLIENT ID
+    private val googleWebClientId = "931091152160-8s3nd7os2p61ac6ecm799gjhekkf0b4i.apps.googleusercontent.com"
 
     suspend fun signIn(): SignInResult {
         if (googleWebClientId.startsWith("ERSETZE_DIES") || googleWebClientId.isBlank()) {
@@ -31,16 +30,8 @@ class CredentialAuthManager(private val context: Context) {
         }
 
         val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false) // Zeigt alle Google Konten auf dem Gerät
+            .setFilterByAuthorizedAccounts(false)
             .setServerClientId(googleWebClientId)
-
-            // **WICHTIG: Scopes hier hinzufügen, um den Consent Screen auszulösen**
-            //.setGrantedScopes(listOf(
-            //    Scopes.EMAIL, // Standard-Scope für E-Mail-Adresse
-            //    Scopes.PROFILE, // Standard-Scope für Basis-Profilinformationen
-            //    "https://www.googleapis.com/auth/calendar.readonly" // Scope für Lesezugriff auf Kalender
-            //))
-            // .setAutoSelectEnabled(true) // Kann Probleme machen, vorerst weglassen oder gut testen
             .build()
 
         val request: GetCredentialRequest = GetCredentialRequest.Builder()
@@ -53,17 +44,17 @@ class CredentialAuthManager(private val context: Context) {
             Timber.d("CredentialAuthManager: Credential erfolgreich erhalten: ${result.credential.type}")
             SignInResult(success = true, credentialResponse = result)
 
-        } catch (e: GetCredentialCancellationException) { // Spezifisch für Nutzerabbruch
+        } catch (e: GetCredentialCancellationException) {
             Timber.w(e, "CredentialAuthManager: Fehler bei getCredential - Vom Nutzer abgebrochen.")
             SignInResult(success = false, error = "Sign-in was cancelled by the user.", exception = e)
-        } catch (e: NoCredentialException) { // Spezifisch, wenn keine Konten/Credentials gefunden wurden
+        } catch (e: NoCredentialException) {
             Timber.w(e, "CredentialAuthManager: Fehler bei getCredential - Keine Credentials auf dem Gerät gefunden.")
             SignInResult(success = false, error = "No accounts found on this device. Please add a Google account.", exception = e)
         }
-        catch (e: GetCredentialException) { // Allgemeinere GetCredentialException
+        catch (e: GetCredentialException) {
             Timber.e(e, "CredentialAuthManager: Fehler bei getCredential (Typ: ${e.type})")
             SignInResult(success = false, error = e.message ?: "Fehler bei der Anmeldung (${e.type})", exception = e)
-        } catch (e: Exception) { // Fallback für andere Exceptions
+        } catch (e: Exception) {
             Timber.e(e, "CredentialAuthManager: Allgemeiner Fehler bei der Anmeldung")
             SignInResult(success = false, error = e.message ?: "Allgemeiner Fehler bei der Anmeldung", exception = e)
         }
@@ -77,15 +68,12 @@ class CredentialAuthManager(private val context: Context) {
         val credential = response?.credential
         if (credential is GoogleIdTokenCredential) {
             try {
-                val userId = credential.id // Eindeutige Google ID des Nutzers
+                val userId = credential.id
                 val displayName = credential.displayName
-                // Die E-Mail ist oft die ID, wenn Scopes.EMAIL angefordert und genehmigt wurde.
-                // GoogleIdTokenCredential selbst hat kein direktes 'email'-Feld. Man müsste das idToken parsen.
-                // Für den Client ist es oft ausreichend, credential.id als primären Identifier (oft E-Mail) zu nutzen.
                 val emailCandidate = credential.id
                 Timber.d("CredentialAuthManager: UserInfo extrahiert: ID (oft Email)=${emailCandidate}, Name=$displayName")
                 return Triple(userId, displayName, emailCandidate)
-            } catch (e: Exception){ // Generische Exception, da GoogleIdTokenParsingException hier nicht direkt geworfen wird
+            } catch (e: Exception){
                 Timber.e(e, "CredentialAuthManager: Allgemeiner Fehler beim Extrahieren von UserInfo aus GoogleIdTokenCredential")
             }
         }

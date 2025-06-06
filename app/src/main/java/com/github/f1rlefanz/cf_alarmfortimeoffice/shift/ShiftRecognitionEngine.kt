@@ -1,9 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.shift
 
-import timber.log.Timber
-import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 
 class ShiftRecognitionEngine(
     private val shiftConfigRepository: ShiftConfigRepository
@@ -11,7 +8,6 @@ class ShiftRecognitionEngine(
     
     suspend fun findNextShiftAlarm(events: List<CalendarEvent>): ShiftMatch? {
         val now = LocalDateTime.now()
-        val shiftDefinitions = shiftConfigRepository.getShiftDefinitions()
         
         val matchingShifts = getAllMatchingShifts(events)
             .filter { it.calendarEvent.startTime.isAfter(now) }
@@ -59,11 +55,5 @@ class ShiftRecognitionEngine(
         } else {
             alarmDateTime
         }
-    }
-    
-    fun isValidShiftEvent(event: CalendarEvent): Boolean {
-        // Add logic to validate if an event is a valid shift event
-        return event.title.isNotBlank() && 
-               event.startTime.isAfter(LocalDateTime.now().minusDays(1))
     }
 }

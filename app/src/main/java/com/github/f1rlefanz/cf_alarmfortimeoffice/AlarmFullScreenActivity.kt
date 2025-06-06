@@ -1,6 +1,5 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice
 
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -24,9 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -44,8 +40,7 @@ class AlarmFullScreenActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         Timber.d("AlarmFullScreenActivity onCreate")
-        
-        // Zeige über Sperrbildschirm und schalte Bildschirm an
+
         setupWindowFlags()
         
         // Hole Alarm-Daten aus Intent
@@ -85,11 +80,11 @@ class AlarmFullScreenActivity : ComponentActivity() {
     private fun performHapticFeedback() {
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 vibratorManager.defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
-                getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
             }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -241,8 +236,7 @@ fun AlarmFullScreenContent(
             
             // Verbesserter Stopp-Button mit Hover-Effekt
             EnhancedStopButton(
-                onStopClicked = onStopClicked,
-                isDarkTheme = isDarkTheme
+                onStopClicked = onStopClicked
             )
         }
     }
@@ -439,8 +433,7 @@ private fun EnhancedShiftInfo(
 
 @Composable
 private fun EnhancedStopButton(
-    onStopClicked: () -> Unit,
-    isDarkTheme: Boolean
+    onStopClicked: () -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
     

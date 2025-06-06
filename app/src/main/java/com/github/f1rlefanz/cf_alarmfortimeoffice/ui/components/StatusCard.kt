@@ -1,8 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,12 +11,12 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun StatusCard(
+    modifier: Modifier = Modifier,
     title: String,
     subtitle: String? = null,
     icon: ImageVector,
     isPositive: Boolean = true,
-    actionButton: (@Composable () -> Unit)? = null,
-    modifier: Modifier = Modifier
+    actionButton: (@Composable () -> Unit)? = null
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),

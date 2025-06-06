@@ -1,6 +1,5 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,8 +29,8 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeT
 @Composable
 fun NoAlarmCard(
     reason: NoAlarmReason,
-    onActionClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onActionClick: (() -> Unit)? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "no_alarm")
     
@@ -165,10 +164,7 @@ sealed class NoAlarmReason(
     val color: Color,
     val actionText: String,
     val actionIcon: androidx.compose.ui.graphics.vector.ImageVector
-) {
-    @Composable
-    fun getColor(): Color = color
-}
+)
 
 class NoShiftFound : NoAlarmReason(
     title = "Keine Schicht gefunden",
@@ -195,15 +191,6 @@ class NoCalendarSelected : NoAlarmReason(
     color = Color(0xFF2196F3), // Blue
     actionText = "Kalender auswählen",
     actionIcon = Icons.Filled.Add
-)
-
-class CalendarPermissionMissing : NoAlarmReason(
-    title = "Kalenderzugriff fehlt",
-    description = "Die App benötigt Zugriff auf deine Kalender, um Schichten zu erkennen.",
-    icon = Icons.Outlined.Lock,
-    color = Color(0xFFF44336), // Red
-    actionText = "Berechtigung erteilen",
-    actionIcon = Icons.Filled.Security
 )
 
 class LoadingShifts : NoAlarmReason(

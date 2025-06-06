@@ -9,8 +9,4 @@ data class CalendarEvent(
     val endTime: LocalDateTime?,
     val description: String? = null,
     val calendarId: String = ""
-) {
-    fun getFormattedStartTime(): String {
-        return startTime.toString() // This can be formatted as needed
-    }
-}
+)

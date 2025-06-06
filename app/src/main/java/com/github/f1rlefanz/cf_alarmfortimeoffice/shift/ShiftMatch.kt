@@ -13,7 +13,4 @@ data class ShiftMatch(
     
     val formattedAlarmTime: String
         get() = calculatedAlarmTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
-        
-    val formattedShiftStartTime: String
-        get() = calendarEvent.startTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
 }
