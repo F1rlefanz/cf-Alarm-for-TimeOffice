@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
+import androidx.credentials.CustomCredential
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -66,18 +67,25 @@ class CredentialAuthManager(private val context: Context) {
 
     fun extractUserInfo(response: GetCredentialResponse?): Triple<String?, String?, String?> {
         val credential = response?.credential
-        if (credential is GoogleIdTokenCredential) {
+        
+        // Check if credential is of type Google ID using correct Credential Manager API
+        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
             try {
-                val userId = credential.id
-                val displayName = credential.displayName
-                val emailCandidate = credential.id
+                // Create Google ID Token using the recommended createFrom method
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                
+                val userId = googleIdTokenCredential.id
+                val displayName = googleIdTokenCredential.displayName
+                val emailCandidate = googleIdTokenCredential.id
+                
                 Timber.d("CredentialAuthManager: UserInfo extrahiert: ID (oft Email)=${emailCandidate}, Name=$displayName")
                 return Triple(userId, displayName, emailCandidate)
-            } catch (e: Exception){
-                Timber.e(e, "CredentialAuthManager: Allgemeiner Fehler beim Extrahieren von UserInfo aus GoogleIdTokenCredential")
+            } catch (e: Exception) {
+                Timber.e(e, "CredentialAuthManager: Fehler beim Erstellen von GoogleIdTokenCredential aus CustomCredential")
             }
         }
-        Timber.w("CredentialAuthManager: Konnte UserInfo nicht extrahieren, credential ist nicht vom Typ GoogleIdTokenCredential oder null.")
+        
+        Timber.w("CredentialAuthManager: Konnte UserInfo nicht extrahieren, credential ist nicht vom Typ Google ID Token oder null.")
         return Triple(null, null, null)
     }
 }
