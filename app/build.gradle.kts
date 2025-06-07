@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import org.gradle.api.JavaVersion
 
 plugins {
@@ -64,7 +66,7 @@ android {
         implementation(libs.androidx.material3)
         
         // Material Icons Extended for better icon support
-        implementation("androidx.compose.material:material-icons-extended:1.7.8")
+        implementation(libs.material.icons.extended)
         
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
@@ -88,8 +90,8 @@ android {
         implementation(libs.googleid)
 
         implementation(libs.androidx.datastore.preferences)
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+        implementation(libs.kotlinx.serialization.json)
+        coreLibraryDesugaring(libs.desugar.jdk.libs)
 
         implementation(libs.google.api.client.android)
         implementation(libs.google.api.services.calendar)
