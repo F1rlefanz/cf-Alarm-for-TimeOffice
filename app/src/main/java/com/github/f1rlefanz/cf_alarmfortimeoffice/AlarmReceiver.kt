@@ -13,6 +13,10 @@ import android.net.Uri
 import android.os.*
 
 import androidx.core.app.NotificationCompat
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.*
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import timber.log.Timber
 
 class AlarmReceiver : BroadcastReceiver() {
@@ -78,6 +82,9 @@ class AlarmReceiver : BroadcastReceiver() {
         
         // Starte Alarmton
         startAlarmSound(context)
+        
+        // Starte Hue-Aktionen
+        startHueActions(context, shiftName)
         
         // Zeige Vollbild-Activity
         showFullScreenAlarm(context, shiftName, alarmTime)
@@ -258,6 +265,59 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
                 notificationManager.createNotificationChannel(channel)
                 Timber.d("Alarm NotificationChannel erstellt")
+            }
+        }
+    }
+    
+    private fun startHueActions(context: Context, shiftName: String) {
+        Timber.d("Starte Hue-Aktionen für Schicht: $shiftName")
+        
+        // Starte Coroutine für Hue-Aktionen
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val configRepository = HueConfigRepository(context)
+                val configuration = configRepository.getConfiguration().first()
+                
+                if (configuration.bridgeIp == null || configuration.username == null) {
+                    Timber.d("Keine Hue Bridge konfiguriert")
+                    return@launch
+                }
+                
+                // Finde passende Regeln für diese Schicht
+                val matchingRules = configuration.rules.filter { rule ->
+                    rule.enabled && rule.shiftPattern.equals(shiftName, ignoreCase = true)
+                }
+                
+                if (matchingRules.isEmpty()) {
+                    Timber.d("Keine Hue-Regeln für Schicht $shiftName gefunden")
+                    return@launch
+                }
+                
+                // Initialisiere Repositories
+                val bridgeRepository = HueBridgeRepository()
+                bridgeRepository.connectToBridge(configuration.bridgeIp)
+                bridgeRepository.setUsername(configuration.username)
+                
+                val lightRepository = HueLightRepository(bridgeRepository)
+                
+                // Führe alle passenden Regeln aus
+                matchingRules.forEach { rule ->
+                    Timber.d("Führe Hue-Regel aus: ${rule.name}")
+                    
+                    // Finde Aktionen für Alarm-Zeit
+                    rule.timeRanges.forEach { timeRange ->
+                        if (timeRange.relativeTo == TimeReference.ALARM_TIME && timeRange.offsetMinutes == 0) {
+                            // Führe alle Aktionen dieser Zeitspanne aus
+                            timeRange.actions.forEach { action ->
+                                Timber.d("Führe Hue-Aktion aus: ${action.actionType} auf ${action.targetName ?: action.targetId}")
+                                lightRepository.executeLightAction(action)
+                            }
+                        }
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Timber.e(e, "Fehler beim Ausführen der Hue-Aktionen")
             }
         }
     }
