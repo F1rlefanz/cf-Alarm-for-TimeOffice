@@ -8,6 +8,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueConfiguration
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

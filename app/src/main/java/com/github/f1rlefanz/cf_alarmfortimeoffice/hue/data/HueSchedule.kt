@@ -1,7 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data
 
 import kotlinx.serialization.Serializable
-import java.time.LocalTime
 
 /**
  * Hue Schedule Rule for shift-based automation

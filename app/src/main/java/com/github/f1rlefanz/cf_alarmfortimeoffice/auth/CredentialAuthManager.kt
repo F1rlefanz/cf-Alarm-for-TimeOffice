@@ -74,12 +74,14 @@ class CredentialAuthManager(private val context: Context) {
                 // Create Google ID Token using the recommended createFrom method
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 
-                val userId = googleIdTokenCredential.id
+                // Note: googleIdTokenCredential.id actually contains the email address
+                val email = googleIdTokenCredential.id
                 val displayName = googleIdTokenCredential.displayName
-                val emailCandidate = googleIdTokenCredential.id
+                // For userId, we use email as fallback since there's no separate ID field
+                val userId = email
                 
-                Timber.d("CredentialAuthManager: UserInfo extrahiert: ID (oft Email)=${emailCandidate}, Name=$displayName")
-                return Triple(userId, displayName, emailCandidate)
+                Timber.d("CredentialAuthManager: UserInfo extrahiert: Email=$email, Name=$displayName")
+                return Triple(userId, displayName, email)
             } catch (e: Exception) {
                 Timber.e(e, "CredentialAuthManager: Fehler beim Erstellen von GoogleIdTokenCredential aus CustomCredential")
             }

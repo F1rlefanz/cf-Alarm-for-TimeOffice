@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
@@ -41,17 +43,43 @@ class ShiftConfigRepository(private val context: Context) {
     val shiftDefinitions: Flow<List<ShiftDefinition>> = context.shiftDataStore.data.map { preferences ->
         try {
             val jsonString = preferences[shiftDefinitionsKey]
-            if (jsonString != null) {
-                json.decodeFromString<List<ShiftDefinition>>(jsonString)
+            val definitions = if (!jsonString.isNullOrEmpty()) {
+                try {
+                    json.decodeFromString<List<ShiftDefinition>>(jsonString)
+                } catch (e: Exception) {
+                    Timber.e(e, "Error decoding shift definitions, using defaults")
+                    emptyList()
+                }
             } else {
-                // Return default definitions if none saved
-                DefaultShiftDefinitions.predefined
+                emptyList()
             }
+            
+            // Always ensure we have the default definitions
+            val result = if (definitions.isEmpty()) {
+                Timber.d("No valid shift definitions found, using defaults")
+                DefaultShiftDefinitions.predefined
+            } else {
+                // Merge with defaults to ensure all predefined shifts are present
+                val existingIds = definitions.map { it.id }.toSet()
+                val missingDefaults = DefaultShiftDefinitions.predefined.filter { it.id !in existingIds }
+                if (missingDefaults.isNotEmpty()) {
+                    Timber.d("Adding ${missingDefaults.size} missing default definitions")
+                    definitions + missingDefaults
+                } else {
+                    definitions
+                }
+            }
+            
+            Timber.d("Returning ${result.size} shift definitions")
+            result
         } catch (e: Exception) {
-            Timber.e(e, "Error loading shift definitions, returning defaults")
+            Timber.e(e, "Critical error loading shift definitions, returning defaults")
             DefaultShiftDefinitions.predefined
         }
-    }
+    }.catch { e ->
+        Timber.e(e, "Flow error in shift definitions, emitting defaults")
+        emit(DefaultShiftDefinitions.predefined)
+    }.distinctUntilChanged()
     
     // Synchronous getter for immediate access
     suspend fun getShiftDefinitions(): List<ShiftDefinition> {

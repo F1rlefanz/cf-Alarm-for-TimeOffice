@@ -18,6 +18,9 @@ class HueViewModel(application: Application) : AndroidViewModel(application) {
     private val configRepository = HueConfigRepository(application)
     private val lightRepository = HueLightRepository(bridgeRepository)
     
+    // Job for discovery cancellation
+    private var discoveryJob: kotlinx.coroutines.Job? = null
+    
     // UI State
     private val _uiState = MutableStateFlow(HueUiState())
     val uiState: StateFlow<HueUiState> = _uiState.asStateFlow()
@@ -49,11 +52,28 @@ class HueViewModel(application: Application) : AndroidViewModel(application) {
      * Start bridge discovery
      */
     fun discoverBridges() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+        Timber.d("HueViewModel: discoverBridges() aufgerufen")
+        
+        // Cancel any existing discovery
+        discoveryJob?.cancel()
+        
+        discoveryJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, discoveryStatus = DiscoveryStatus()) }
             
+            // Collect discovery status updates
+            launch {
+                bridgeRepository.discoveryStatus.collect { status ->
+                    _uiState.update { it.copy(discoveryStatus = status) }
+                }
+            }
+            
+            Timber.d("HueViewModel: Starte Bridge-Discovery über Repository...")
             bridgeRepository.discoverBridges()
                 .onSuccess { bridges ->
+                    Timber.i("HueViewModel: Bridge-Discovery erfolgreich - ${bridges.size} Bridges gefunden")
+                    bridges.forEachIndexed { index, bridge ->
+                        Timber.d("HueViewModel: Bridge [$index]: ID='${bridge.id}', IP='${bridge.internalipaddress}'")
+                    }
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
@@ -62,6 +82,7 @@ class HueViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 .onFailure { error ->
+                    Timber.e(error, "HueViewModel: Bridge-Discovery fehlgeschlagen")
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
@@ -73,15 +94,67 @@ class HueViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
+     * Stop bridge discovery
+     */
+    fun stopDiscovery() {
+        Timber.d("HueViewModel: stopDiscovery() aufgerufen")
+        discoveryJob?.cancel()
+        _uiState.update { 
+            it.copy(
+                isLoading = false,
+                error = "Suche abgebrochen"
+            )
+        }
+    }
+    
+    /**
      * Connect to a bridge
      */
     fun connectToBridge(bridgeIp: String) {
-        bridgeRepository.connectToBridge(bridgeIp)
-        _uiState.update { 
-            it.copy(
-                currentBridgeIp = bridgeIp,
-                setupStep = SetupStep.LINK_BUTTON
-            )
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            // First check if we already have credentials for this bridge
+            val config = configuration.value
+            if (config.bridgeIp == bridgeIp && config.username != null) {
+                // Already have credentials, try to connect directly
+                bridgeRepository.connectToBridge(bridgeIp)
+                bridgeRepository.setUsername(config.username)
+                
+                // Verify connection by getting bridge config
+                bridgeRepository.getBridgeConfig()
+                    .onSuccess {
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false,
+                                isConnected = true,
+                                setupStep = SetupStep.COMPLETE,
+                                currentBridgeIp = bridgeIp
+                            )
+                        }
+                        refreshLightsAndGroups()
+                    }
+                    .onFailure {
+                        // Credentials might be invalid, need to re-authenticate
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false,
+                                currentBridgeIp = bridgeIp,
+                                setupStep = SetupStep.LINK_BUTTON
+                            )
+                        }
+                    }
+            } else {
+                // New bridge or no credentials, need to authenticate
+                bridgeRepository.connectToBridge(bridgeIp)
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        currentBridgeIp = bridgeIp,
+                        setupStep = SetupStep.LINK_BUTTON
+                    )
+                }
+            }
         }
     }
     
@@ -92,7 +165,7 @@ class HueViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            bridgeRepository.createUser("CFAlarmForTimeOffice", android.os.Build.MODEL)
+            bridgeRepository.createUser()
                 .onSuccess { username ->
                     // Get bridge config to save ID
                     bridgeRepository.getBridgeConfig()
@@ -222,7 +295,8 @@ data class HueUiState(
     val currentBridgeIp: String? = null,
     val discoveredBridges: List<BridgeDiscoveryResponse> = emptyList(),
     val lights: Map<String, HueLight> = emptyMap(),
-    val groups: Map<String, HueGroup> = emptyMap()
+    val groups: Map<String, HueGroup> = emptyMap(),
+    val discoveryStatus: DiscoveryStatus = DiscoveryStatus()
 )
 
 /**

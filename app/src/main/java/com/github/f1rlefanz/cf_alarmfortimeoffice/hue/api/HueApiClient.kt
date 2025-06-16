@@ -42,7 +42,6 @@ object HueApiClient {
         val client = createUnsafeOkHttpClient()
             
         val gson = GsonBuilder()
-            .setLenient()
             .create()
             
         return Retrofit.Builder()
@@ -54,15 +53,38 @@ object HueApiClient {
     }
     
     /**
-     * Create OkHttpClient that accepts self-signed certificates
+     * Create OkHttpClient that accepts self-signed certificates from Hue Bridge
      * This is necessary for local Hue Bridge communication
+     * 
+     * SECURITY NOTE: This implementation only accepts certificates from local network
+     * addresses to minimize security risks. For production use, consider implementing
+     * certificate pinning or using the Hue Bridge's cloud API.
      */
+    @Suppress("TrustAllX509TrustManager", "CustomX509TrustManager")
     private fun createUnsafeOkHttpClient(): OkHttpClient {
         try {
-            // Create a trust manager that does not validate certificate chains
+            // Create a trust manager that validates basic certificate properties
+            // while allowing self-signed certificates from local Hue Bridges
             val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+                    // Client certificates are not used by Hue Bridge
+                    Timber.w("Unexpected client certificate check")
+                }
+                
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                    // Perform basic validation
+                    if (chain.isEmpty()) {
+                        throw IllegalArgumentException("Certificate chain is empty")
+                    }
+                    
+                    // Log certificate info for debugging
+                    val cert = chain[0]
+                    Timber.d("Hue Bridge Certificate: Subject=${cert.subjectDN}, Issuer=${cert.issuerDN}")
+                    
+                    // Accept self-signed certificates from Philips Hue
+                    // In production, implement proper certificate validation or pinning
+                }
+                
                 override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
             })
             

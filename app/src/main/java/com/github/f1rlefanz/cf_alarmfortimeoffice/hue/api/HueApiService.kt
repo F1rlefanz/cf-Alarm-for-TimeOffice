@@ -84,8 +84,15 @@ data class CreateUserResponse(
 
 /**
  * Hue Bridge Discovery API
+ * Note: The /api/nupnp endpoint has been deprecated. 
+ * Alternative: Use mDNS discovery or manual IP entry
  */
 interface HueBridgeDiscoveryService {
+    // Original endpoint - may return 404
     @GET("api/nupnp")
     suspend fun discoverBridges(): Response<List<BridgeDiscoveryResponse>>
+    
+    // Alternative endpoint without /api prefix
+    @GET("nupnp")
+    suspend fun discoverBridgesAlternative(): Response<List<BridgeDiscoveryResponse>>
 }

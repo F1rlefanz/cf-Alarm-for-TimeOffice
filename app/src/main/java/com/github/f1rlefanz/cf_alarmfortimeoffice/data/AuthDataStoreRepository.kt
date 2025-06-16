@@ -18,6 +18,9 @@ class AuthDataStoreRepository(private val context: Context) {
     private val userIdKey = stringPreferencesKey("user_id")
     private val userEmailKey = stringPreferencesKey("user_email")
     private val calendarIdKey = stringPreferencesKey("calendar_id")
+    private val accessTokenKey = stringPreferencesKey("access_token")
+    private val tokenExpiryKey = stringPreferencesKey("token_expiry")
+    private val selectedCalendarsKey = stringPreferencesKey("selected_calendars")
 
     // Funktionen zum Speichern
     suspend fun saveLoginStatus(isLoggedIn: Boolean) {
@@ -34,13 +37,31 @@ class AuthDataStoreRepository(private val context: Context) {
 
     suspend fun saveUserEmail(userEmail: String?) {
         context.dataStore.edit { preferences ->
-            preferences[userEmailKey] = userEmail ?: "" // Sicherstellen, dass es nicht null ist
+            preferences[userEmailKey] = userEmail ?: ""
         }
     }
 
     suspend fun saveCalendarId(calendarId: String) {
         context.dataStore.edit { preferences ->
             preferences[calendarIdKey] = calendarId
+        }
+    }
+
+    suspend fun saveAccessToken(accessToken: String?) {
+        context.dataStore.edit { preferences ->
+            preferences[accessTokenKey] = accessToken ?: ""
+        }
+    }
+
+    suspend fun saveTokenExpiry(expiryTime: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[tokenExpiryKey] = expiryTime.toString()
+        }
+    }
+
+    suspend fun saveSelectedCalendars(calendarIds: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[selectedCalendarsKey] = calendarIds.joinToString(",")
         }
     }
 
@@ -59,6 +80,19 @@ class AuthDataStoreRepository(private val context: Context) {
 
     val calendarId: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[calendarIdKey] ?: ""
+    }
+
+    val accessToken: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[accessTokenKey] ?: ""
+    }
+
+    val tokenExpiry: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[tokenExpiryKey]?.toLongOrNull() ?: 0L
+    }
+
+    val selectedCalendars: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        val calendarsString = preferences[selectedCalendarsKey] ?: ""
+        if (calendarsString.isEmpty()) emptySet() else calendarsString.split(",").toSet()
     }
 
     // Funktion zum Löschen der Daten beim Logout

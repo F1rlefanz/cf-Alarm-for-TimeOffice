@@ -19,6 +19,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftRecognitionEngine
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.DefaultShiftDefinitions
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
@@ -34,6 +35,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+data class Sextuple<A, B, C, D, E, F>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E, val sixth: F)
 
 data class AuthState(
     val isLoading: Boolean = false,
@@ -79,18 +82,48 @@ class AuthViewModel(
     val temporarilySelectedCalendarId: StateFlow<String> = _temporarilySelectedCalendarId.asStateFlow()
 
     val persistedCalendarId: Flow<String> = authDataStoreRepository.calendarId
+    
+    private val _shouldShowCalendarSelection = MutableStateFlow(false)
+    val shouldShowCalendarSelection: StateFlow<Boolean> = _shouldShowCalendarSelection.asStateFlow()
+
+    fun clearCalendarSelectionFlag() {
+        _shouldShowCalendarSelection.value = false
+    }
+    
+    private val _needsCalendarScopeRequest = MutableStateFlow(false)
+    val needsCalendarScopeRequest: StateFlow<Boolean> = _needsCalendarScopeRequest.asStateFlow()
+    
+    fun clearCalendarScopeRequestFlag() {
+        _needsCalendarScopeRequest.value = false
+    }
 
     // Die String-Konstante des Scopes, den wir suchen
     private val targetCalendarScopeString = CalendarScopes.CALENDAR_READONLY
 
     init {
         Timber.d("AuthViewModel init")
+        
+        // Setze initial die Default-Schichtdefinitionen synchron
+        _authState.update { it.copy(
+            shiftDefinitions = DefaultShiftDefinitions.predefined,
+            shiftConfigLoading = true
+        )}
+        
         viewModelScope.launch {
+            // Initialize shift definitions if empty
+            launch {
+                val currentDefinitions = shiftConfigRepository.getShiftDefinitions()
+                if (currentDefinitions.isEmpty()) {
+                    Timber.d("No shift definitions found, initializing with defaults")
+                    shiftConfigRepository.saveShiftDefinitions(DefaultShiftDefinitions.predefined)
+                }
+            }
+            
             // Beobachte Schicht-Konfiguration
             launch {
                 combine(
-                    shiftConfigRepository.shiftDefinitions,
-                    shiftConfigRepository.autoAlarmEnabled
+                    shiftConfigRepository.shiftDefinitions.distinctUntilChanged(),
+                    shiftConfigRepository.autoAlarmEnabled.distinctUntilChanged()
                 ) { definitions, autoEnabled ->
                     Pair(definitions, autoEnabled)
                 }.collectLatest { (definitions, autoEnabled) ->
@@ -100,8 +133,9 @@ class AuthViewModel(
                     }
                     _authState.update { currentState ->
                         currentState.copy(
-                            shiftDefinitions = definitions,
-                            autoAlarmEnabled = autoEnabled
+                            shiftDefinitions = definitions.ifEmpty { DefaultShiftDefinitions.predefined },
+                            autoAlarmEnabled = autoEnabled,
+                            shiftConfigLoading = false
                         )
                     }
                 }
@@ -114,22 +148,35 @@ class AuthViewModel(
                 .combine(authDataStoreRepository.calendarId) { loginEmailUserIdPair, calIdDs ->
                     Quadruple(loginEmailUserIdPair.first, loginEmailUserIdPair.second, loginEmailUserIdPair.third, calIdDs)
                 }
-                .collectLatest { (isLoggedInDataStore, emailFromDataStore, userIdFromDataStore, persistedCalIdFromDataStore) ->
-                    Timber.d("AuthViewModel init collect: isLoggedIn=$isLoggedInDataStore, email='$emailFromDataStore', userId='$userIdFromDataStore', calId='$persistedCalIdFromDataStore'")
+                .combine(authDataStoreRepository.accessToken) { quadruple, token ->
+                    Quintuple(quadruple.first, quadruple.second, quadruple.third, quadruple.fourth, token)
+                }
+                .combine(authDataStoreRepository.tokenExpiry) { quintuple, expiry ->
+                    Sextuple(quintuple.first, quintuple.second, quintuple.third, quintuple.fourth, quintuple.fifth, expiry)
+                }
+                .collectLatest { (isLoggedInDataStore, emailFromDataStore, userIdFromDataStore, persistedCalIdFromDataStore, storedAccessToken, tokenExpiry) ->
+                    Timber.d("AuthViewModel init collect: isLoggedIn=$isLoggedInDataStore, email='$emailFromDataStore', userId='$userIdFromDataStore', calId='$persistedCalIdFromDataStore', hasToken=${storedAccessToken.isNotBlank()}")
                     _authState.update { currentState ->
+                        // Check if token is still valid
+                        val isTokenValid = storedAccessToken.isNotBlank() && 
+                            tokenExpiry > System.currentTimeMillis()
+                        
                         val newState = if (isLoggedInDataStore) {
                             if (emailFromDataStore.isNotBlank()) {
                                 currentState.copy(
                                     isLoading = false, isSignedIn = true,
                                     userName = userIdFromDataStore.ifBlank { emailFromDataStore },
-                                    userEmailOrId = emailFromDataStore, error = null
+                                    userEmailOrId = emailFromDataStore, 
+                                    error = null,
+                                    accessToken = if (isTokenValid) storedAccessToken else null
                                 )
                             } else {
                                 currentState.copy(
                                     isLoading = false, isSignedIn = true,
                                     userName = if (currentState.userName.isNullOrBlank() && userIdFromDataStore.isNotBlank()) userIdFromDataStore else currentState.userName,
                                     userEmailOrId = if (currentState.userEmailOrId.isNullOrBlank() && emailFromDataStore.isNotBlank()) emailFromDataStore else currentState.userEmailOrId,
-                                    error = if (currentState.userEmailOrId.isNullOrBlank() && emailFromDataStore.isBlank() && currentState.error == null) "E-Mail-Verarbeitung nach Login..." else currentState.error
+                                    error = if (currentState.userEmailOrId.isNullOrBlank() && emailFromDataStore.isBlank() && currentState.error == null) "E-Mail-Verarbeitung nach Login..." else currentState.error,
+                                    accessToken = if (isTokenValid) storedAccessToken else null
                                 )
                             }
                         } else {
@@ -138,6 +185,20 @@ class AuthViewModel(
                         if (persistedCalIdFromDataStore.isNotBlank() && _temporarilySelectedCalendarId.value != persistedCalIdFromDataStore) {
                             _temporarilySelectedCalendarId.value = persistedCalIdFromDataStore
                         }
+                        
+                        // Auto-load calendar events if signed in and calendar is selected
+                        if (newState.isSignedIn && persistedCalIdFromDataStore.isNotBlank() && !newState.calendarEventsLoaded) {
+                            Timber.d("AuthViewModel: Auto-loading calendar events on startup for calendar: $persistedCalIdFromDataStore")
+                            // Delay to ensure all initialization is complete
+                            viewModelScope.launch {
+                                kotlinx.coroutines.delay(500)
+                                // Need to get calendar permissions first
+                                if (newState.androidCalendarPermissionGranted && newState.accessToken != null) {
+                                    loadCalendarEvents(persistedCalIdFromDataStore)
+                                }
+                            }
+                        }
+                        
                         newState
                     }
                 }
@@ -157,9 +218,29 @@ class AuthViewModel(
         }
         if (isGranted && _authState.value.isSignedIn && !_authState.value.userEmailOrId.isNullOrBlank()) {
             if (_authState.value.accessToken.isNullOrBlank()) {
-                Timber.i("Android Berechtigung erteilt, AccessToken fehlt. UI sollte AuthorizationClient-Flow starten (via triggerCalendarAccess).")
+                Timber.i("Android Berechtigung erteilt, AccessToken fehlt. Triggere Google API Authorization automatisch...")
+                // Clear the flag first
+                _needsCalendarScopeRequest.value = false
+                // Continue with calendar access flow automatically
+                viewModelScope.launch {
+                    // Small delay to ensure UI state is updated
+                    kotlinx.coroutines.delay(100)
+                    // This will trigger the Google API authorization
+                    _needsCalendarScopeRequest.value = true
+                }
             } else {
                 loadCalendarsUsingToken()
+                // Check if calendar is already selected
+                viewModelScope.launch {
+                    val selectedCalendarId = persistedCalendarId.first()
+                    if (selectedCalendarId.isNotBlank()) {
+                        // Load events for already selected calendar
+                        loadCalendarEvents(selectedCalendarId)
+                    } else {
+                        // Show calendar selection
+                        _shouldShowCalendarSelection.value = true
+                    }
+                }
             }
         } else if (!isGranted) {
             Timber.w("Android Kalenderberechtigung nicht erteilt.")
@@ -169,6 +250,7 @@ class AuthViewModel(
 
     fun triggerCalendarAccess(activity: MainActivity) {
         viewModelScope.launch {
+            Timber.d("AuthViewModel: triggerCalendarAccess aufgerufen")
             if (!_authState.value.isSignedIn || _authState.value.userEmailOrId.isNullOrBlank()) {
                 Timber.w("AuthViewModel: Kalenderzugriff nicht möglich, Nutzer nicht eingeloggt oder E-Mail fehlt.")
                 _authState.update { it.copy(error = "Bitte zuerst anmelden, um Kalender zu laden.") }
@@ -184,6 +266,19 @@ class AuthViewModel(
             } else {
                 Timber.d("AuthViewModel triggerCalendarAccess: Android-Berechtigung und AccessToken vorhanden. Lade Kalender.")
                 loadCalendarsUsingToken()
+                // Show calendar selection after authorization
+                _shouldShowCalendarSelection.value = true
+            }
+        }
+    }
+    
+    // New method for automatic flow after permission grant
+    fun continueCalendarAccessAfterPermission(activity: MainActivity) {
+        viewModelScope.launch {
+            Timber.d("AuthViewModel: continueCalendarAccessAfterPermission aufgerufen")
+            if (_authState.value.androidCalendarPermissionGranted && _authState.value.accessToken.isNullOrBlank()) {
+                Timber.d("AuthViewModel: Android-Berechtigung vorhanden, AccessToken fehlt. Starte Google API Authorization...")
+                requestCalendarScopes(activity)
             }
         }
     }
@@ -223,7 +318,15 @@ class AuthViewModel(
             } else if (authResult.accessToken != null) {
                 Timber.i("AuthorizationClient: Zugriffstoken direkt erhalten: ${authResult.accessToken?.take(10)}...")
                 _authState.update { currentState -> currentState.copy(accessToken = authResult.accessToken, calendarsLoading = false, error = null, calendarPermissionDenied = false) }
+                // Save access token to persistent storage
+                viewModelScope.launch {
+                    authDataStoreRepository.saveAccessToken(authResult.accessToken)
+                    // Token expires in 1 hour (3600 seconds)
+                    authDataStoreRepository.saveTokenExpiry(System.currentTimeMillis() + 3600000)
+                }
                 loadCalendarsUsingToken()
+                // Show calendar selection after authorization
+                _shouldShowCalendarSelection.value = true
             } else if (checkCalendarScopeGranted(authResult.grantedScopes)) { // Verwendung der spezialisierten Methode
                 Timber.w("AuthorizationClient: Scopes erteilt, aber kein direkter AccessToken.")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Kalenderberechtigung erteilt, aber Token-Abruf benötigt weitere Schritte.") }
@@ -259,7 +362,23 @@ class AuthViewModel(
             if (authResult.accessToken != null) {
                 Timber.i("AuthorizationClient: Zugriffstoken nach Intent-Auflösung erhalten: ${authResult.accessToken?.take(10)}...")
                 _authState.update { currentState -> currentState.copy(accessToken = authResult.accessToken, error = null, calendarPermissionDenied = false, calendarsLoading = false) }
+                // Save access token to persistent storage
+                viewModelScope.launch {
+                    authDataStoreRepository.saveAccessToken(authResult.accessToken)
+                    // Token expires in 1 hour (3600 seconds)
+                    authDataStoreRepository.saveTokenExpiry(System.currentTimeMillis() + 3600000)
+                }
                 loadCalendarsUsingToken()
+                // Show calendar selection after authorization if needed
+                viewModelScope.launch {
+                    val selectedCalendarId = persistedCalendarId.first()
+                    if (selectedCalendarId.isBlank()) {
+                        _shouldShowCalendarSelection.value = true
+                    } else {
+                        // Auto-load events for already selected calendar
+                        loadCalendarEvents(selectedCalendarId)
+                    }
+                }
             } else if (checkCalendarScopeGranted(authResult.grantedScopes)) { // Verwendung der spezialisierten Methode
                 Timber.w("AuthorizationClient: Scopes nach Intent erteilt, aber kein direkter AccessToken.")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Kalenderberechtigung erteilt, aber Token-Abruf benötigt weitere Schritte.") }
@@ -291,25 +410,40 @@ class AuthViewModel(
         }
 
         Timber.d("loadCalendarsUsingToken: Lade Kalender mit Access Token (erste 10 Zeichen: ${token.take(10)})...")
+        Timber.d("loadCalendarsUsingToken: Aktuelle Berechtigungen - Android Calendar: ${_authState.value.androidCalendarPermissionGranted}")
         _authState.update { it.copy(calendarsLoading = true, error = null, calendarPermissionDenied = false) }
         viewModelScope.launch {
             try {
+                Timber.d("loadCalendarsUsingToken: Rufe CalendarRepository.getCalendarsWithToken() auf...")
                 val fetchedCalendars = calendarRepository.getCalendarsWithToken(token)
                 _calendars.value = fetchedCalendars
                 Timber.i("loadCalendarsUsingToken: ${fetchedCalendars.size} Kalender geladen.")
-                if (fetchedCalendars.isEmpty() && _authState.value.isSignedIn && !_authState.value.calendarPermissionDenied) {
-                    Timber.w("loadCalendarsUsingToken: Keine Kalender gefunden (API-Call ok, aber Liste leer).")
+                fetchedCalendars.forEachIndexed { index, calendar ->
+                    Timber.d("loadCalendarsUsingToken: [$index] ID: '${calendar.id}', Name: '${calendar.displayName}'")
                 }
-                _authState.update { it.copy(calendarsLoading = false) }
+                if (fetchedCalendars.isEmpty() && _authState.value.isSignedIn && !_authState.value.calendarPermissionDenied) {
+                    Timber.w("loadCalendarsUsingToken: Keine Kalender gefunden (API-Call ok, aber Liste leer). Mögliche Ursachen: 1) Keine Kalender im Google Account 2) Unzureichende Berechtigungen 3) API-Filter zu strikt")
+                    _authState.update { it.copy(calendarsLoading = false, error = "Keine Kalender in Ihrem Google-Account gefunden oder Zugriff nicht vollständig gewährt.") }
+                } else {
+                    _authState.update { it.copy(calendarsLoading = false) }
+                }
+                
+                // Show calendar selection if no calendar is selected yet
+                val selectedCalendarId = persistedCalendarId.first()
+                Timber.d("loadCalendarsUsingToken: Gespeicherte Kalender-ID: '$selectedCalendarId'")
+                if (selectedCalendarId.isBlank() && fetchedCalendars.isNotEmpty()) {
+                    Timber.d("loadCalendarsUsingToken: Keine Kalender-ID gespeichert, zeige Kalenderauswahl")
+                    _shouldShowCalendarSelection.value = true
+                }
                 
                 // Load calendar events if a calendar is already selected
-                val selectedCalendarId = persistedCalendarId.first()
                 if (selectedCalendarId.isNotBlank()) {
+                    Timber.d("loadCalendarsUsingToken: Lade Ereignisse für gespeicherten Kalender: '$selectedCalendarId'")
                     loadCalendarEvents(selectedCalendarId)
                 }
                 
             } catch (e: com.google.api.client.googleapis.json.GoogleJsonResponseException) {
-                Timber.e(e, "loadCalendarsUsingToken: GoogleJsonResponseException. Status: ${e.statusCode}")
+                Timber.e(e, "loadCalendarsUsingToken: GoogleJsonResponseException. Status: ${e.statusCode}, Message: '${e.statusMessage}', Details: ${e.details}")
                 if (e.statusCode == 401 || e.statusCode == 403) {
                     Timber.w("Access Token möglicherweise ungültig/abgelaufen oder Scopes nicht ausreichend. Lösche Token.")
                     clearAccessToken()
@@ -320,7 +454,7 @@ class AuthViewModel(
                 _calendars.value = emptyList()
             }
             catch (e: Exception) {
-                Timber.e(e, "loadCalendarsUsingToken: Allgemeiner Fehler beim Abrufen der Kalender.")
+                Timber.e(e, "loadCalendarsUsingToken: Allgemeiner Fehler beim Abrufen der Kalender. Exception-Type: ${e.javaClass.simpleName}")
                 _authState.update { currentState -> currentState.copy(calendarsLoading = false, error = "Unbekannter Fehler beim Laden der Kalender: ${e.localizedMessage}", calendarPermissionDenied = true) }
                 _calendars.value = emptyList()
             }
@@ -426,6 +560,8 @@ class AuthViewModel(
             val idToSave = _temporarilySelectedCalendarId.value
             if (idToSave.isNotBlank()) {
                 authDataStoreRepository.saveCalendarId(idToSave)
+                // Save selected calendars as a set (for now just one)
+                authDataStoreRepository.saveSelectedCalendars(setOf(idToSave))
                 Timber.i("AuthViewModel: Kalender-ID '$idToSave' persistent gespeichert.")
                 
                 // Load calendar events for the selected calendar
@@ -674,6 +810,60 @@ class AuthViewModel(
             setAlarmFromShiftMatch()
         } else if (!currentState.autoAlarmEnabled) {
             cancelSystemAlarm()
+        }
+    }
+    
+    // Method to trigger automatic calendar loading after permissions check
+    fun checkAndLoadCalendarOnStartup() {
+        viewModelScope.launch {
+            val currentState = _authState.value
+            val selectedCalendarId = persistedCalendarId.first()
+            
+            // Check Android permission status
+            val hasAndroidPermission = getApplication<Application>().checkSelfPermission(
+                android.Manifest.permission.READ_CALENDAR
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            
+            // Update state with correct permission status
+            _authState.update { it.copy(androidCalendarPermissionGranted = hasAndroidPermission) }
+            
+            Timber.d("checkAndLoadCalendarOnStartup: isSignedIn=${currentState.isSignedIn}, calendarId=$selectedCalendarId, accessToken=${currentState.accessToken != null}, androidPermission=$hasAndroidPermission")
+            
+            if (currentState.isSignedIn && selectedCalendarId.isNotBlank()) {
+                // Delay to ensure UI is ready
+                kotlinx.coroutines.delay(1000)
+                
+                if (hasAndroidPermission && currentState.accessToken != null) {
+                    // We have everything, just load the events
+                    Timber.d("All permissions available, loading calendar events")
+                    loadCalendarEvents(selectedCalendarId)
+                } else if (hasAndroidPermission && currentState.accessToken == null) {
+                    // Have Android permission but no Google token, need to request it
+                    Timber.d("Have Android permission but no access token, triggering calendar scope request")
+                    _needsCalendarScopeRequest.value = true
+                } else {
+                    // Need Android permission first
+                    Timber.d("Need Android calendar permission first")
+                    // This will be handled by the UI - the user needs to grant permission manually
+                }
+            }
+        }
+    }
+    
+    // Manual refresh of calendar events
+    fun refreshCalendarEvents() {
+        viewModelScope.launch {
+            val selectedCalendarId = persistedCalendarId.first()
+            if (selectedCalendarId.isNotBlank() && _authState.value.accessToken != null) {
+                Timber.d("Manual refresh of calendar events for: $selectedCalendarId")
+                loadCalendarEvents(selectedCalendarId)
+            } else if (selectedCalendarId.isBlank()) {
+                Timber.w("No calendar selected for refresh")
+                _authState.update { it.copy(error = "Bitte wählen Sie zuerst einen Kalender aus") }
+            } else if (_authState.value.accessToken == null) {
+                Timber.w("No access token for calendar refresh")
+                _authState.update { it.copy(error = "Keine Kalenderberechtigung. Bitte erneut autorisieren.") }
+            }
         }
     }
     

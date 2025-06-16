@@ -1,8 +1,10 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository
 
+import androidx.core.graphics.toColorInt
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.*
 import kotlinx.coroutines.delay
 import timber.log.Timber
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -149,7 +151,7 @@ class HueLightRepository(
      * Convert RGB to Hue color values
      */
     fun rgbToHue(rgb: String): HueColor {
-        val color = android.graphics.Color.parseColor(rgb)
+        val color = rgb.toColorInt()
         val r = android.graphics.Color.red(color) / 255f
         val g = android.graphics.Color.green(color) / 255f
         val b = android.graphics.Color.blue(color) / 255f
@@ -184,34 +186,34 @@ class HueLightRepository(
     private fun rgbToXY(r: Float, g: Float, b: Float): List<Float> {
         // Apply gamma correction
         val red = if (r > 0.04045f) {
-            Math.pow(((r + 0.055) / 1.055).toDouble(), 2.4).toFloat()
+            ((r + 0.055) / 1.055).pow(2.4).toFloat()
         } else {
             (r / 12.92f)
         }
         
         val green = if (g > 0.04045f) {
-            Math.pow(((g + 0.055) / 1.055).toDouble(), 2.4).toFloat()
+            ((g + 0.055) / 1.055).pow(2.4).toFloat()
         } else {
             (g / 12.92f)
         }
         
         val blue = if (b > 0.04045f) {
-            Math.pow(((b + 0.055) / 1.055).toDouble(), 2.4).toFloat()
+            ((b + 0.055) / 1.055).pow(2.4).toFloat()
         } else {
             (b / 12.92f)
         }
         
         // Convert to XYZ
-        val X = red * 0.649926f + green * 0.103455f + blue * 0.197109f
-        val Y = red * 0.234327f + green * 0.743075f + blue * 0.022598f
-        val Z = red * 0.0000000f + green * 0.053077f + blue * 1.035763f
+        val x = red * 0.649926f + green * 0.103455f + blue * 0.197109f
+        val y = red * 0.234327f + green * 0.743075f + blue * 0.022598f
+        val z = red * 0.0000000f + green * 0.053077f + blue * 1.035763f
         
         // Convert to xy
-        val sum = X + Y + Z
+        val sum = x + y + z
         return if (sum == 0f) {
             listOf(0f, 0f)
         } else {
-            listOf(X / sum, Y / sum)
+            listOf(x / sum, y / sum)
         }
     }
 }

@@ -82,6 +82,7 @@ android {
 
         // ViewModel
         implementation(libs.androidx.lifecycle.viewmodel.ktx)
+        implementation(libs.androidx.lifecycle.viewmodel.compose)
 
         // Google Sign-In
         implementation(libs.play.services.auth)
@@ -100,11 +101,11 @@ android {
         implementation(libs.gson)
 
         // Philips Hue Integration
-        implementation("com.squareup.retrofit2:retrofit:2.11.0")
-        implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-        implementation("com.squareup.okhttp3:okhttp:4.12.0")
-        implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+        implementation(libs.retrofit)
+        implementation(libs.converter.gson)
+        implementation(libs.okhttp)
+        implementation(libs.logging.interceptor)
+        implementation(libs.kotlinx.coroutines.android)
 
     }
 }

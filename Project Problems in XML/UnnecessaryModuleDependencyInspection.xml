@@ -1,0 +1,26 @@
+<problems>
+<problem>
+  <file>CF-Alarm_for_TimeOffice.app.unitTest</file>
+  <module>CF-Alarm_for_TimeOffice.app.unitTest</module>
+  <entry_point TYPE="module" FQNAME="CF-Alarm_for_TimeOffice.app.unitTest" />
+  <problem_class id="UnnecessaryModuleDependencyInspection" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unnecessary module dependency</problem_class>
+  <hints>
+    <hint value="CF-Alarm_for_TimeOffice.app.main" />
+  </hints>
+  <description>Module 'CF-Alarm_for_TimeOffice.app.unitTest' sources do not depend on module 'CF-Alarm_for_TimeOffice.app.main' sources</description>
+  <highlighted_element />
+  <language />
+</problem>
+<problem>
+  <file>CF-Alarm_for_TimeOffice.app.androidTest</file>
+  <module>CF-Alarm_for_TimeOffice.app.androidTest</module>
+  <entry_point TYPE="module" FQNAME="CF-Alarm_for_TimeOffice.app.androidTest" />
+  <problem_class id="UnnecessaryModuleDependencyInspection" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unnecessary module dependency</problem_class>
+  <hints>
+    <hint value="CF-Alarm_for_TimeOffice.app.main" />
+  </hints>
+  <description>Module 'CF-Alarm_for_TimeOffice.app.androidTest' sources do not depend on module 'CF-Alarm_for_TimeOffice.app.main' sources</description>
+  <highlighted_element />
+  <language />
+</problem>
+</problems>

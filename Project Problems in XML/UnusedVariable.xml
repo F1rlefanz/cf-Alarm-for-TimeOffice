@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/ui/screens/MainContentScreen.kt</file>
+  <line>42</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.MainContentScreenKt void MainContentScreen(com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState authState, java.lang.String persistedCalendarId, java.util.List&lt;com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem&gt; calendars, com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel authViewModel, com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity activity, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onSignOut, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onShowShiftConfig, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onShowCalendarSelection)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>context</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>7</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/ui/screens/hue/HueMainScreen.kt</file>
+  <line>27</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.hue</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.hue.HueMainScreenKt void HueMainScreen(com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel viewModel, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onNavigateToSetup, kotlin.jvm.functions.Function1&lt;? super java.lang.String,kotlin.Unit&gt; onNavigateToRuleConfig, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onNavigateToLightSelection)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>uiState</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>7</length>
+</problem>
+</problems>

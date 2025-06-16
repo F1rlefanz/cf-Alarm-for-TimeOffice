@@ -1,5 +1,7 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Represents a Hue Group (Room, Zone, etc.)
  */
@@ -11,7 +13,8 @@ data class HueGroup(
     val action: GroupAction,
     val state: GroupState? = null,
     val recycle: Boolean = false,
-    val class: String? = null // Room class like "Living room", "Bedroom", etc.
+    @SerializedName("class")
+    val roomClass: String? = null // Room class like "Living room", "Bedroom", etc.
 )
 
 /**
@@ -33,8 +36,10 @@ data class GroupAction(
  * Group State
  */
 data class GroupState(
-    val all_on: Boolean,
-    val any_on: Boolean
+    @SerializedName("all_on")
+    val allOn: Boolean,
+    @SerializedName("any_on")
+    val anyOn: Boolean
 )
 
 /**
@@ -43,5 +48,6 @@ data class GroupState(
 data class GroupUpdate(
     val name: String? = null,
     val lights: List<String>? = null,
-    val class: String? = null
+    @SerializedName("class")
+    val roomClass: String? = null
 )

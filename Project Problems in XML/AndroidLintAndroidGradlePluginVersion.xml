@@ -1,0 +1,15 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties</file>
+  <line>4</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" />
+  <problem_class id="AndroidLintAndroidGradlePluginVersion" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Android Gradle Plugin Version</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of Gradle than 8.14.1 is available: 8.14.2&lt;/html&gt;</description>
+  <highlighted_element>https\://services.gradle.org/distributions/gradle-8.14.1-bin.zip</highlighted_element>
+  <language>Properties</language>
+  <offset>16</offset>
+  <length>64</length>
+</problem>
+</problems>

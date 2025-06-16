@@ -22,6 +22,7 @@ import androidx.core.net.toUri
 import com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.*
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.AlarmCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
@@ -71,34 +72,21 @@ fun MainContentScreen(
         when {
             authState.nextShiftAlarm != null -> {
                 item {
-                    CountdownTimer(
-                        targetTime = authState.nextShiftAlarm.calculatedAlarmTime,
-                        onTimeUp = {
-                            // Alarm should already be triggered by the system
+                    AlarmCard(
+                        shiftMatch = authState.nextShiftAlarm,
+                        systemAlarmSet = authState.systemAlarmSet,
+                        canScheduleExactAlarms = authState.canScheduleExactAlarms,
+                        onCancelAlarm = { authViewModel.cancelSystemAlarm() },
+                        onSetAlarm = { authViewModel.setAlarmFromShiftMatch() },
+                        onRequestAlarmPermission = {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                val intent = Intent(
+                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    "package:${activity.packageName}".toUri()
+                                )
+                                activity.startActivity(intent)
+                            }
                         }
-                    )
-                }
-
-                item {
-                    InfoCard(
-                        title = "Nächster Wecker",
-                        content = {
-                            Text(
-                                text = "Schicht: ${authState.nextShiftAlarm.shiftDefinition.name}",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "Termin: ${authState.nextShiftAlarm.calendarEventTitle}",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "Weckzeit: ${authState.nextShiftAlarm.formattedAlarmTime}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        icon = Icons.Filled.Schedule
                     )
                 }
             }
@@ -110,7 +98,6 @@ fun MainContentScreen(
                         onActionClick = {
                             authViewModel.triggerCalendarAccess(activity)
                             if (calendars.isNotEmpty()) {
-                                authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
                                 onShowCalendarSelection()
                             }
                         }
@@ -127,7 +114,7 @@ fun MainContentScreen(
                 }
             }
 
-            authState.calendarsLoading || (authState.calendarEventsLoaded) -> {
+            authState.calendarsLoading || (!authState.calendarEventsLoaded && authState.nextShiftAlarm == null) -> {
                 item {
                     NoAlarmCard(
                         reason = if (authState.calendarsLoading) LoadingShifts() else NoShiftFound(),
@@ -142,42 +129,6 @@ fun MainContentScreen(
                         } else null
                     )
                 }
-            }
-        }
-
-        // System Alarm Status
-        if (authState.autoAlarmEnabled) {
-            item {
-                StatusCard(
-                    title = "System-Alarm",
-                    subtitle = authState.alarmStatusMessage
-                        ?: if (authState.systemAlarmSet) "Aktiv" else "Nicht gesetzt",
-                    icon = if (authState.systemAlarmSet) Icons.Filled.NotificationsActive else Icons.Filled.NotificationsOff,
-                    isPositive = authState.systemAlarmSet,
-                    actionButton = {
-                        if (!authState.canScheduleExactAlarms && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                            ActionButton(
-                                text = "Alarm-Berechtigung erteilen",
-                                icon = Icons.Filled.Settings,
-                                onClick = {
-                                    val intent = Intent(
-                                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                        "package:${activity.packageName}".toUri()
-                                    )
-                                    activity.startActivity(intent)
-                                },
-                                variant = ButtonVariant.Error
-                            )
-                        } else if (authState.systemAlarmSet) {
-                            ActionButton(
-                                text = "Alarm abbrechen",
-                                icon = Icons.Filled.Cancel,
-                                onClick = { authViewModel.cancelSystemAlarm() },
-                                variant = ButtonVariant.Secondary
-                            )
-                        }
-                    }
-                )
             }
         }
 
@@ -271,7 +222,39 @@ fun MainContentScreen(
                 title = "Dienstplan-Kalender",
                 subtitle = if (persistedCalendarId.isNotBlank()) persistedCalendarId else "Kein Kalender ausgewählt",
                 icon = Icons.Outlined.CalendarMonth,
-                isPositive = persistedCalendarId.isNotBlank()
+                isPositive = persistedCalendarId.isNotBlank(),
+                actionButton = if (persistedCalendarId.isNotBlank() && !authState.calendarsLoading) {
+                    {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { authViewModel.refreshCalendarEvents() },
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Kalender prüfen")
+                            }
+                            OutlinedButton(
+                                onClick = onShowCalendarSelection,
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.SwapHoriz,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Wechseln")
+                            }
+                        }
+                    }
+                } else null
             )
         }
 
@@ -296,40 +279,6 @@ fun MainContentScreen(
                         }
                     },
                     icon = Icons.Default.Refresh
-                )
-            }
-        }
-
-        // Main action buttons
-        item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionButton(
-                    text = "Schicht-Einstellungen",
-                    icon = Icons.Filled.Settings,
-                    onClick = onShowShiftConfig
-                )
-
-                ActionButton(
-                    text = if (persistedCalendarId.isBlank()) "Dienstplan-Kalender auswählen" else "Dienstplan-Kalender ändern",
-                    icon = Icons.Filled.CalendarMonth,
-                    onClick = {
-                        if (authState.isSignedIn) {
-                            authViewModel.triggerCalendarAccess(activity)
-                            if (calendars.isNotEmpty() || authState.calendarsLoading) {
-                                authViewModel.onCalendarTemporarilySelected(persistedCalendarId)
-                                onShowCalendarSelection()
-                                Timber.d("MainContent: 'Kalender auswählen' geklickt. Zeige Auswahl.")
-                            } else {
-                                Timber.d("MainContent: 'Kalender auswählen' geklickt, Flow wurde getriggert.")
-                            }
-                        } else {
-                            Toast.makeText(context, "Bitte zuerst anmelden.", Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    },
-                    variant = ButtonVariant.Secondary
                 )
             }
         }

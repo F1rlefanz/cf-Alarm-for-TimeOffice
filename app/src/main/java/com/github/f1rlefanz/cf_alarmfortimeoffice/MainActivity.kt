@@ -25,6 +25,11 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeT
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModelFactory
 import timber.log.Timber
+import android.content.Context
+import android.content.Intent
+import androidx.core.net.toUri
+import android.provider.Settings
+import android.app.NotificationManager
 
 class MainActivity : ComponentActivity() {
 
@@ -73,6 +78,44 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Prüfe und fordere USE_FULL_SCREEN_INTENT Permission an (ab Android 14)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (!notificationManager.canUseFullScreenIntent()) {
+                // Zeige Dialog oder Toast
+                Toast.makeText(
+                    this,
+                    "Bitte erlauben Sie Vollbild-Benachrichtigungen für Alarme in den App-Einstellungen",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Navigiere zu App-Einstellungen
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+                startActivity(intent)
+            }
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            if (!alarmManager.canScheduleExactAlarms()) {
+                // Zeige einen Dialog oder Toast, um den Nutzer zu informieren
+                Toast.makeText(
+                    this,
+                    "Bitte erlauben Sie exakte Alarme in den App-Einstellungen",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Optional: Direkt zu den Einstellungen navigieren
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    "package:$packageName".toUri()
+                )
+                startActivity(intent)
+            }
+        }
+
         setContent {
             CFAlarmForTimeOfficeTheme {
                 Surface(
@@ -80,6 +123,37 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val authState by authViewModel.authState.collectAsState()
+                    val needsCalendarScopeRequest by authViewModel.needsCalendarScopeRequest.collectAsState()
+
+                    // React to needsCalendarScopeRequest flag
+                    LaunchedEffect(needsCalendarScopeRequest) {
+                        if (needsCalendarScopeRequest) {
+                            Timber.d("MainActivity: needsCalendarScopeRequest flag detected, triggering Google API authorization...")
+                            authViewModel.clearCalendarScopeRequestFlag()
+                            authViewModel.continueCalendarAccessAfterPermission(this@MainActivity)
+                        }
+                    }
+                    
+                    // Check and load calendar on startup if signed in
+                    LaunchedEffect(authState.isSignedIn) {
+                        if (authState.isSignedIn) {
+                            Timber.d("MainActivity: User is signed in, checking for calendar auto-load")
+                            
+                            // Check Android permission immediately
+                            val hasAndroidPermission = ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.READ_CALENDAR
+                            ) == PackageManager.PERMISSION_GRANTED
+                            
+                            if (hasAndroidPermission) {
+                                // Permission already granted, update state and check calendar
+                                authViewModel.onAndroidCalendarPermissionResult(true)
+                            }
+                            
+                            // Always check and load calendar on startup
+                            authViewModel.checkAndLoadCalendarOnStartup()
+                        }
+                    }
 
                     if (authState.isLoading && !authState.isSignedIn) {
                         LoadingScreen(message = "Lade Anmeldestatus...")
@@ -129,4 +203,3 @@ class MainActivity : ComponentActivity() {
         authViewModel.clearAuthorizationPendingIntent()
     }
 }
-

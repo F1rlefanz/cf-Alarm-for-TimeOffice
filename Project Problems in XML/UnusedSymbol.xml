@@ -1,0 +1,184 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/MainActivity.kt</file>
+  <line>148</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity void launchAuthorizationIntent(android.app.PendingIntent pendingIntent)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;launchAuthorizationIntent&quot; is never used</description>
+  <highlighted_element>launchAuthorizationIntent</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>25</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/api/HueApiService.kt</file>
+  <line>25</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiService java.lang.Object getLight(java.lang.String username, java.lang.String lightId, kotlin.coroutines.Continuation&lt;? super retrofit2.Response&lt;com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueLight&gt;&gt; $completion)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;getLight&quot; is never used</description>
+  <highlighted_element>getLight</highlighted_element>
+  <language>kotlin</language>
+  <offset>16</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/api/HueApiService.kt</file>
+  <line>42</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiService java.lang.Object getGroup(java.lang.String username, java.lang.String groupId, kotlin.coroutines.Continuation&lt;? super retrofit2.Response&lt;com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueGroup&gt;&gt; $completion)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;getGroup&quot; is never used</description>
+  <highlighted_element>getGroup</highlighted_element>
+  <language>kotlin</language>
+  <offset>16</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/api/HueApiService.kt</file>
+  <line>55</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiService java.lang.Object createGroup(java.lang.String username, com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.GroupUpdate group, kotlin.coroutines.Continuation&lt;? super retrofit2.Response&lt;java.util.List&lt;java.util.Map&lt;java.lang.String,java.lang.String&gt;&gt;&gt;&gt; $completion)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;createGroup&quot; is never used</description>
+  <highlighted_element>createGroup</highlighted_element>
+  <language>kotlin</language>
+  <offset>16</offset>
+  <length>11</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/data/HueBridge.kt</file>
+  <line>8</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data</package>
+  <entry_point TYPE="class" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Class &quot;HueBridge&quot; is never used</description>
+  <highlighted_element>HueBridge</highlighted_element>
+  <language>kotlin</language>
+  <offset>11</offset>
+  <length>9</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/data/HueSchedule.kt</file>
+  <line>80</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data</package>
+  <entry_point TYPE="field" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TimeReference SHIFT_END" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Class &quot;SHIFT_END&quot; is never used</description>
+  <highlighted_element>SHIFT_END</highlighted_element>
+  <language>kotlin</language>
+  <offset>4</offset>
+  <length>9</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/data/HueSchedule.kt</file>
+  <line>82</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data</package>
+  <entry_point TYPE="field" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TimeReference ABSOLUTE" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Class &quot;ABSOLUTE&quot; is never used</description>
+  <highlighted_element>ABSOLUTE</highlighted_element>
+  <language>kotlin</language>
+  <offset>4</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/repository/HueLightRepository.kt</file>
+  <line>153</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueLightRepository com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueColor rgbToHue(java.lang.String rgb)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;rgbToHue&quot; is never used</description>
+  <highlighted_element>rgbToHue</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/AuthViewModel.kt</file>
+  <line>80</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="field" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel temporarilySelectedCalendarId" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Property &quot;temporarilySelectedCalendarId&quot; is never used</description>
+  <highlighted_element>temporarilySelectedCalendarId</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>29</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/AuthViewModel.kt</file>
+  <line>473</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel void clearTemporaryCalendarSelection()" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;clearTemporaryCalendarSelection&quot; is never used</description>
+  <highlighted_element>clearTemporaryCalendarSelection</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>31</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/HueViewModel.kt</file>
+  <line>158</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel void addScheduleRule(com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule rule)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;addScheduleRule&quot; is never used</description>
+  <highlighted_element>addScheduleRule</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>15</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/HueViewModel.kt</file>
+  <line>185</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel void testLightAction(com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueLightAction action)" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;testLightAction&quot; is never used</description>
+  <highlighted_element>testLightAction</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>15</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/HueViewModel.kt</file>
+  <line>199</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel void clearError()" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;clearError&quot; is never used</description>
+  <highlighted_element>clearError</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>10</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/HueViewModel.kt</file>
+  <line>206</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel void resetConfiguration()" />
+  <problem_class id="UnusedSymbol" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused symbol</problem_class>
+  <description>Function &quot;resetConfiguration&quot; is never used</description>
+  <highlighted_element>resetConfiguration</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>18</length>
+</problem>
+</problems>
