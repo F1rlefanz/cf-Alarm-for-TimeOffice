@@ -29,7 +29,19 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import android.provider.Settings
+import android.os.PowerManager
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import android.app.NotificationManager
+import android.app.AlarmManager
+import kotlinx.coroutines.DelicateCoroutinesApi
+
+private val Context.dataStore by preferencesDataStore(name = "app_settings")
 
 class MainActivity : ComponentActivity() {
 
@@ -45,7 +57,7 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-    // Launcher für Notification-Berechtigung
+    // Launcher für Notification-Berechtigung  
     private val requestNotificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             Timber.d("Notification permission result: $isGranted")
@@ -70,17 +82,23 @@ class MainActivity : ComponentActivity() {
             AuthViewModelFactory(application, credentialAuthManager)
         )[AuthViewModel::class.java]
 
-        // Prüfe und fordere Notification-Berechtigung an
+        // Prüfe und fordere Notification-Berechtigung an (DELAYED)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
                 != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                // Delay to avoid "Can request only one set of permissions at a time"
+                window.decorView.postDelayed({
+                    requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }, 1000)
             }
         }
+        
+        // Prüfe Akku-Optimierung beim ersten Start
+        checkBatteryOptimizationOnFirstLaunch()
 
         // Prüfe und fordere USE_FULL_SCREEN_INTENT Permission an (ab Android 14)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (!notificationManager.canUseFullScreenIntent()) {
                 // Zeige Dialog oder Toast
                 Toast.makeText(
@@ -98,7 +116,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
                 // Zeige einen Dialog oder Toast, um den Nutzer zu informieren
                 Toast.makeText(
@@ -201,5 +219,45 @@ class MainActivity : ComponentActivity() {
         val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent).build()
         authorizationLauncher.launch(intentSenderRequest)
         authViewModel.clearAuthorizationPendingIntent()
+    }
+    
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun checkBatteryOptimizationOnFirstLaunch() {
+        val batteryOptimizationAskedKey = booleanPreferencesKey("battery_optimization_asked")
+        
+        GlobalScope.launch {
+            val hasAsked = dataStore.data.map { preferences ->
+                preferences[batteryOptimizationAskedKey] == true
+            }.first()
+            
+            if (!hasAsked) {
+                // Mark as asked
+                dataStore.edit { preferences ->
+                    preferences[batteryOptimizationAskedKey] = true
+                }
+                
+                // Check if already optimized
+                val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                    // Show toast on UI thread - Dialog would be better in Compose
+                    runOnUiThread {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Bitte deaktivieren Sie die Akku-Optimierung für eine zuverlässige Wecker-Funktion",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = "package:$packageName".toUri()
+                            }
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to open battery optimization settings")
+                        }
+                    }
+                }
+            }
+        }
     }
 }

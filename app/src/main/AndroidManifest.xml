@@ -27,6 +27,9 @@
     
     <!-- For API 33+ (Android 13+) - The Optimal Way -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    
+    <!-- Battery optimization permission -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".CFAlarmApplication"

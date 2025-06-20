@@ -43,34 +43,33 @@ class ShiftConfigRepository(private val context: Context) {
     val shiftDefinitions: Flow<List<ShiftDefinition>> = context.shiftDataStore.data.map { preferences ->
         try {
             val jsonString = preferences[shiftDefinitionsKey]
-            val definitions = if (!jsonString.isNullOrEmpty()) {
+            val userDefinitions = if (!jsonString.isNullOrEmpty()) {
                 try {
                     json.decodeFromString<List<ShiftDefinition>>(jsonString)
                 } catch (e: Exception) {
-                    Timber.e(e, "Error decoding shift definitions, using defaults")
+                    Timber.e(e, "Error decoding shift definitions")
                     emptyList()
                 }
             } else {
                 emptyList()
             }
             
-            // Always ensure we have the default definitions
-            val result = if (definitions.isEmpty()) {
-                Timber.d("No valid shift definitions found, using defaults")
-                DefaultShiftDefinitions.predefined
-            } else {
-                // Merge with defaults to ensure all predefined shifts are present
-                val existingIds = definitions.map { it.id }.toSet()
-                val missingDefaults = DefaultShiftDefinitions.predefined.filter { it.id !in existingIds }
-                if (missingDefaults.isNotEmpty()) {
-                    Timber.d("Adding ${missingDefaults.size} missing default definitions")
-                    definitions + missingDefaults
-                } else {
-                    definitions
-                }
+            // ALWAYS include default definitions as "examples" that users can modify
+            // This ensures they're always available immediately, even on first start
+            val defaultsAsExamples = DefaultShiftDefinitions.predefined.map { default ->
+                // Check if user has modified this default
+                val userVersion = userDefinitions.find { it.id == default.id }
+                userVersion ?: default // Use user version if exists, otherwise use default
             }
             
-            Timber.d("Returning ${result.size} shift definitions")
+            // Add any custom user definitions that aren't overrides of defaults
+            val customDefinitions = userDefinitions.filter { userDef ->
+                DefaultShiftDefinitions.predefined.none { it.id == userDef.id }
+            }
+            
+            val result = defaultsAsExamples + customDefinitions
+            
+            Timber.d("Returning ${result.size} shift definitions (${defaultsAsExamples.size} defaults/modified, ${customDefinitions.size} custom)")
             result
         } catch (e: Exception) {
             Timber.e(e, "Critical error loading shift definitions, returning defaults")

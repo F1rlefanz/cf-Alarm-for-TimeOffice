@@ -98,7 +98,15 @@ class AuthDataStoreRepository(private val context: Context) {
     // Funktion zum Löschen der Daten beim Logout
     suspend fun clearAuthData() {
         context.dataStore.edit { preferences ->
+            // Preserve calendar selection and selected calendars across logout/login
+            val savedCalendarId = preferences[calendarIdKey]
+            val savedSelectedCalendars = preferences[selectedCalendarsKey]
+            
             preferences.clear()
+            
+            // Restore calendar settings
+            savedCalendarId?.let { preferences[calendarIdKey] = it }
+            savedSelectedCalendars?.let { preferences[selectedCalendarsKey] = it }
         }
     }
 }

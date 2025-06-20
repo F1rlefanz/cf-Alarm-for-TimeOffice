@@ -23,6 +23,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.AlarmCard
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.PermissionWarningCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
@@ -47,6 +48,13 @@ fun MainContentScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Permission warnings - show at the top
+        item {
+            PermissionWarningCard(
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
         // Welcome Header
         item {
             Column(
