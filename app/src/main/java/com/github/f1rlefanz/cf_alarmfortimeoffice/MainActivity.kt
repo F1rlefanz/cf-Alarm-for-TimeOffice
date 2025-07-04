@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
                                 alarmViewModel = alarmViewModel,
                                 mainViewModel = mainViewModel,
                                 navigationViewModel = navigationViewModel,
+                                viewModelFactory = viewModelFactory,
                                 authDataStoreRepository = appContainer.authDataStoreRepository as com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository,
                                 onRequestCalendarPermission = { checkCalendarPermission() }
                             )

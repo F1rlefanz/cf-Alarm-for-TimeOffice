@@ -25,7 +25,7 @@ sealed class NavigationState {
 }
 
 enum class MainTab {
-    HOME, STATUS, SETTINGS
+    HOME, STATUS, SETTINGS, HUE
 }
 
 /**

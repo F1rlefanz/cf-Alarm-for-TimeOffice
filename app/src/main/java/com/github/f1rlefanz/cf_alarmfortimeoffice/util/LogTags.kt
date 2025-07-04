@@ -26,6 +26,8 @@ object LogTags {
     const val HUE_RULES = "CFAlarm.Hue.Rules"
     const val HUE_CONFIG = "CFAlarm.Hue.Config"
     const val HUE_DISCOVERY = "CFAlarm.Hue.Discovery"
+    const val HUE_USECASE = "CFAlarm.Hue.UseCase"
+    const val HUE_VIEWMODEL = "CFAlarm.Hue.ViewModel"
     const val CALENDAR_CACHE = "CFAlarm.Cal.Cache"
     const val CALENDAR_API = "CFAlarm.Cal.API"
     

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -13,6 +14,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.HomeTabContent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.StatusTabContent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.SettingsTabContent
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.HueTabContent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.MainTab
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 
@@ -71,6 +73,12 @@ fun MainContentScreen(
                     selected = selectedTab == MainTab.SETTINGS,
                     onClick = { onSelectedTabChange(MainTab.SETTINGS) }
                 )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Lightbulb, contentDescription = "Hue") },
+                    label = { Text("Hue") },
+                    selected = selectedTab == MainTab.HUE,
+                    onClick = { onSelectedTabChange(MainTab.HUE) }
+                )
             }
         }
     ) { innerPadding ->
@@ -101,6 +109,11 @@ fun MainContentScreen(
                         shiftViewModel = shiftViewModel,
                         onShowShiftConfig = onShowShiftConfig,
                         onShowCalendarSelection = onShowCalendarSelection
+                    )
+                }
+                MainTab.HUE -> {
+                    HueTabContent(
+                        viewModelFactory = viewModelFactory
                     )
                 }
             }

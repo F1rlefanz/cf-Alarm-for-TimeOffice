@@ -29,6 +29,21 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.ICalendarUs
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IShiftUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.data.CalendarSelectionRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalendarSelectionRepository
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueBridgeRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueConfigRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueLightRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueBridgeRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueConfigRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueLightRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueBridgeUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueLightUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.IHueBridgeUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.IHueLightUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.IHueRuleUseCase
 
 /**
  * Dependency Container für Clean Architecture mit Interface-basierter DI
@@ -40,6 +55,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalenda
  * ✅ OAuth2TokenManager für langlebige Token-Authentifizierung
  * ✅ Backwards compatibility mit bestehendem System
  * ✅ Schrittweise Migration möglich
+ * ✅ HUE INTEGRATION: Complete Domain Layer mit Repository/UseCase Pattern
  * 
  * TESTING IMPROVEMENTS:
  * - Mock-fähige Repository-Interfaces
@@ -47,6 +63,11 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalenda
  * - Entkoppelte Business Logic von Infrastructure
  */
 class AppContainer(private val context: Context) {
+    
+    // ==============================
+    // DATASTORE CONFIGURATION
+    // ==============================
+    private val Context.hueDataStore: DataStore<Preferences> by preferencesDataStore(name = "hue_settings")
     
     // ==============================
     // TOKEN MANAGEMENT (New OAuth2 Infrastructure)
@@ -98,6 +119,22 @@ class AppContainer(private val context: Context) {
     
     val calendarSelectionRepository: ICalendarSelectionRepository by lazy {
         CalendarSelectionRepository(context)
+    }
+    
+    // ==============================
+    // HUE INTEGRATION - REPOSITORY LAYER
+    // ==============================
+    
+    val hueBridgeRepository: IHueBridgeRepository by lazy {
+        HueBridgeRepository()
+    }
+    
+    val hueConfigRepository: IHueConfigRepository by lazy {
+        HueConfigRepository(context.hueDataStore)
+    }
+    
+    val hueLightRepository: IHueLightRepository by lazy {
+        HueLightRepository(hueBridgeRepository)
     }
     
     // ==============================
@@ -159,6 +196,30 @@ class AppContainer(private val context: Context) {
             alarmManagerService = alarmManagerService,
             shiftConfigRepository = shiftConfigRepository,
             shiftRecognitionEngine = shiftRecognitionEngine
+        )
+    }
+    
+    // ==============================
+    // HUE INTEGRATION - USE CASE LAYER
+    // ==============================
+    
+    val hueBridgeUseCase: IHueBridgeUseCase by lazy {
+        HueBridgeUseCase(
+            bridgeRepository = hueBridgeRepository,
+            configRepository = hueConfigRepository
+        )
+    }
+    
+    val hueLightUseCase: IHueLightUseCase by lazy {
+        HueLightUseCase(
+            lightRepository = hueLightRepository
+        )
+    }
+    
+    val hueRuleUseCase: IHueRuleUseCase by lazy {
+        HueRuleUseCase(
+            configRepository = hueConfigRepository,
+            lightUseCase = hueLightUseCase
         )
     }
     

@@ -28,6 +28,7 @@ class ViewModelFactory(
     // SINGLETON PATTERN: Shared ViewModel Instances für State-Konsistenz
     private var _calendarViewModel: CalendarViewModel? = null
     private var _shiftViewModel: ShiftViewModel? = null
+    private var _hueViewModel: HueViewModel? = null
     
     private fun getOrCreateCalendarViewModel(): CalendarViewModel {
         return _calendarViewModel ?: CalendarViewModel(
@@ -78,6 +79,9 @@ class ViewModelFactory(
                 // NavigationViewModel wird jetzt auch über Factory erstellt
                 // statt als Singleton im AppContainer
                 NavigationViewModel() as T
+            }
+            modelClass.isAssignableFrom(HueViewModel::class.java) -> {
+                getOrCreateHueViewModel() as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

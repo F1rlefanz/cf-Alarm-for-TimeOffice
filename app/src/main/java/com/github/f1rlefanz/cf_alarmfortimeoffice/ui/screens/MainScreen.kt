@@ -25,6 +25,7 @@ fun MainScreen(
     alarmViewModel: AlarmViewModel,
     mainViewModel: MainViewModel,
     navigationViewModel: NavigationViewModel,
+    viewModelFactory: ViewModelFactory,
     authDataStoreRepository: AuthDataStoreRepository,
     onRequestCalendarPermission: () -> Unit
 ) {
@@ -163,6 +164,7 @@ fun MainScreen(
                     shiftViewModel = shiftViewModel,
                     alarmViewModel = alarmViewModel,
                     mainViewModel = mainViewModel,
+                    viewModelFactory = viewModelFactory,
                     selectedTab = mainContentState.selectedTab,
                     onSelectedTabChange = { tab -> navigationViewModel.changeTab(tab) },
                     onShowShiftConfig = { navigationViewModel.navigateToShiftConfig(mainContentState.selectedTab) },
