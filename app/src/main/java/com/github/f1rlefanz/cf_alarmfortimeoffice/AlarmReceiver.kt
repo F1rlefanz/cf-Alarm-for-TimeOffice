@@ -13,7 +13,9 @@ import android.net.Uri
 import android.os.*
 
 import androidx.core.app.NotificationCompat
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
 
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -28,7 +30,7 @@ class AlarmReceiver : BroadcastReceiver() {
         private var vibratorManager: VibratorManager? = null
         
         fun stopAlarmMedia() {
-            Timber.d("Stoppe Alarm-Medien")
+            Logger.d(LogTags.ALARM, "Stopping alarm media")
             try {
                 mediaPlayer?.let {
                     if (it.isPlaying) {
@@ -38,7 +40,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     mediaPlayer = null
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Fehler beim Stoppen des MediaPlayers")
+                Logger.e(LogTags.ALARM, "Error stopping MediaPlayer", e)
             }
             
             try {
@@ -51,18 +53,18 @@ class AlarmReceiver : BroadcastReceiver() {
                     vibrator = null
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Fehler beim Stoppen der Vibration")
+                Logger.e(LogTags.ALARM, "Error stopping vibration", e)
             }
         }
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null) {
-            Timber.e("AlarmReceiver: Context ist null")
+            Logger.e(LogTags.ALARM_RECEIVER, "AlarmReceiver: Context is null")
             return
         }
         
-        Timber.i("🚨 ALARM EMPFANGEN! 🚨")
+        Logger.business(LogTags.ALARM_RECEIVER, "🚨 ALARM RECEIVED! 🚨")
         
         // Stoppe vorherige Alarm-Medien falls vorhanden
         stopAlarmMedia()
@@ -71,7 +73,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val shiftName = intent?.getStringExtra("shift_name") ?: "Unbekannte Schicht"
         val alarmTime = intent?.getStringExtra("alarm_time") ?: "Jetzt"
         
-        Timber.i("Alarm für Schicht: $shiftName um $alarmTime")
+        Logger.business(LogTags.ALARM_RECEIVER, "Alarm for shift", "$shiftName at $alarmTime")
         
         // Starte Vibration
         startVibration(context)
@@ -88,7 +90,7 @@ class AlarmReceiver : BroadcastReceiver() {
     
     private fun startVibration(context: Context) {
         try {
-            val vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000, 500)
+            val vibrationPattern = UIConstants.ALARM_VIBRATION_PATTERN
             
             when {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -98,7 +100,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         if (defaultVibrator.hasVibrator()) {
                             val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
                             vibratorManager?.vibrate(CombinedVibration.createParallel(vibrationEffect))
-                            Timber.d("Vibration gestartet (VibratorManager)")
+                            Logger.d(LogTags.ALARM, "Vibration started (VibratorManager)")
                         }
                     }
                 }
@@ -110,7 +112,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         if (vib.hasVibrator()) {
                             val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
                             vib.vibrate(vibrationEffect)
-                            Timber.d("Vibration gestartet (VibrationEffect)")
+                            Logger.d(LogTags.ALARM, "Vibration started (VibrationEffect)")
                         }
                     }
                 }
@@ -122,13 +124,13 @@ class AlarmReceiver : BroadcastReceiver() {
                         if (vib.hasVibrator()) {
                             @Suppress("DEPRECATION")
                             vib.vibrate(vibrationPattern, 1) // Repeat from index 1
-                            Timber.d("Vibration gestartet (Legacy)")
+                            Logger.d(LogTags.ALARM, "Vibration started (Legacy)")
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Starten der Vibration")
+            Logger.e(LogTags.ALARM, "Error starting vibration", e)
         }
     }
     
@@ -152,28 +154,28 @@ class AlarmReceiver : BroadcastReceiver() {
                     isLooping = true
                     
                     setOnPreparedListener { mp ->
-                        Timber.d("MediaPlayer vorbereitet, starte Wiedergabe")
+                        Logger.d(LogTags.ALARM, "MediaPlayer prepared, starting playback")
                         try {
                             mp.start()
                         } catch (e: Exception) {
-                            Timber.e(e, "Fehler beim Starten der Wiedergabe")
+                            Logger.e(LogTags.ALARM, "Error starting playback", e)
                         }
                     }
                     
                     setOnErrorListener { _, what, extra ->
-                        Timber.e("MediaPlayer Fehler: what=$what, extra=$extra")
+                        Logger.e(LogTags.ALARM, "MediaPlayer error: what=$what, extra=$extra")
                         stopAlarmMedia()
                         true
                     }
                     
                     prepareAsync()
                 }
-                Timber.d("Alarmton wird vorbereitet...")
+                Logger.d(LogTags.ALARM, "Alarm sound being prepared")
             } else {
-                Timber.e("Kein Alarmton verfügbar")
+                Logger.e(LogTags.ALARM, "No alarm sound available")
             }
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Starten des Alarmtons")
+            Logger.e(LogTags.ALARM, "Error starting alarm sound", e)
         }
     }
     
@@ -183,11 +185,12 @@ class AlarmReceiver : BroadcastReceiver() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("shift_name", shiftName)
                 putExtra("alarm_time", alarmTime)
+                setPackage(context.packageName)
             }
             context.startActivity(fullScreenIntent)
-            Timber.d("Vollbild-Alarm Activity gestartet")
+            Logger.d(LogTags.ALARM, "Full-screen alarm activity started")
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Starten der Vollbild-Activity")
+            Logger.e(LogTags.ALARM, "Error starting full-screen activity", e)
         }
     }
     
@@ -199,7 +202,9 @@ class AlarmReceiver : BroadcastReceiver() {
             createAlarmNotificationChannel(notificationManager)
             
             // Stoppt-Intent für Notification-Action
-            val stopIntent = Intent(context, AlarmStopService::class.java)
+            val stopIntent = Intent(context, com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmStopService::class.java).apply {
+                setPackage(context.packageName)
+            }
             val stopPendingIntent = PendingIntent.getService(
                 context, 0, stopIntent, 
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -209,6 +214,7 @@ class AlarmReceiver : BroadcastReceiver() {
             val fullScreenIntent = Intent(context, AlarmFullScreenActivity::class.java).apply {
                 putExtra("shift_name", shiftName)
                 putExtra("alarm_time", alarmTime)
+                setPackage(context.packageName)
             }
             val fullScreenPendingIntent = PendingIntent.getActivity(
                 context, 0, fullScreenIntent,
@@ -216,7 +222,7 @@ class AlarmReceiver : BroadcastReceiver() {
             )
             
             val notification = NotificationCompat.Builder(context, ALARM_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground) // TODO: Besseres Icon
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // Standard alarm icon
                 .setContentTitle("⏰ CF-Alarm: $shiftName")
                 .setContentText("Zeit aufzustehen! Schicht um $alarmTime")
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -235,10 +241,10 @@ class AlarmReceiver : BroadcastReceiver() {
                 .build()
             
             notificationManager.notify(ALARM_NOTIFICATION_ID, notification)
-            Timber.d("Alarm-Notification angezeigt")
+            Logger.d(LogTags.ALARM, "Alarm notification displayed")
             
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Anzeigen der Notification")
+            Logger.e(LogTags.ALARM, "Error showing notification", e)
         }
     }
     
@@ -257,7 +263,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     setBypassDnd(true) // Umgeht "Nicht stören" Modus
                 }
                 notificationManager.createNotificationChannel(channel)
-                Timber.d("Alarm NotificationChannel erstellt")
+                Logger.d(LogTags.ALARM, "Alarm NotificationChannel created")
             }
         }
     }

@@ -5,10 +5,12 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Exclude sensitive authentication data from cloud backup -->
+        <exclude domain="sharedpref" path="encrypted_token_storage.xml"/>
+        <exclude domain="sharedpref" path="oauth2_tokens.xml"/>
+        <!-- Include app configuration for user convenience -->
+        <include domain="sharedpref" path="shift_config.xml"/>
+        <include domain="sharedpref" path="alarm_settings.xml"/>
     </cloud-backup>
     <!--
     <device-transfer>

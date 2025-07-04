@@ -1,165 +1,108 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.MainActivity
-import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.*
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
+import androidx.compose.ui.text.style.TextOverflow
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.HomeTabContent
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.StatusTabContent
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.SettingsTabContent
+import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.MainTab
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 
-/**
- * OPTIMIERTE MainContentScreen - 70% reduzierte Komplexität
- * 
- * BEHOBENE PROBLEME:
- * ✅ Überkomplexe when-Verschachtelungen → Content State System
- * ✅ Extracted Composables für bessere Modularität
- * ✅ Verbesserte Lesbarkeit und Testbarkeit
- * ✅ Klare Trennung von UI-Logic und State Management
- * 
- * VERBESSERUNGEN:
- * - Von komplexer when-Logic zu ContentState + ErrorState
- * - MainContentComponents.kt für extracted Composables
- * - MainContentState.kt für State Management
- * - Bessere Performance durch kleinere Rekomposition-Scope
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainContentScreen(
-    authState: AuthState,
-    persistedCalendarId: String,
-    calendars: List<CalendarItem>,
     authViewModel: AuthViewModel,
-    activity: MainActivity,
-    onSignOut: () -> Unit,
+    calendarViewModel: CalendarViewModel,
+    shiftViewModel: ShiftViewModel,
+    alarmViewModel: AlarmViewModel,
+    mainViewModel: MainViewModel,
+    selectedTab: MainTab,
+    onSelectedTabChange: (MainTab) -> Unit,
     onShowShiftConfig: () -> Unit,
-    onShowCalendarSelection: () -> Unit
+    onShowCalendarSelection: () -> Unit,
+    onShowEventList: () -> Unit
 ) {
-    // OPTIMIERUNG: State Determination ausgelagert
-    val contentState = remember(authState, persistedCalendarId) {
-        determineContentState(authState, persistedCalendarId)
-    }
-    
-    val errorState = remember(authState) {
-        determineErrorState(authState)
-    }
+    val authState by authViewModel.uiState.collectAsState()
+    val calendarState by calendarViewModel.uiState.collectAsState()
+    val shiftState by shiftViewModel.uiState.collectAsState()
+    val alarmState by alarmViewModel.uiState.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Permission warnings
-        item {
-            PermissionWarningCard(
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        
-        // Welcome Header - EXTRACTED
-        item {
-            WelcomeHeader(authState)
-        }
-
-        // Main Content - EXTRACTED & SIMPLIFIED
-        item {
-            MainContent(
-                contentState = contentState,
-                authState = authState,
-                persistedCalendarId = persistedCalendarId,
-                calendars = calendars,
-                authViewModel = authViewModel,
-                activity = activity,
-                onShowShiftConfig = onShowShiftConfig,
-                onShowCalendarSelection = onShowCalendarSelection
-            )
-        }
-
-        // Error handling - EXTRACTED & SIMPLIFIED
-        item {
-            ErrorContent(
-                errorState = errorState,
-                authState = authState,
-                authViewModel = authViewModel,
-                activity = activity
-            )
-        }
-
-        // Calendar Status - EXTRACTED
-        item {
-            CalendarStatusSection(
-                persistedCalendarId = persistedCalendarId,
-                authState = authState,
-                authViewModel = authViewModel,
-                onShowCalendarSelection = onShowCalendarSelection
-            )
-        }
-
-        // Loading indicator - EXTRACTED
-        item {
-            LoadingIndicator(authState)
-        }
-
-        // Sign out button
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
-            ActionButton(
-                text = "Abmelden",
-                icon = Icons.AutoMirrored.Filled.Logout,
-                onClick = onSignOut,
-                variant = ButtonVariant.Error
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MainContentPreview() {
-    CFAlarmForTimeOfficeTheme {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                WelcomeHeader(
-                    AuthState(
-                        isSignedIn = true,
-                        userName = "Test Nutzer"
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "CF-Alarm for TimeOffice",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
+                    label = { Text("Home") },
+                    selected = selectedTab == MainTab.HOME,
+                    onClick = { onSelectedTabChange(MainTab.HOME) }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Info, contentDescription = "Status") },
+                    label = { Text("Status") },
+                    selected = selectedTab == MainTab.STATUS,
+                    onClick = { onSelectedTabChange(MainTab.STATUS) }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") },
+                    label = { Text("Einstellungen") },
+                    selected = selectedTab == MainTab.SETTINGS,
+                    onClick = { onSelectedTabChange(MainTab.SETTINGS) }
                 )
             }
-
-            item {
-                InfoCard(
-                    title = "Nächster Wecker",
-                    content = {
-                        Text("Schicht: Nachtdienst")
-                        Text("Termin: IMC Nachtdienst")
-                        Text("Weckzeit: 06.06.2025 19:45", fontWeight = FontWeight.Bold)
-                    },
-                    icon = Icons.Filled.Schedule
-                )
-            }
-
-            item {
-                ActionButton(
-                    text = "Schicht-Einstellungen",
-                    icon = Icons.Filled.Settings,
-                    onClick = { /* Preview */ }
-                )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            // Tab-Inhalt mit eigener Fehlerbehandlung
+            when (selectedTab) {
+                MainTab.HOME -> {
+                    HomeTabContent(
+                        calendarState = calendarState,
+                        shiftState = shiftState,
+                        alarmState = alarmState,
+                        onRefresh = { mainViewModel.forceRefreshCalendarEvents() },
+                        onShowEventList = onShowEventList
+                    )
+                }
+                MainTab.STATUS -> {
+                    StatusTabContent(
+                        authState = authState,
+                        calendarState = calendarState,
+                        shiftState = shiftState,
+                        alarmState = alarmState,
+                        calendarViewModel = calendarViewModel
+                    )
+                }
+                MainTab.SETTINGS -> {
+                    SettingsTabContent(
+                        authViewModel = authViewModel,
+                        shiftViewModel = shiftViewModel,
+                        onShowShiftConfig = onShowShiftConfig,
+                        onShowCalendarSelection = onShowCalendarSelection
+                    )
+                }
             }
         }
     }

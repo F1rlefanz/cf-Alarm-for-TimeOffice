@@ -1,223 +1,123 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens
 
-import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.github.f1rlefanz.cf_alarmfortimeoffice.R
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIText
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 
 @Composable
 fun LoginScreen(
-    authViewModel: AuthViewModel
+    authViewModel: AuthViewModel,
+    onSignIn: () -> Unit
 ) {
-    val authState by authViewModel.authState.collectAsState()
-    val context = LocalContext.current
-
-    // Zeige Fehler als Toast an
-    LaunchedEffect(authState.error) {
-        authState.error?.let {
-            if (it != "Sign-in was cancelled by the user.") {
-                Toast.makeText(context, "Fehler: $it", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
+    val authState by authViewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(SpacingConstants.SPACING_EXTRA_LARGE),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // App Logo/Icon
-        Card(
-            modifier = Modifier.size(120.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        // App Icon placeholder
+        Surface(
+            modifier = Modifier.size(SpacingConstants.APP_ICON_SIZE),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.primaryContainer
         ) {
             Box(
-                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Schedule,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                Text(
+                    UIText.APP_ICON_LETTERS,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // App Title
+
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
+
         Text(
-            text = "CF-Alarm for TimeOffice",
+            text = UIText.APP_TITLE,
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
+            textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
+
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_SMALL))
+
         Text(
-            text = "Ihr intelligenter Dienstplan-Wecker",
+            text = UIText.APP_SUBTITLE,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        
-        Spacer(modifier = Modifier.height(48.dp))
 
-        if (authState.isLoading) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXXL))
+
+        Button(
+            onClick = onSignIn,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(SpacingConstants.BUTTON_HEIGHT_LARGE),
+            enabled = !authState.calendarOps.calendarsLoading
+        ) {
+            if (authState.calendarOps.calendarsLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD),
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp)
+                    // Standard Google Sign-In icon
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_partial_secure),
+                        contentDescription = null,
+                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Anmeldung wird verarbeitet...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Willkommen!",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Bitte melden Sie sich mit Ihrem Google-Konto an, um die App zu nutzen und Ihre Dienstpläne zu verwalten.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Button(
-                        onClick = { authViewModel.startSignIn() },
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Login,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Mit Google anmelden",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(SpacingConstants.SPACING_MEDIUM))
+                    Text(UIText.GOOGLE_SIGN_IN)
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // Feature highlights
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+
+        authState.errors.error?.let { error ->
+            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_LARGE))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
             ) {
                 Text(
-                    text = "Funktionen:",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                FeatureItem(
-                    icon = Icons.Filled.CalendarMonth,
-                    text = "Automatische Kalender-Integration"
-                )
-                FeatureItem(
-                    icon = Icons.Filled.SmartDisplay,
-                    text = "Intelligente Schicht-Erkennung"
-                )
-                FeatureItem(
-                    icon = Icons.Filled.NotificationsActive,
-                    text = "Zuverlässige Wecker-Funktion"
+                    text = error,
+                    modifier = Modifier.padding(SpacingConstants.PADDING_CARD),
+                    color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }
-    }
-}
 
-@Composable
-private fun FeatureItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size(20.dp)
-        )
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
+
         Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
+            text = UIText.PERMISSION_EXPLANATION,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = SpacingConstants.SPACING_XXL)
         )
     }
 }

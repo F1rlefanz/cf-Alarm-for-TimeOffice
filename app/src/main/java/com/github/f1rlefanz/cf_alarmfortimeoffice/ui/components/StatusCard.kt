@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
 
 @Composable
 fun StatusCard(
@@ -26,14 +27,14 @@ fun StatusCard(
             else 
                 MaterialTheme.colorScheme.errorContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION / 2)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(SpacingConstants.PADDING_CARD)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = icon,
@@ -42,7 +43,7 @@ fun StatusCard(
                         MaterialTheme.colorScheme.onPrimaryContainer 
                     else 
                         MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                 )
                 
                 Column(modifier = Modifier.weight(1f)) {
@@ -70,7 +71,7 @@ fun StatusCard(
             }
             
             actionButton?.let {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(SpacingConstants.SPACING_MEDIUM))
                 it()
             }
         }
@@ -89,21 +90,21 @@ fun InfoCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION / 2)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(SpacingConstants.PADDING_CARD)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(bottom = 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM),
+                modifier = Modifier.padding(bottom = SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                 )
                 
                 Text(
@@ -132,14 +133,14 @@ fun ActionButton(
             Button(
                 onClick = onClick,
                 modifier = modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = SpacingConstants.PADDING_CARD, vertical = SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                 Text(text)
             }
         }
@@ -147,14 +148,14 @@ fun ActionButton(
             OutlinedButton(
                 onClick = onClick,
                 modifier = modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = SpacingConstants.PADDING_CARD, vertical = SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                 Text(text)
             }
         }
@@ -165,14 +166,14 @@ fun ActionButton(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 ),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = SpacingConstants.PADDING_CARD, vertical = SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                 Text(text)
             }
         }

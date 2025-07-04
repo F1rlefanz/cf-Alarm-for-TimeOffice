@@ -8,9 +8,11 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 
 data class SignInResult(
     val success: Boolean,
@@ -22,13 +24,16 @@ data class SignInResult(
 class CredentialAuthManager(private val context: Context) {
 
     private val credentialManager = CredentialManager.create(context)
-    private val googleWebClientId = "931091152160-8s3nd7os2p61ac6ecm799gjhekkf0b4i.apps.googleusercontent.com"
+    // Use BuildConfig for Web Client ID
+    private val googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
 
     suspend fun signIn(): SignInResult {
-        if (googleWebClientId.startsWith("ERSETZE_DIES") || googleWebClientId.isBlank()) {
-            Timber.e("CredentialAuthManager: WICHTIG: Web Client ID wurde nicht korrekt in CredentialAuthManager.kt ersetzt!")
+        if (googleWebClientId.isBlank()) {
+            Logger.e(LogTags.AUTH, "Web Client ID is empty!")
             return SignInResult(success = false, error = "Web Client ID nicht konfiguriert")
         }
+
+        Logger.d(LogTags.AUTH, "Using Web Client ID: ${googleWebClientId.take(20)}...")
 
         val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
@@ -39,53 +44,66 @@ class CredentialAuthManager(private val context: Context) {
             .addCredentialOption(googleIdOption)
             .build()
 
-        Timber.d("CredentialAuthManager: Fordere Credentials an mit Scopes: EMAIL, PROFILE, calendar.readonly...")
+        Logger.d(LogTags.AUTH, "Requesting credentials...")
         return try {
             val result = credentialManager.getCredential(context = context, request = request)
-            Timber.d("CredentialAuthManager: Credential erfolgreich erhalten: ${result.credential.type}")
+            Logger.business(LogTags.AUTH, "Credential successfully obtained", result.credential.type)
             SignInResult(success = true, credentialResponse = result)
 
         } catch (e: GetCredentialCancellationException) {
-            Timber.w(e, "CredentialAuthManager: Fehler bei getCredential - Vom Nutzer abgebrochen.")
-            SignInResult(success = false, error = "Sign-in was cancelled by the user.", exception = e)
+            Logger.w(LogTags.AUTH, "Sign-in cancelled by user", e)
+            SignInResult(success = false, error = "Anmeldung wurde abgebrochen.", exception = e)
         } catch (e: NoCredentialException) {
-            Timber.w(e, "CredentialAuthManager: Fehler bei getCredential - Keine Credentials auf dem Gerät gefunden.")
-            SignInResult(success = false, error = "No accounts found on this device. Please add a Google account.", exception = e)
-        }
-        catch (e: GetCredentialException) {
-            Timber.e(e, "CredentialAuthManager: Fehler bei getCredential (Typ: ${e.type})")
-            SignInResult(success = false, error = e.message ?: "Fehler bei der Anmeldung (${e.type})", exception = e)
+            Logger.w(LogTags.AUTH, "No Google accounts found", e)
+            val detailedError = when {
+                e.message?.contains("Developer console") == true -> {
+                    """
+                    Google Sign-In ist nicht korrekt konfiguriert:
+                    1. Überprüfen Sie die SHA-1 Fingerprints in der Google Cloud Console
+                    2. Debug SHA-1 muss für Package: ${context.packageName} hinzugefügt sein
+                    3. OAuth 2.0 Web Client ID muss korrekt sein
+                    """.trimIndent()
+                }
+                else -> "Kein Google-Konto auf diesem Gerät gefunden. Bitte fügen Sie ein Google-Konto in den Einstellungen hinzu."
+            }
+            SignInResult(success = false, error = detailedError, exception = e)
+        } catch (e: GetCredentialException) {
+            Logger.e(LogTags.AUTH, "GetCredentialException (Type: ${e.type})", e)
+            val errorMessage = when {
+                e.message?.contains("10:") == true -> "Google Play Services Fehler. Bitte aktualisieren Sie Google Play Services."
+                e.message?.contains("Developer console") == true -> "Google Sign-In Konfigurationsfehler. Bitte Entwickler kontaktieren."
+                else -> e.message ?: "Fehler bei der Anmeldung (${e.type})"
+            }
+            SignInResult(success = false, error = errorMessage, exception = e)
         } catch (e: Exception) {
-            Timber.e(e, "CredentialAuthManager: Allgemeiner Fehler bei der Anmeldung")
-            SignInResult(success = false, error = e.message ?: "Allgemeiner Fehler bei der Anmeldung", exception = e)
+            Logger.e(LogTags.AUTH, "Unexpected error", e)
+            SignInResult(success = false, error = "Unerwarteter Fehler: ${e.message}", exception = e)
         }
     }
 
     fun signOutLocally() {
-        Timber.d("CredentialAuthManager: Lokaler Sign-Out (im ViewModel behandelt).")
+        Logger.d(LogTags.AUTH, "Local sign-out")
     }
 
     fun extractUserInfo(response: GetCredentialResponse?): Triple<String?, String?, String?> {
         val credential = response?.credential
         
-        // Check if credential is of type Google ID using correct Credential Manager API
         if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
             try {
-                // Create Google ID Token using the recommended createFrom method
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 
                 val userId = googleIdTokenCredential.id
                 val displayName = googleIdTokenCredential.displayName
-                val emailCandidate = googleIdTokenCredential.id
+                val email = googleIdTokenCredential.id // ID ist normalerweise die E-Mail
                 
-                Timber.d("CredentialAuthManager: UserInfo extrahiert: ID (oft Email)=${emailCandidate}, Name=$displayName")
-                return Triple(userId, displayName, emailCandidate)
+                Logger.business(LogTags.AUTH, "Extracted user info: Email=$email, Name=$displayName")
+                return Triple(userId, displayName, email)
             } catch (e: Exception) {
-                Timber.e(e, "CredentialAuthManager: Fehler beim Erstellen von GoogleIdTokenCredential aus CustomCredential")
+                Logger.e(LogTags.AUTH, "Error parsing Google ID Token Credential", e)
             }
         }
         
-        Timber.w("CredentialAuthManager: Konnte UserInfo nicht extrahieren, credential ist nicht vom Typ Google ID Token oder null.")
+        Logger.w(LogTags.AUTH, "Credential is not of expected type")
         return Triple(null, null, null)
     }
 }

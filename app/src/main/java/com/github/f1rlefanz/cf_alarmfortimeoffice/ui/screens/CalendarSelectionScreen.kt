@@ -3,99 +3,167 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarItem
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.CalendarViewModel
 
+/**
+ * CalendarSelectionScreen - REFACTORED für Single Source of Truth
+ * 
+ * STATE SYNCHRONISATION FIXES:
+ * ✅ Entfernt temporären remember State - eliminiert doppelte Sources of Truth
+ * ✅ Verwendet direkt CalendarViewModel.toggleCalendarSelection für atomare Updates
+ * ✅ Reactive UI basiert vollständig auf persistiertem State
+ * ✅ Keine lokale State-Synchronisation mehr nötig
+ * ✅ Automatisches Save durch Repository - keine manuellen Save-Operationen
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarSelectionScreen(
-    calendars: List<CalendarItem>,
-    selectedCalendarId: String,
-    onCalendarSelected: (String) -> Unit,
-    onSaveClicked: () -> Unit,
-    onCancelClicked: () -> Unit,
-    isLoading: Boolean
+    calendarViewModel: CalendarViewModel,
+    onSave: () -> Unit,
+    onCancel: () -> Unit
 ) {
+    val calendarState by calendarViewModel.uiState.collectAsState()
+
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(title = { Text("Dienstplan-Kalender wählen") })
+            TopAppBar(
+                title = { Text("Kalender auswählen") },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Abbrechen"
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = onSave, // SIMPLIFIED: Kein manuelles Save mehr - alles automatisch
+                        enabled = calendarState.selectedCalendarIds.isNotEmpty()
+                    ) {
+                        Text("Speichern")
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(SpacingConstants.SPACING_LARGE),
+            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
         ) {
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "Wähle die Kalender aus, die für Schichtalarme überwacht werden sollen.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (calendarState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator()
-                    Timber.d("CalendarSelectionScreen: Zeige Ladeindikator.")
                 }
-            } else if (calendars.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Keine Kalender gefunden oder Zugriff verweigert. Bitte überprüfe die Berechtigungen und versuche es erneut.")
-                    Timber.d("CalendarSelectionScreen: Keine Kalender zum Anzeigen.")
+            } else if (calendarState.availableCalendars.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        "Keine Kalender verfügbar",
+                        modifier = Modifier.padding(SpacingConstants.SPACING_LARGE),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             } else {
-                Timber.d("CalendarSelectionScreen: Zeige ${calendars.size} Kalender. Ausgewählt: $selectedCalendarId")
-                LazyColumn(modifier = Modifier.weight(1.0f)) {
-                    items(calendars) { calendar ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = (calendar.id == selectedCalendarId),
-                                    onClick = {
-                                        Timber.d("CalendarSelectionScreen: Kalender ausgewählt - ID: ${calendar.id}, Name: ${calendar.displayName}")
-                                        onCalendarSelected(calendar.id)
-                                    }
-                                )
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = (calendar.id == selectedCalendarId),
-                                onClick = {
-                                    Timber.d("CalendarSelectionScreen: RadioButton geklickt - ID: ${calendar.id}")
-                                    onCalendarSelected(calendar.id)
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = calendar.displayName,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
                 ) {
-                    TextButton(onClick = {
-                        Timber.d("CalendarSelectionScreen: Abbrechen geklickt.")
-                        onCancelClicked()
-                    }) {
-                        Text("Abbrechen")
+                    items(calendarState.availableCalendars) { calendar ->
+                        val isSelected = calendarState.selectedCalendarIds.contains(calendar.id)
+                        
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                // SINGLE SOURCE OF TRUTH: Direkte Aktualisierung über ViewModel
+                                // Kein lokaler State - alles geht durch Repository
+                                calendarViewModel.toggleCalendarSelection(calendar.id)
+                            },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(SpacingConstants.SPACING_LARGE),
+                                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        calendar.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    calendar.accountName?.let { accountName ->
+                                        Text(
+                                            accountName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Ausgewählt",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            Timber.d("CalendarSelectionScreen: Speichern geklickt mit ID: $selectedCalendarId")
-                            onSaveClicked()
-                        },
-                        enabled = selectedCalendarId.isNotBlank()
-                    ) {
-                        Text("Auswahl speichern")
+                    
+                    // PAGINATION: Load More Button
+                    if (calendarState.hasMoreCalendars) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = SpacingConstants.SPACING_MEDIUM),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (calendarState.isLoadingMore) {
+                                    CircularProgressIndicator()
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { calendarViewModel.loadMoreCalendars() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Weitere Kalender laden")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

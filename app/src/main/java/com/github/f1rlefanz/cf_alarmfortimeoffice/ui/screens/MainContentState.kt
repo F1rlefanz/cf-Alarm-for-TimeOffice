@@ -1,6 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens
 
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AuthState
 
 /**
  * OPTIMIERUNG: MainContentScreen State Management
@@ -33,7 +33,6 @@ fun determineContentState(authState: AuthState, persistedCalendarId: String): Co
         persistedCalendarId.isBlank() -> ContentState.NoCalendarSelected
         !authState.autoAlarmEnabled -> ContentState.AutoAlarmDisabled
         authState.calendarsLoading -> ContentState.LoadingShifts
-        !authState.calendarEventsLoaded && authState.nextShiftAlarm == null -> ContentState.NoShiftFound
         else -> ContentState.NoShiftFound
     }
 }
@@ -53,8 +52,8 @@ fun determineErrorState(authState: AuthState): ErrorState {
         authState.accessToken.isNullOrBlank() && !authState.calendarsLoading && authState.calendarPermissionDenied -> {
             ErrorState.GoogleAuthFailed
         }
-        authState.error != null && (authState.error.contains("Kalender") || authState.error.contains("Authentifizierung")) -> {
-            ErrorState.GeneralError(authState.error)
+        authState.error?.let { it.contains("Kalender") || it.contains("Authentifizierung") } == true -> {
+            ErrorState.GeneralError(authState.error!!)
         }
         else -> ErrorState.None
     }

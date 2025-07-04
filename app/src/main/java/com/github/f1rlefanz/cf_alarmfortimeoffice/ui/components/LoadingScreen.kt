@@ -5,7 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
 
 @Composable
 fun LoadingScreen(
@@ -18,10 +18,10 @@ fun LoadingScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(48.dp),
-            strokeWidth = 4.dp
+            modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE),
+            strokeWidth = SpacingConstants.SPACING_EXTRA_SMALL
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_LARGE))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,

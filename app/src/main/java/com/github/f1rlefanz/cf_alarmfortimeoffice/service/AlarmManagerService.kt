@@ -8,9 +8,11 @@ import android.content.Intent
 import android.os.Build
 import com.github.f1rlefanz.cf_alarmfortimeoffice.AlarmReceiver
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DateTimeFormats
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 
 /**
  * Extrahierte AlarmManager-Logic aus AuthViewModel
@@ -26,7 +28,12 @@ class AlarmManagerService(private val application: Application) {
         val alarmStatusMessage: String?
     )
     
-    fun checkAlarmPermissions(): Boolean {
+    data class NextAlarmInfo(
+        val triggerTime: Long,
+        val formattedTime: String
+    )
+    
+    fun canScheduleExactAlarms(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             alarmManager.canScheduleExactAlarms()
         } else {
@@ -34,9 +41,47 @@ class AlarmManagerService(private val application: Application) {
         }
     }
     
+    fun checkAlarmPermissions(): Boolean {
+        return canScheduleExactAlarms()
+    }
+    
+    fun requestExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!alarmManager.canScheduleExactAlarms()) {
+                val intent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                application.startActivity(intent)
+            }
+        }
+    }
+    
+    fun getNextAlarmInfo(): NextAlarmInfo? {
+        return try {
+            val nextAlarmClockInfo = alarmManager.nextAlarmClock
+            if (nextAlarmClockInfo != null) {
+                val triggerTime = nextAlarmClockInfo.triggerTime
+                val formattedTime = formatAlarmTime(
+                    java.time.LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(triggerTime),
+                        java.time.ZoneId.systemDefault()
+                    )
+                )
+                NextAlarmInfo(triggerTime, formattedTime)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM_MANAGER, "Error getting next alarm info", e)
+            null
+        }
+    }
+    
     fun setAlarmFromShiftMatch(shiftMatch: ShiftMatch, autoAlarmEnabled: Boolean): AlarmStatus {
+        Logger.business(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: setAlarmFromShiftMatch called", 
+            "autoAlarmEnabled=$autoAlarmEnabled, shift=${shiftMatch.shiftDefinition.name}, alarmTime=${shiftMatch.calculatedAlarmTime}")
+        
         if (!autoAlarmEnabled) {
-            Timber.d("Auto-Alarm deaktiviert, setze keinen Alarm")
+            Logger.d(LogTags.ALARM_MANAGER, "Auto-Alarm disabled, not setting alarm")
             return AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = checkAlarmPermissions(),
@@ -44,8 +89,11 @@ class AlarmManagerService(private val application: Application) {
             )
         }
         
-        if (!checkAlarmPermissions()) {
-            Timber.w("Keine Berechtigung für exakte Alarme")
+        val canSchedule = checkAlarmPermissions()
+        Logger.business(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Permissions check", "canScheduleExactAlarms=$canSchedule")
+        
+        if (!canSchedule) {
+            Logger.w(LogTags.ALARM_MANAGER, "No permission for exact alarms")
             return AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = false,
@@ -54,10 +102,32 @@ class AlarmManagerService(private val application: Application) {
         }
         
         return try {
+            val alarmTimeMillis = shiftMatch.calculatedAlarmTime
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+            
+            val currentTimeMillis = System.currentTimeMillis()
+            val timeDifferenceMinutes = (alarmTimeMillis - currentTimeMillis) / (1000 * 60)
+            
+            Logger.business(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Timing", 
+                "currentTime=$currentTimeMillis, alarmTime=$alarmTimeMillis, differenceMinutes=$timeDifferenceMinutes")
+            
+            if (alarmTimeMillis <= currentTimeMillis) {
+                Logger.w(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Alarm time is in the past! alarmTime=${shiftMatch.calculatedAlarmTime}, current=${java.time.LocalDateTime.now()}")
+                return AlarmStatus(
+                    systemAlarmSet = false,
+                    canScheduleExactAlarms = true,
+                    alarmStatusMessage = "Alarm-Zeit liegt in der Vergangenheit"
+                )
+            }
+            
             // Erstelle Intent für AlarmReceiver
             val alarmIntent = Intent(application, AlarmReceiver::class.java).apply {
                 putExtra("shift_name", shiftMatch.shiftDefinition.name)
                 putExtra("alarm_time", formatAlarmTime(shiftMatch.calculatedAlarmTime))
+                // Fix AttributionTag issue
+                setPackage(application.packageName)
             }
             
             val pendingIntent = PendingIntent.getBroadcast(
@@ -67,12 +137,10 @@ class AlarmManagerService(private val application: Application) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             
-            // Setze exakten Alarm
-            val alarmTimeMillis = shiftMatch.calculatedAlarmTime
-                .atZone(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
+            Logger.business(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Setting alarm", 
+                "requestCode=$ALARM_REQUEST_CODE, pendingIntent=$pendingIntent")
             
+            // Setze exakten Alarm
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 alarmTimeMillis,
@@ -80,7 +148,13 @@ class AlarmManagerService(private val application: Application) {
             )
             
             val formattedTime = formatAlarmTime(shiftMatch.calculatedAlarmTime)
-            Timber.i("System-Alarm gesetzt für ${shiftMatch.shiftDefinition.name} um $formattedTime")
+            Logger.business(LogTags.ALARM_MANAGER, "✅ ALARM DEBUG: System alarm set successfully", 
+                "${shiftMatch.shiftDefinition.name} at $formattedTime")
+            
+            // Verify alarm was set by checking next alarm
+            val nextAlarmInfo = getNextAlarmInfo()
+            Logger.business(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Next alarm verification", 
+                "nextAlarm=${nextAlarmInfo?.formattedTime ?: "none"}")
             
             AlarmStatus(
                 systemAlarmSet = true,
@@ -89,14 +163,14 @@ class AlarmManagerService(private val application: Application) {
             )
             
         } catch (e: SecurityException) {
-            Timber.e(e, "SecurityException beim Setzen des Alarms")
+            Logger.e(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: SecurityException when setting alarm", e)
             AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = false,
-                alarmStatusMessage = "Alarm-Berechtigung verweigert"
+                alarmStatusMessage = "Alarm-Berechtigung verweigert: ${e.message}"
             )
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Setzen des System-Alarms")
+            Logger.e(LogTags.ALARM_MANAGER, "🔧 ALARM DEBUG: Exception when setting alarm", e)
             AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = checkAlarmPermissions(),
@@ -107,7 +181,10 @@ class AlarmManagerService(private val application: Application) {
     
     fun cancelSystemAlarm(): AlarmStatus {
         return try {
-            val alarmIntent = Intent(application, AlarmReceiver::class.java)
+            val alarmIntent = Intent(application, AlarmReceiver::class.java).apply {
+                // Fix AttributionTag issue
+                setPackage(application.packageName)
+            }
             val pendingIntent = PendingIntent.getBroadcast(
                 application,
                 ALARM_REQUEST_CODE,
@@ -118,7 +195,7 @@ class AlarmManagerService(private val application: Application) {
             alarmManager.cancel(pendingIntent)
             pendingIntent.cancel()
             
-            Timber.i("System-Alarm abgebrochen")
+            Logger.business(LogTags.ALARM_MANAGER, "System alarm cancelled")
             AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = checkAlarmPermissions(),
@@ -126,7 +203,7 @@ class AlarmManagerService(private val application: Application) {
             )
             
         } catch (e: Exception) {
-            Timber.e(e, "Fehler beim Abbrechen des System-Alarms")
+            Logger.e(LogTags.ALARM_MANAGER, "Error cancelling system alarm", e)
             AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = checkAlarmPermissions(),
@@ -136,11 +213,47 @@ class AlarmManagerService(private val application: Application) {
     }
     
     private fun formatAlarmTime(alarmTime: java.time.LocalDateTime): String {
-        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+        val formatter = DateTimeFormatter.ofPattern(DateTimeFormats.STANDARD_DATETIME)
         return alarmTime.format(formatter)
     }
     
     companion object {
         private const val ALARM_REQUEST_CODE = 1001
+    }
+    
+    /**
+     * DEBUG: Create a test alarm for debugging purposes
+     * This creates an alarm 2 minutes in the future to test the alarm system
+     */
+    fun createDebugAlarm(): AlarmStatus {
+        Logger.business(LogTags.ALARM_MANAGER, "🧪 DEBUG: Creating test alarm")
+        
+        val now = java.time.LocalDateTime.now()
+        val alarmTime = now.plusMinutes(2) // 2 minutes from now
+        
+        val debugShiftDefinition = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+            id = "debug_shift",
+            name = "🧪 DEBUG ALARM",
+            keywords = listOf("DEBUG"),
+            alarmTime = java.time.LocalTime.now().plusMinutes(2),
+            isEnabled = true
+        )
+        
+        val debugEvent = com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent(
+            id = "debug_event_${System.currentTimeMillis()}",
+            title = "DEBUG ALARM EVENT",
+            startTime = alarmTime,
+            endTime = alarmTime.plusHours(1),
+            calendarId = "debug_calendar",
+            isAllDay = false
+        )
+        
+        val debugShiftMatch = com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch(
+            shiftDefinition = debugShiftDefinition,
+            calendarEvent = debugEvent,
+            calculatedAlarmTime = alarmTime
+        )
+        
+        return setAlarmFromShiftMatch(debugShiftMatch, autoAlarmEnabled = true)
     }
 }
