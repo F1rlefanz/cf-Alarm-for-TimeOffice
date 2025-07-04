@@ -18,6 +18,14 @@ object LogTags {
     
     // === CALENDAR OPERATIONS ===
     const val CALENDAR = "CFAlarm.Calendar"
+    
+    // === HUE INTEGRATION ===
+    const val HUE = "CFAlarm.Hue"
+    const val HUE_BRIDGE = "CFAlarm.Hue.Bridge"
+    const val HUE_LIGHTS = "CFAlarm.Hue.Lights"
+    const val HUE_RULES = "CFAlarm.Hue.Rules"
+    const val HUE_CONFIG = "CFAlarm.Hue.Config"
+    const val HUE_DISCOVERY = "CFAlarm.Hue.Discovery"
     const val CALENDAR_CACHE = "CFAlarm.Cal.Cache"
     const val CALENDAR_API = "CFAlarm.Cal.API"
     
