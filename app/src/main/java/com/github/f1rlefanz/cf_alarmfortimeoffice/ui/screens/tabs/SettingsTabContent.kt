@@ -29,8 +29,9 @@ fun SettingsTabContent(
 ) {
     val context = LocalContext.current
     val authState by authViewModel.uiState.collectAsState()
-    val shiftState by (shiftViewModel?.uiState?.collectAsState() ?: MutableStateFlow(null).collectAsState())
-    
+    val shiftState by (shiftViewModel?.uiState?.collectAsState()
+        ?: MutableStateFlow(null).collectAsState())
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -45,7 +46,7 @@ fun SettingsTabContent(
                 onDismiss = { authViewModel.clearError() }
             )
         }
-        
+
         Text(
             "Einstellungen",
             style = MaterialTheme.typography.headlineMedium,
@@ -129,7 +130,7 @@ fun SettingsTabContent(
             shiftState?.currentShiftConfig?.let { config ->
                 var expanded by remember { mutableStateOf(false) }
                 val daysOptions = listOf(3, 7, 14, 30)
-                
+
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -157,7 +158,7 @@ fun SettingsTabContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
+
                         ExposedDropdownMenuBox(
                             expanded = expanded,
                             onExpandedChange = { expanded = !expanded }
@@ -195,83 +196,6 @@ fun SettingsTabContent(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = SpacingConstants.SPACING_SMALL))
 
-        // DEBUG-Bereich (nur in Debug-Builds)
-        if (com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig.DEBUG) {
-            Text(
-                "🔧 Debug",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            
-            // Debug Alarm Test
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { 
-                    try {
-                        val alarmService = com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmManagerService(context.applicationContext as android.app.Application)
-                        val result = alarmService.createDebugAlarm()
-                        
-                        // Ensure Toast runs on UI thread
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            val message = if (result.systemAlarmSet) {
-                                "🧪 Debug-Alarm in 2 Minuten gesetzt!"
-                            } else {
-                                "❌ Debug-Alarm fehlgeschlagen: ${result.alarmStatusMessage}"
-                            }
-                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-                        }
-                        
-                        // Log for debugging
-                        com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger.business(
-                            com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags.ALARM, 
-                            "Debug alarm button clicked", 
-                            "Success: ${result.systemAlarmSet}, Message: ${result.alarmStatusMessage}"
-                        )
-                    } catch (e: Exception) {
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(context, "❌ Fehler: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                        }
-                        com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger.e(
-                            com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags.ALARM,
-                            "Debug alarm button error",
-                            e
-                        )
-                    }
-                },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(SpacingConstants.PADDING_CARD),
-                    horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.BugReport,
-                        contentDescription = null,
-                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "🧪 Test Alarm (2 Min)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            "Testet die Alarm-Funktionalität",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-            }
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = SpacingConstants.SPACING_SMALL))
-        }
 
         // Account-Bereich
         Text(
@@ -311,7 +235,7 @@ fun SettingsTabContent(
 
         // App-Info
         Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
-        
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -339,7 +263,7 @@ fun SettingsTabContent(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                
+
                 Text(
                     "CF-Alarm for TimeOffice",
                     style = MaterialTheme.typography.bodyMedium
