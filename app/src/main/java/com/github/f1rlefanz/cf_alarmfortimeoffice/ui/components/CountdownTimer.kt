@@ -23,6 +23,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DateTimeFormats
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIText
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AlphaValues
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.FontSizes
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.BorderConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AnimationDurations
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalDateTime
@@ -57,7 +65,7 @@ fun CountdownTimer(
                 remaining
             }
             
-            delay(1000)
+            delay(AnimationDurations.TIMER_UPDATE_MS)
         }
     }
     
@@ -72,7 +80,7 @@ fun CountdownTimer(
         initialValue = 1f,
         targetValue = 1.02f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = EaseInOutCubic),
+            animation = tween(AnimationDurations.PULSE_MS.toInt(), easing = EaseInOutCubic),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
@@ -94,9 +102,9 @@ fun CountdownTimer(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 8.dp
+            defaultElevation = SpacingConstants.CARD_ELEVATION * 2
         ),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS * 2)
     ) {
         Box(
             modifier = Modifier
@@ -104,8 +112,8 @@ fun CountdownTimer(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            urgencyColor.copy(alpha = 0.1f),
-                            urgencyColor.copy(alpha = 0.05f),
+                            urgencyColor.copy(alpha = AlphaValues.LIGHT),
+                            urgencyColor.copy(alpha = AlphaValues.VERY_LIGHT),
                             Color.Transparent
                         )
                     )
@@ -114,23 +122,23 @@ fun CountdownTimer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(SpacingConstants.SPACING_EXTRA_LARGE),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
             ) {
                 // Header with icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
                 ) {
                     Icon(
                         imageVector = if (isExpired) Icons.Filled.NotificationsActive else Icons.Filled.Timer,
                         contentDescription = null,
                         tint = urgencyColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                     )
                     Text(
-                        text = if (isExpired) "Zeit abgelaufen!" else "Zeit bis zum Wecker",
+                        text = if (isExpired) UIText.TIME_EXPIRED else UIText.TIME_UNTIL_ALARM,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -140,20 +148,20 @@ fun CountdownTimer(
                 // Time display
                 if (!isExpired) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (days > 0) {
                             TimeUnit(
                                 value = days.toInt(),
-                                unit = "Tage",
+                                unit = UIText.UNIT_DAYS,
                                 color = urgencyColor
                             )
                         }
                         
                         TimeUnit(
                             value = hours.toInt(),
-                            unit = "Std",
+                            unit = UIText.UNIT_HOURS,
                             color = urgencyColor,
                             isHighlighted = days == 0L
                         )
@@ -162,7 +170,7 @@ fun CountdownTimer(
                         
                         TimeUnit(
                             value = minutes.toInt(),
-                            unit = "Min",
+                            unit = UIText.UNIT_MINUTES,
                             color = urgencyColor,
                             isHighlighted = days == 0L && hours == 0L
                         )
@@ -172,22 +180,22 @@ fun CountdownTimer(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = SpacingConstants.SPACING_SMALL),
                         contentAlignment = Alignment.Center
                     ) {
                         val blink = rememberInfiniteTransition(label = "blink")
                         val alpha = blink.animateFloat(
-                            initialValue = 0.3f,
+                            initialValue = AlphaValues.STRONG,
                             targetValue = 1f,
                             animationSpec = infiniteRepeatable(
-                                animation = tween(500),
+                                animation = tween(AnimationDurations.BLINK_MS.toInt()),
                                 repeatMode = RepeatMode.Reverse
                             ),
                             label = "blinkAlpha"
                         )
                         
                         Text(
-                            text = "ALARM AKTIV!",
+                            text = UIText.ALARM_ACTIVE,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error,
@@ -198,7 +206,7 @@ fun CountdownTimer(
                 
                 // Target time display
                 Text(
-                    text = targetTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")),
+                    text = targetTime.format(DateTimeFormatter.ofPattern(DateTimeFormats.STANDARD_DATETIME)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -223,19 +231,19 @@ private fun TimeUnit(
         Box(
             modifier = Modifier
                 .size(
-                    width = if (isHighlighted) 80.dp else 72.dp,
-                    height = if (isHighlighted) 80.dp else 72.dp
+                    width = if (isHighlighted) SpacingConstants.ICON_SIZE_XXL + SpacingConstants.SPACING_SMALL else SpacingConstants.ICON_SIZE_XXL,
+                    height = if (isHighlighted) SpacingConstants.ICON_SIZE_XXL + SpacingConstants.SPACING_SMALL else SpacingConstants.ICON_SIZE_XXL
                 )
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(SpacingConstants.SPACING_LARGE))
                 .background(
                     color = if (isHighlighted) 
-                        color.copy(alpha = 0.15f) 
+                        color.copy(alpha = AlphaValues.MEDIUM) 
                     else 
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaValues.SURFACE_VARIANT)
                 )
                 .then(
                     if (isHighlighted) 
-                        Modifier.border(2.dp, color, RoundedCornerShape(16.dp))
+                        Modifier.border(BorderConstants.HIGHLIGHTED_WIDTH.dp, color, RoundedCornerShape(SpacingConstants.SPACING_LARGE))
                     else 
                         Modifier
                 ),
@@ -243,14 +251,14 @@ private fun TimeUnit(
         ) {
             Text(
                 text = displayValue,
-                fontSize = if (isHighlighted) 28.sp else 24.sp,
+                fontSize = if (isHighlighted) FontSizes.COUNTDOWN_LARGE.sp else FontSizes.COUNTDOWN_NORMAL.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (isHighlighted) color else MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_SMALL))
         
         Text(
             text = unit,
@@ -266,18 +274,18 @@ private fun TimeUnitSeparator() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.height(64.dp)
+        modifier = Modifier.height(SpacingConstants.ICON_SIZE_XXL)
     ) {
         Box(
             modifier = Modifier
-                .size(4.dp)
+                .size(SpacingConstants.SPACING_EXTRA_SMALL)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.onSurfaceVariant)
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_SMALL))
         Box(
             modifier = Modifier
-                .size(4.dp)
+                .size(SpacingConstants.SPACING_EXTRA_SMALL)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.onSurfaceVariant)
         )
@@ -291,8 +299,8 @@ fun CountdownTimerPreview() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(SpacingConstants.SPACING_LARGE),
+            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
         ) {
             // In 2 days
             CountdownTimer(

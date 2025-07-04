@@ -64,7 +64,7 @@
             
         <!-- AlarmStopService - Stops alarm when user dismisses -->
         <service
-            android:name=".AlarmStopService"
+            android:name=".service.AlarmStopService"
             android:exported="false" />
         
     </application>

@@ -29,8 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmStopService
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AnimationDurations
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -39,7 +43,7 @@ class AlarmFullScreenActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        Timber.d("AlarmFullScreenActivity onCreate")
+        Logger.d(LogTags.ALARM, "AlarmFullScreenActivity onCreate")
 
         setupWindowFlags()
         
@@ -95,12 +99,12 @@ class AlarmFullScreenActivity : ComponentActivity() {
                 vibrator.vibrate(200)
             }
         } catch (e: Exception) {
-            Timber.w(e, "Haptic feedback failed")
+            Logger.w(LogTags.ALARM, "Haptic feedback failed: ${e.message}")
         }
     }
     
     private fun stopAlarmAndFinish() {
-        Timber.d("Stoppe Alarm und beende Activity")
+        Logger.d(LogTags.ALARM, "Stoppe Alarm und beende Activity")
         
         // Stoppe Alarm über Service
         val stopIntent = Intent(this, AlarmStopService::class.java)
@@ -112,7 +116,7 @@ class AlarmFullScreenActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        Timber.d("AlarmFullScreenActivity onDestroy")
+        Logger.d(LogTags.ALARM, "AlarmFullScreenActivity onDestroy")
     }
 }
 
@@ -128,7 +132,7 @@ fun AlarmFullScreenContent(
     // Timer für Zeit-Update
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(AnimationDurations.TIMER_UPDATE_MS)
             currentTime = getCurrentTimeString()
         }
     }
@@ -139,7 +143,7 @@ fun AlarmFullScreenContent(
         initialValue = 0.9f,
         targetValue = 1.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = EaseInOutSine),
+            animation = tween(AnimationDurations.PULSE_MS.toInt(), easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
         label = "alarm_pulse_scale"
@@ -171,7 +175,7 @@ fun AlarmFullScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .background(brush = backgroundGradient)
-            .padding(24.dp),
+            .padding(SpacingConstants.SPACING_EXTRA_LARGE),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -187,7 +191,7 @@ fun AlarmFullScreenContent(
                 isDarkTheme = isDarkTheme
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
             
             // Alarm Titel mit Einblend-Animation
             AnimatedVisibility(
@@ -215,7 +219,7 @@ fun AlarmFullScreenContent(
                 )
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_EXTRA_LARGE))
             
             // Moderne Zeit-Anzeige
             ModernTimeDisplay(
@@ -223,7 +227,7 @@ fun AlarmFullScreenContent(
                 isDarkTheme = isDarkTheme
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
             
             // Verbesserte Schicht-Info mit Animation
             EnhancedShiftInfo(
@@ -232,7 +236,7 @@ fun AlarmFullScreenContent(
                 isDarkTheme = isDarkTheme
             )
             
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXXL))
             
             // Verbesserter Stopp-Button mit Hover-Effekt
             EnhancedStopButton(
@@ -249,7 +253,7 @@ private fun AnimatedAlarmIcon(
 ) {
     Card(
         modifier = Modifier
-            .size(140.dp)
+            .size(SpacingConstants.FULLSCREEN_ELEMENT_SIZE)
             .scale(scale),
         colors = CardDefaults.cardColors(
             containerColor = if (isDarkTheme)
@@ -257,7 +261,7 @@ private fun AnimatedAlarmIcon(
             else
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION * 4),
         shape = CircleShape
     ) {
         Box(
@@ -267,7 +271,7 @@ private fun AnimatedAlarmIcon(
             Icon(
                 imageVector = Icons.Filled.Alarm,
                 contentDescription = "Wecker-Symbol",
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(SpacingConstants.ICON_SIZE_GIANT - SpacingConstants.SPACING_LARGE),
                 tint = MaterialTheme.colorScheme.error
             )
         }
@@ -287,20 +291,20 @@ private fun ModernTimeDisplay(
             else
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-        shape = RoundedCornerShape(20.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION * 3),
+        shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(28.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(SpacingConstants.SPACING_XXXL - SpacingConstants.SPACING_EXTRA_SMALL),
+            horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(SpacingConstants.ICON_SIZE_XXL)
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -309,7 +313,7 @@ private fun ModernTimeDisplay(
                     Icon(
                         imageVector = Icons.Filled.AccessTime,
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(SpacingConstants.SPACING_XXXL - SpacingConstants.SPACING_LARGE),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -353,21 +357,21 @@ private fun EnhancedShiftInfo(
                 else
                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f)
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            shape = RoundedCornerShape(16.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.SPACING_SMALL),
+            shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS + SpacingConstants.SPACING_EXTRA_SMALL)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(SpacingConstants.SPACING_EXTRA_LARGE),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
                 ) {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE + SpacingConstants.SPACING_EXTRA_SMALL)
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -377,7 +381,7 @@ private fun EnhancedShiftInfo(
                                 imageVector = Icons.Filled.Work,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                             )
                         }
                     }
@@ -390,7 +394,7 @@ private fun EnhancedShiftInfo(
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(SpacingConstants.SPACING_MEDIUM))
                 
                 Text(
                     text = shiftName,
@@ -406,16 +410,16 @@ private fun EnhancedShiftInfo(
                 )
                 
                 if (alarmTime != "Jetzt") {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(SpacingConstants.SPACING_MEDIUM))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Schedule,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
                         )
                         Text(
                             text = "Geplant für: $alarmTime",
@@ -451,26 +455,26 @@ private fun EnhancedStopButton(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
+                .height(SpacingConstants.BUTTON_HEIGHT_FULLSCREEN)
                 .scale(if (isPressed) 0.95f else 1f),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.error,
                 contentColor = MaterialTheme.colorScheme.onError
             ),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS),
             elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 12.dp,
-                pressedElevation = 8.dp
+                defaultElevation = SpacingConstants.CARD_ELEVATION * 3,
+                pressedElevation = SpacingConstants.SPACING_SMALL
             )
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.onError.copy(alpha = 0.2f),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE + SpacingConstants.SPACING_SMALL)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -479,7 +483,7 @@ private fun EnhancedStopButton(
                         Icon(
                             imageVector = Icons.Filled.Stop,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_LARGE),
                             tint = MaterialTheme.colorScheme.onError
                         )
                     }
@@ -502,7 +506,7 @@ private fun EnhancedStopButton(
     // Reset pressed state after animation
     LaunchedEffect(isPressed) {
         if (isPressed) {
-            kotlinx.coroutines.delay(150)
+            kotlinx.coroutines.delay(AnimationDurations.QUICK_MS)
             isPressed = false
         }
     }

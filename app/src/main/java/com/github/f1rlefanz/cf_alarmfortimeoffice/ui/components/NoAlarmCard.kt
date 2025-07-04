@@ -22,6 +22,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIColors
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.GraphicsConstants
 
 /**
  * Card shown when no alarm is set
@@ -38,7 +42,7 @@ fun NoAlarmCard(
         initialValue = -5f,
         targetValue = 5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = EaseInOutCubic),
+            animation = tween(UIConstants.ANIMATION_DURATION_LONG_MS.toInt(), easing = EaseInOutCubic),
             repeatMode = RepeatMode.Reverse
         ),
         label = "float"
@@ -48,7 +52,7 @@ fun NoAlarmCard(
         initialValue = 0.3f,
         targetValue = 0.7f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOut),
+            animation = tween((UIConstants.ANIMATION_DURATION_LONG_MS * 0.7).toInt(), easing = EaseInOut),
             repeatMode = RepeatMode.Reverse
         ),
         label = "alpha"
@@ -62,9 +66,9 @@ fun NoAlarmCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 6.dp
+            defaultElevation = SpacingConstants.CARD_ELEVATION
         ),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS)
     ) {
         Box(
             modifier = Modifier
@@ -76,21 +80,21 @@ fun NoAlarmCard(
                             reason.color.copy(alpha = 0.05f),
                             Color.Transparent
                         ),
-                        radius = 500f
+                        radius = GraphicsConstants.GRADIENT_RADIUS
                     )
                 )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(SpacingConstants.PADDING_CARD),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
             ) {
                 // Animated icon
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(SpacingConstants.ICON_SIZE_XXL + SpacingConstants.SPACING_LARGE)
                         .clip(CircleShape)
                         .background(
                             color = reason.color.copy(alpha = alphaAnimation.value * 0.3f)
@@ -102,7 +106,7 @@ fun NoAlarmCard(
                         contentDescription = null,
                         tint = reason.color,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                             .rotate(floatAnimation.value)
                     )
                 }
@@ -127,22 +131,22 @@ fun NoAlarmCard(
                 
                 // Action button (if provided)
                 onActionClick?.let {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(SpacingConstants.SPACING_SMALL))
                     
                     Button(
                         onClick = it,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = reason.color
                         ),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(SpacingConstants.SPACING_LARGE),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
                             imageVector = reason.actionIcon,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                         Text(
                             text = reason.actionText,
                             fontWeight = FontWeight.Bold
@@ -168,10 +172,10 @@ sealed class NoAlarmReason(
 
 class NoShiftFound : NoAlarmReason(
     title = "Keine Schicht gefunden",
-    description = "In den nächsten Tagen wurden keine Schichten in deinem Kalender gefunden. Genieße deine freie Zeit!",
+    description = "In den nächsten Tagen wurden keine Schichten in deinem Kalender gefunden.",
     icon = Icons.Outlined.EventBusy,
-    color = Color(0xFF4CAF50), // Green
-    actionText = "Kalender prüfen",
+    color = Color(UIColors.STATUS_SUCCESS), // Green
+    actionText = "Kalender auswählen",
     actionIcon = Icons.Filled.CalendarMonth
 )
 
@@ -179,7 +183,7 @@ class AutoAlarmDisabled : NoAlarmReason(
     title = "Auto-Alarm deaktiviert",
     description = "Automatische Wecker sind momentan ausgeschaltet. Aktiviere sie in den Einstellungen.",
     icon = Icons.Outlined.NotificationsOff,
-    color = Color(0xFFFF9800), // Orange
+    color = Color(UIColors.STATUS_WARNING), // Orange
     actionText = "Einstellungen öffnen",
     actionIcon = Icons.Filled.Settings
 )
@@ -188,7 +192,7 @@ class NoCalendarSelected : NoAlarmReason(
     title = "Kein Kalender ausgewählt",
     description = "Bitte wähle einen Dienstplan-Kalender aus, um automatische Wecker zu aktivieren.",
     icon = Icons.Outlined.CalendarMonth,
-    color = Color(0xFF2196F3), // Blue
+    color = Color(UIColors.STATUS_INFO), // Blue
     actionText = "Kalender auswählen",
     actionIcon = Icons.Filled.Add
 )
@@ -197,7 +201,7 @@ class LoadingShifts : NoAlarmReason(
     title = "Lade Schichten...",
     description = "Deine Kalenderdaten werden gerade abgerufen. Einen Moment bitte.",
     icon = Icons.Outlined.Refresh,
-    color = Color(0xFF9C27B0), // Purple
+    color = Color(UIColors.STATUS_LOADING), // Purple
     actionText = "",
     actionIcon = Icons.Filled.Refresh
 )
@@ -209,8 +213,8 @@ fun NoAlarmCardPreview() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(SpacingConstants.SPACING_LARGE),
+            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
         ) {
             NoAlarmCard(
                 reason = NoShiftFound(),

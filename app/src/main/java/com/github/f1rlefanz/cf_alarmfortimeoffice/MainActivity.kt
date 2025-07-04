@@ -17,33 +17,55 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.CredentialAuthManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.di.AppContainer
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.LoadingScreen
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.LoginScreen
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.MainScreen
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModelFactory
-import timber.log.Timber
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.common.api.ApiException
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var credentialAuthManager: CredentialAuthManager
-    internal lateinit var authViewModel: AuthViewModel
+    // ViewModels mit manueller Injection
+    private lateinit var authViewModel: AuthViewModel
+    private lateinit var calendarViewModel: CalendarViewModel
+    private lateinit var shiftViewModel: ShiftViewModel
+    private lateinit var alarmViewModel: AlarmViewModel
+    private lateinit var mainViewModel: MainViewModel
+    private lateinit var navigationViewModel: NavigationViewModel
 
-    // Launcher für die Android Kalender-Berechtigung
+    // PERFORMANCE FIX: Deduplication für Calendar Permission Requests
+    @Volatile
+    private var isPermissionRequestInProgress = false
+    @Volatile
+    private var lastPermissionCheckTime = 0L
+
+    // Permission Launchers
     private val requestCalendarPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            authViewModel.onAndroidCalendarPermissionResult(
-                isGranted = isGranted,
-                showRationaleIfDenied = !isGranted && !shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR)
-            )
+            isPermissionRequestInProgress = false // RESET permission request flag
+            
+            if (isGranted) {
+                Logger.business(LogTags.PERMISSIONS, "Calendar permission granted")
+                // PERFORMANCE FIX: Only load if not already loaded recently
+                val calendarState = calendarViewModel.uiState.value
+                if (calendarState.availableCalendars.isEmpty() && !calendarState.isLoading) {
+                    calendarViewModel.loadAvailableCalendars()
+                }
+            } else {
+                Toast.makeText(this, "Kalenderberechtigung ist erforderlich!", Toast.LENGTH_LONG).show()
+            }
         }
 
     // Launcher für Notification-Berechtigung
     private val requestNotificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            Timber.d("Notification permission result: $isGranted")
+            Logger.business(LogTags.PERMISSIONS, "Notification permission result", "granted: $isGranted")
             if (!isGranted) {
                 Toast.makeText(this, "Benachrichtigungsberechtigung ist für Alarme erforderlich!", Toast.LENGTH_LONG).show()
             }
@@ -52,26 +74,50 @@ class MainActivity : ComponentActivity() {
     // Launcher für das Ergebnis des AuthorizationClient Flows (Consent Screen)
     private val authorizationLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { activityResult: ActivityResult ->
-            Timber.d("AuthorizationClient: Ergebnis vom IntentSender erhalten. ResultCode: ${activityResult.resultCode}")
-            authViewModel.handleAuthorizationResult(activityResult, this)
+            Logger.d(LogTags.AUTH, "Authorization result: ${activityResult.resultCode}")
+            handleAuthorizationResult(activityResult)
+        }
+
+    // Launcher für Google Sign-In
+    private val googleSignInLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                try {
+                    val account = task.getResult(ApiException::class.java)
+                    Logger.business(LogTags.AUTH, "Google Sign-In successful", account.email ?: "unknown")
+                    authViewModel.handleSignInResult(account, this)
+                } catch (e: ApiException) {
+                    Logger.e(LogTags.AUTH, "Google Sign-In failed: ${e.statusCode}", e)
+                    authViewModel.handleSignInResult(null, this)
+                }
+            } else {
+                Logger.d(LogTags.AUTH, "Google Sign-In cancelled or failed")
+                authViewModel.handleSignInResult(null, this)
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        credentialAuthManager = CredentialAuthManager(this)
-        authViewModel = ViewModelProvider(
-            this,
-            AuthViewModelFactory(application, credentialAuthManager)
-        )[AuthViewModel::class.java]
+        // Dependency Container abrufen
+        val appContainer = (application as CFAlarmApplication).appContainer
+        
+        // ViewModels mit Factory erstellen
+        val viewModelFactory = ViewModelFactory(appContainer)
+        authViewModel = ViewModelProvider(this, viewModelFactory)[AuthViewModel::class.java]
+        calendarViewModel = ViewModelProvider(this, viewModelFactory)[CalendarViewModel::class.java]
+        shiftViewModel = ViewModelProvider(this, viewModelFactory)[ShiftViewModel::class.java]
+        alarmViewModel = ViewModelProvider(this, viewModelFactory)[AlarmViewModel::class.java]
+        mainViewModel = ViewModelProvider(this, viewModelFactory)[MainViewModel::class.java]
+        navigationViewModel = ViewModelProvider(this, viewModelFactory)[NavigationViewModel::class.java]
 
-        // Prüfe und fordere Notification-Berechtigung an
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
-                != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
+        // MEMORY LEAK FIX: Event-basiertes System statt Callback
+        // Observiere daysAhead-Änderungen über StateFlow statt Memory-Leak Callback
+        // Das wird in MainScreen.kt über LaunchedEffect gehandhabt
+
+        // Prüfe Notification-Berechtigung
+        checkNotificationPermission()
 
         setContent {
             CFAlarmForTimeOfficeTheme {
@@ -79,54 +125,118 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val authState by authViewModel.authState.collectAsState()
+                    // MEMORY LEAK FIX: Consolidated State Collection für MainActivity
+                    // Reduziert excessive Recompositions durch weniger collectAsState() calls
+                    val authState by authViewModel.uiState.collectAsState()
+                    val mainState by mainViewModel.uiState.collectAsState()
 
-                    if (authState.isLoading && !authState.isSignedIn) {
-                        LoadingScreen(message = "Lade Anmeldestatus...")
-                    } else if (authState.isSignedIn) {
-                        MainScreen(
-                            authViewModel = authViewModel,
-                            activity = this@MainActivity
-                        )
-                    } else {
-                        LoginScreen(authViewModel = authViewModel)
+                    // PERFORMANCE OPTIMIZATION: Memoized Screen Selection
+                    // Verhindert unnötige Recompositions bei State-Changes
+                    val screenContent = remember(authState.isSignedIn, authState.calendarOps.calendarsLoading) {
+                        when {
+                            authState.calendarOps.calendarsLoading && !authState.isSignedIn -> "loading"
+                            authState.isSignedIn -> "main"
+                            else -> "login"
+                        }
+                    }
+
+                    when (screenContent) {
+                        "loading" -> {
+                            LoadingScreen(message = "Lade Anmeldestatus...")
+                        }
+                        "main" -> {
+                            MainScreen(
+                                authViewModel = authViewModel,
+                                calendarViewModel = calendarViewModel,
+                                shiftViewModel = shiftViewModel,
+                                alarmViewModel = alarmViewModel,
+                                mainViewModel = mainViewModel,
+                                navigationViewModel = navigationViewModel,
+                                authDataStoreRepository = appContainer.authDataStoreRepository as com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository,
+                                onRequestCalendarPermission = { checkCalendarPermission() }
+                            )
+                        }
+                        "login" -> {
+                            LoginScreen(
+                                authViewModel = authViewModel,
+                                onSignIn = { launchSignIn() }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    fun checkAndRequestCalendarPermission() {
-        Timber.d("MainActivity: checkAndRequestCalendarPermission aufgerufen")
+    private fun checkNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    fun checkCalendarPermission() {
+        // PERFORMANCE FIX: Deduplication für mehrfache Permission-Checks
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastCheck = currentTime - lastPermissionCheckTime
+        
+        if (isPermissionRequestInProgress || timeSinceLastCheck < 2000) {
+            Logger.d(LogTags.PERMISSIONS, "Permission check throttled - in progress: $isPermissionRequestInProgress, time since last: ${timeSinceLastCheck}ms")
+            return
+        }
+        
+        lastPermissionCheckTime = currentTime
+        
         when {
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.READ_CALENDAR
             ) == PackageManager.PERMISSION_GRANTED -> {
-                Timber.d("MainActivity: Kalenderberechtigung bereits erteilt.")
-                authViewModel.onAndroidCalendarPermissionResult(isGranted = true)
+                Logger.business(LogTags.PERMISSIONS, "Calendar permission already granted")
+                // PERFORMANCE FIX: Only load if not already loaded and not loading
+                val calendarState = calendarViewModel.uiState.value
+                if (calendarState.availableCalendars.isEmpty() && !calendarState.isLoading) {
+                    calendarViewModel.loadAvailableCalendars()
+                }
             }
-
-            shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR) -> {
-                Timber.d("MainActivity: Erklärung für Kalenderberechtigung sollte angezeigt werden.")
-                authViewModel.onAndroidCalendarPermissionResult(
-                    isGranted = false,
-                    showRationaleIfDenied = true
-                )
-            }
-
             else -> {
-                Timber.d("MainActivity: Fordere Kalenderberechtigung an...")
+                Logger.d(LogTags.PERMISSIONS, "Requesting calendar permission")
+                isPermissionRequestInProgress = true
                 requestCalendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
             }
         }
     }
 
+    private fun launchSignIn() {
+        Logger.business(LogTags.AUTH, "Starting Google Sign-In")
+        
+        // Get Google Sign-In options from CalendarAuthUseCase
+        val appContainer = (application as CFAlarmApplication).appContainer
+        val calendarAuthUseCase = appContainer.calendarAuthUseCase as com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarAuthUseCase
+        val googleSignInOptions = calendarAuthUseCase.getGoogleSignInOptions()
+        
+        // Create GoogleSignInClient and start sign-in
+        val googleSignInClient = GoogleSignIn.getClient(this, googleSignInOptions)
+        val signInIntent = googleSignInClient.signInIntent
+        googleSignInLauncher.launch(signInIntent)
+    }
+
     fun launchAuthorizationIntent(pendingIntent: PendingIntent) {
-        Timber.d("MainActivity: Starte Authorization PendingIntent...")
+        Logger.d(LogTags.AUTH, "Starting Authorization PendingIntent")
         val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent).build()
         authorizationLauncher.launch(intentSenderRequest)
-        authViewModel.clearAuthorizationPendingIntent()
+    }
+
+    private fun handleAuthorizationResult(result: ActivityResult) {
+        // Authorization Result verarbeiten
+        if (result.resultCode == RESULT_OK) {
+            Logger.business(LogTags.AUTH, "Authorization successful")
+            // Kalender neu laden nach erfolgreicher Autorisierung
+            calendarViewModel.loadAvailableCalendars()
+        } else {
+            Logger.w(LogTags.AUTH, "Authorization failed or cancelled")
+        }
     }
 }
-

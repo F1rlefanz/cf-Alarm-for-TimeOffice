@@ -4,44 +4,46 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftDefinition
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftViewModel
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ShiftEditDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShiftConfigScreen(
-    authState: com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthState,
-    onToggleAutoAlarm: () -> Unit,
-    onUpdateShiftDefinition: (ShiftDefinition) -> Unit,
-    onDeleteShiftDefinition: (String) -> Unit,
-    onResetToDefaults: () -> Unit,
+    shiftViewModel: ShiftViewModel,
     onNavigateBack: () -> Unit
 ) {
-    var showAddShiftDialog by remember { mutableStateOf(false) }
-    var editingShift by remember { mutableStateOf<ShiftDefinition?>(null) }
-    
+    val shiftState by shiftViewModel.uiState.collectAsState()
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingDefinition by remember { mutableStateOf<ShiftDefinition?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Schicht-Konfiguration") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Zurück"
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showAddShiftDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Schicht hinzufügen")
-                    }
-                    IconButton(onClick = onResetToDefaults) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Zurücksetzen")
+                    IconButton(onClick = { showAddDialog = true }) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Schicht hinzufügen"
+                        )
                     }
                 }
             )
@@ -51,269 +53,198 @@ fun ShiftConfigScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
+            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
         ) {
-            // Auto-Alarm Toggle
+            // Auto-Alarm Switch
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(SpacingConstants.PADDING_CARD),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Automatische Wecker",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            "Automatische Alarme",
+                            style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Wecker basierend auf erkannten Schichten setzen",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "Alarme automatisch für erkannte Schichten setzen",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
-                        checked = authState.autoAlarmEnabled,
-                        onCheckedChange = { onToggleAutoAlarm() }
+                        checked = shiftState.currentShiftConfig?.autoAlarmEnabled ?: false,
+                        onCheckedChange = { enabled ->
+                            shiftState.currentShiftConfig?.let { config ->
+                                shiftViewModel.updateShiftConfig(
+                                    config.copy(autoAlarmEnabled = enabled)
+                                )
+                            }
+                        }
                     )
                 }
             }
-            
-            // Next Shift Info
-            authState.nextShiftAlarm?.let { nextShift ->
+
+            // Schichttypen
+            Text(
+                "Schichttypen",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            if (shiftState.currentShiftConfig?.definitions?.isEmpty() == true) {
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(SpacingConstants.PADDING_CARD),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_XXL),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(SpacingConstants.SPACING_SMALL))
                         Text(
-                            text = "Nächster Wecker",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            "Keine Schichttypen definiert",
+                            style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                            text = "Schicht: ${nextShift.shiftDefinition.name}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Termin: ${nextShift.calendarEventTitle}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Weckzeit: ${nextShift.calculatedAlarmTime}",
+                            "Füge Schichttypen hinzu, um die automatische Erkennung zu aktivieren",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }
-            }
-            
-            // Shift Definitions List
-            Text(
-                text = "Schicht-Definitionen",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            if (authState.shiftConfigLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
             } else {
-                LazyColumn {
-                    items(authState.shiftDefinitions) { shift ->
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
+                ) {
+                    items(
+                        shiftState.currentShiftConfig?.definitions ?: emptyList(),
+                        key = { it.name }
+                    ) { definition ->
                         ShiftDefinitionCard(
-                            shiftDefinition = shift,
-                            onEdit = { editingShift = shift },
-                            onDelete = { onDeleteShiftDefinition(shift.id) },
-                            onToggleEnabled = { 
-                                onUpdateShiftDefinition(shift.copy(isEnabled = !shift.isEnabled))
+                            definition = definition,
+                            onEdit = { editingDefinition = definition },
+                            onDelete = {
+                                shiftState.currentShiftConfig?.let { config ->
+                                    shiftViewModel.updateShiftConfig(
+                                        config.copy(
+                                            definitions = config.definitions - definition
+                                        )
+                                    )
+                                }
                             }
                         )
                     }
                 }
             }
+
+            // Reset Button
+            Spacer(modifier = Modifier.weight(1f))
             
-            authState.error?.let { error ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
-                ) {
-                    Text(
-                        text = error,
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
+            OutlinedButton(
+                onClick = {
+                    // Reset to defaults
+                    shiftViewModel.updateShiftConfig(ShiftConfig.getDefaultConfig())
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.RestartAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
+                )
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
+                Text("Auf Standardwerte zurücksetzen")
             }
         }
     }
-    
-    // Add/Edit Shift Dialog
-    if (showAddShiftDialog || editingShift != null) {
+
+    // Add/Edit Dialog
+    if (showAddDialog || editingDefinition != null) {
         ShiftEditDialog(
-            shift = editingShift,
-            onDismiss = { 
-                showAddShiftDialog = false
-                editingShift = null
+            shift = editingDefinition,
+            onSave = { newDefinition ->
+                shiftState.currentShiftConfig?.let { config ->
+                    val updatedDefinitions = if (editingDefinition != null) {
+                        config.definitions.map { 
+                            if (it.name == editingDefinition?.name) newDefinition else it 
+                        }
+                    } else {
+                        config.definitions + newDefinition
+                    }
+                    shiftViewModel.updateShiftConfig(
+                        config.copy(definitions = updatedDefinitions)
+                    )
+                }
+                showAddDialog = false
+                editingDefinition = null
             },
-            onSave = { shift ->
-                onUpdateShiftDefinition(shift)
-                showAddShiftDialog = false
-                editingShift = null
+            onDismiss = {
+                showAddDialog = false
+                editingDefinition = null
             }
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShiftDefinitionCard(
-    shiftDefinition: ShiftDefinition,
+private fun ShiftDefinitionCard(
+    definition: ShiftDefinition,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onToggleEnabled: () -> Unit
+    onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onEdit
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(SpacingConstants.PADDING_CARD),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = shiftDefinition.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Schlüsselwörter: ${shiftDefinition.keywords.joinToString(", ")}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Weckzeit: ${shiftDefinition.alarmTime}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                
-                Row {
-                    Switch(
-                        checked = shiftDefinition.isEnabled,
-                        onCheckedChange = { onToggleEnabled() }
-                    )
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Bearbeiten")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Löschen")
-                    }
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    definition.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Muster: ${definition.keywords.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "Alarm: ${definition.getAlarmTimeFormatted()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Löschen",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
 }
 
-@Composable
-fun ShiftEditDialog(
-    shift: ShiftDefinition?,
-    onDismiss: () -> Unit,
-    onSave: (ShiftDefinition) -> Unit
-) {
-    var name by remember { mutableStateOf(shift?.name ?: "") }
-    var keywords by remember { mutableStateOf(shift?.keywords?.joinToString(", ") ?: "") }
-    var alarmTime by remember { mutableStateOf(shift?.alarmTime ?: "06:00") }
-    var isEnabled by remember { mutableStateOf(shift?.isEnabled != false) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { 
-            Text(if (shift == null) "Neue Schicht" else "Schicht bearbeiten") 
-        },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = keywords,
-                    onValueChange = { keywords = it },
-                    label = { Text("Schlüsselwörter (kommagetrennt)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = alarmTime,
-                    onValueChange = { alarmTime = it },
-                    label = { Text("Weckzeit (HH:mm)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Switch(
-                        checked = isEnabled,
-                        onCheckedChange = { isEnabled = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Aktiviert")
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val id = shift?.id ?: "custom_${System.currentTimeMillis()}"
-                    val keywordList = keywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    onSave(
-                        ShiftDefinition(
-                            id = id,
-                            name = name,
-                            keywords = keywordList,
-                            alarmTime = alarmTime,
-                            isEnabled = isEnabled
-                        )
-                    )
-                },
-                enabled = name.isNotBlank() && keywords.isNotBlank() && alarmTime.isNotBlank()
-            ) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-}
+
