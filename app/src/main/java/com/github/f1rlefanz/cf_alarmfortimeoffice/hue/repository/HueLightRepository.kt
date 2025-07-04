@@ -1,0 +1,256 @@
+package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository
+
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiClient
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueGroup
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueLight
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueBridgeRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueLightRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Repository for Hue Light operations
+ * Implements Clean Architecture with Interface-based DI and Logger integration
+ */
+class HueLightRepository(
+    private val bridgeRepository: IHueBridgeRepository
+) : IHueLightRepository {
+    
+    private val apiClient = HueApiClient()
+    
+    override suspend fun getLights(): Result<List<HueLight>> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot get lights: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Fetching lights from bridge $bridgeIp")
+            
+            val lightsResponse = apiClient.getLights(bridgeIp, username)
+            val lights = lightsResponse.map { (id, lightData) ->
+                HueLight(
+                    id = id,
+                    name = lightData.name,
+                    on = lightData.state.on,
+                    brightness = lightData.state.bri,
+                    hue = lightData.state.hue,
+                    saturation = lightData.state.sat,
+                    reachable = lightData.state.reachable
+                )
+            }
+            
+            Logger.i(LogTags.HUE_LIGHTS, "Successfully retrieved ${lights.size} lights")
+            Result.success(lights)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to get lights", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun getGroups(): Result<List<HueGroup>> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot get groups: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Fetching groups from bridge $bridgeIp")
+            
+            val groupsResponse = apiClient.getGroups(bridgeIp, username)
+            val groups = groupsResponse.map { (id, groupData) ->
+                HueGroup(
+                    id = id,
+                    name = groupData.name,
+                    lightIds = groupData.lights,
+                    on = groupData.action?.on ?: false,
+                    brightness = groupData.action?.bri,
+                    hue = groupData.action?.hue,
+                    saturation = groupData.action?.sat
+                )
+            }
+            
+            Logger.i(LogTags.HUE_LIGHTS, "Successfully retrieved ${groups.size} groups")
+            Result.success(groups)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to get groups", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun controlLight(
+        lightId: String,
+        on: Boolean?,
+        brightness: Int?,
+        hue: Int?,
+        saturation: Int?
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot control light: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            // Build state change object
+            val stateChange = buildMap<String, Any> {
+                on?.let { put("on", it) }
+                brightness?.let { 
+                    if (it in 0..254) put("bri", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid brightness value: $it (must be 0-254)")
+                }
+                hue?.let { 
+                    if (it in 0..65535) put("hue", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid hue value: $it (must be 0-65535)")
+                }
+                saturation?.let { 
+                    if (it in 0..254) put("sat", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid saturation value: $it (must be 0-254)")
+                }
+            }
+            
+            if (stateChange.isEmpty()) {
+                Logger.w(LogTags.HUE_LIGHTS, "No valid state changes provided for light $lightId")
+                return@withContext Result.success(Unit)
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Controlling light $lightId with changes: $stateChange")
+            
+            apiClient.setLightState(bridgeIp, username, lightId, stateChange)
+            
+            Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled light $lightId")
+            Result.success(Unit)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to control light $lightId", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun controlGroup(
+        groupId: String,
+        on: Boolean?,
+        brightness: Int?,
+        hue: Int?,
+        saturation: Int?
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot control group: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            // Build action change object
+            val actionChange = buildMap<String, Any> {
+                on?.let { put("on", it) }
+                brightness?.let { 
+                    if (it in 0..254) put("bri", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid brightness value: $it (must be 0-254)")
+                }
+                hue?.let { 
+                    if (it in 0..65535) put("hue", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid hue value: $it (must be 0-65535)")
+                }
+                saturation?.let { 
+                    if (it in 0..254) put("sat", it)
+                    else Logger.w(LogTags.HUE_LIGHTS, "Invalid saturation value: $it (must be 0-254)")
+                }
+            }
+            
+            if (actionChange.isEmpty()) {
+                Logger.w(LogTags.HUE_LIGHTS, "No valid action changes provided for group $groupId")
+                return@withContext Result.success(Unit)
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Controlling group $groupId with changes: $actionChange")
+            
+            apiClient.setGroupAction(bridgeIp, username, groupId, actionChange)
+            
+            Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled group $groupId")
+            Result.success(Unit)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to control group $groupId", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun getLightState(lightId: String): Result<HueLight> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot get light state: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Getting state for light $lightId")
+            
+            val lightData = apiClient.getLight(bridgeIp, username, lightId)
+            val light = HueLight(
+                id = lightId,
+                name = lightData.name,
+                on = lightData.state.on,
+                brightness = lightData.state.bri,
+                hue = lightData.state.hue,
+                saturation = lightData.state.sat,
+                reachable = lightData.state.reachable
+            )
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Successfully retrieved state for light $lightId")
+            Result.success(light)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to get light state for $lightId", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun getGroupState(groupId: String): Result<HueGroup> = withContext(Dispatchers.IO) {
+        try {
+            val bridgeIp = bridgeRepository.getCurrentBridgeIp()
+            val username = bridgeRepository.getCurrentUsername()
+            
+            if (bridgeIp == null || username == null) {
+                Logger.w(LogTags.HUE_LIGHTS, "Cannot get group state: bridge not connected")
+                return@withContext Result.failure(IllegalStateException("Bridge not connected"))
+            }
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Getting state for group $groupId")
+            
+            val groupData = apiClient.getGroup(bridgeIp, username, groupId)
+            val group = HueGroup(
+                id = groupId,
+                name = groupData.name,
+                lightIds = groupData.lights,
+                on = groupData.action?.on ?: false,
+                brightness = groupData.action?.bri,
+                hue = groupData.action?.hue,
+                saturation = groupData.action?.sat
+            )
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Successfully retrieved state for group $groupId")
+            Result.success(group)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Failed to get group state for $groupId", e)
+            Result.failure(e)
+        }
+    }
+}
