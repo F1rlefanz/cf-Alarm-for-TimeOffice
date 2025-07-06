@@ -1,5 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces
 
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import kotlinx.coroutines.flow.Flow
@@ -38,14 +39,3 @@ interface IHueBridgeUseCase {
      */
     suspend fun getBridgeConnectionInfo(): Result<BridgeConnectionInfo>
 }
-
-/**
- * Bridge connection information for UI display
- */
-data class BridgeConnectionInfo(
-    val isConnected: Boolean,
-    val bridgeIp: String?,
-    val bridgeName: String?,
-    val username: String?,
-    val lastValidated: Long? = null
-)

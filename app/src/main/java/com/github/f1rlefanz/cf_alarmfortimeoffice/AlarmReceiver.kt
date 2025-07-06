@@ -11,11 +11,14 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.*
-
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueRepositoryFactory
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
 
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -72,8 +75,14 @@ class AlarmReceiver : BroadcastReceiver() {
         // Hole Schicht-Info aus Intent (falls verfügbar)
         val shiftName = intent?.getStringExtra("shift_name") ?: "Unbekannte Schicht"
         val alarmTime = intent?.getStringExtra("alarm_time") ?: "Jetzt"
+        val shiftPattern = intent?.getStringExtra("shift_pattern")
+        val shiftStartTime = intent?.getStringExtra("shift_start_time") 
+        val shiftEndTime = intent?.getStringExtra("shift_end_time")
         
         Logger.business(LogTags.ALARM_RECEIVER, "Alarm for shift", "$shiftName at $alarmTime")
+        
+        // **NEUE HUE-INTEGRATION:** Führe Hue-Regeln aus
+        executeHueRules(context, shiftPattern, shiftStartTime, shiftEndTime, alarmTime)
         
         // Starte Vibration
         startVibration(context)
@@ -86,6 +95,152 @@ class AlarmReceiver : BroadcastReceiver() {
         
         // Zeige Notification
         showAlarmNotification(context, shiftName, alarmTime)
+    }
+    
+    /**
+     * Führt Hue-Regeln basierend auf Schichtinformationen aus
+     * 
+     * Integration der Philips Hue Automation in den Alarm-Workflow.
+     * Sucht nach passenden Regeln und führt entsprechende Lichtaktionen aus.
+     * 
+     * @param context Android Context
+     * @param shiftPattern Schichtmuster (z.B. "Early", "Late", "S1", "S2")
+     * @param shiftStartTime Schichtbeginn (ISO 8601 Format)
+     * @param shiftEndTime Schichtende (ISO 8601 Format) 
+     * @param alarmTime Alarm-Zeit
+     */
+    private fun executeHueRules(
+        context: Context,
+        shiftPattern: String?,
+        shiftStartTime: String?,
+        shiftEndTime: String?,
+        alarmTime: String
+    ) {
+        // Hue-Integration nur ausführen wenn Schichtinformationen verfügbar
+        if (shiftPattern.isNullOrBlank()) {
+            Logger.d(LogTags.HUE_INTEGRATION, "No shift pattern available - skipping Hue integration")
+            return
+        }
+        
+        Logger.i(LogTags.HUE_INTEGRATION, "🎨 Starting Hue integration for shift: $shiftPattern")
+        
+        // Async Hue-Operation um AlarmReceiver nicht zu blockieren
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            try {
+                // Erstelle Repositories mit Factory Pattern (Clean Architecture)
+                val hueBridgeRepository = HueRepositoryFactory.createHueBridgeRepository(context)
+                val hueConfigRepository = HueRepositoryFactory.createHueConfigRepository(context)
+                val hueLightRepository = HueRepositoryFactory.createHueLightRepository(hueBridgeRepository)
+                
+                // Erstelle HueLightUseCase (Bridge zwischen Repository und RuleUseCase)
+                val hueLightUseCase = com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueLightUseCase(
+                    lightRepository = hueLightRepository
+                )
+                
+                // Erstelle HueRuleUseCase mit korrekten Dependencies
+                val hueRuleUseCase = HueRuleUseCase(
+                    configRepository = hueConfigRepository,
+                    lightUseCase = hueLightUseCase
+                )
+                
+                // Erstelle ShiftMatch für Rule-Matching
+                val shiftMatch = createShiftMatchFromAlarm(
+                    shiftPattern = shiftPattern,
+                    shiftStartTime = shiftStartTime,
+                    shiftEndTime = shiftEndTime,
+                    alarmTime = alarmTime
+                )
+                
+                // Führe passende Hue-Regeln aus
+                hueRuleUseCase.executeMatchingRules(shiftMatch)
+                
+                Logger.i(LogTags.HUE_INTEGRATION, "✅ Hue integration completed successfully")
+                
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_INTEGRATION, "❌ Error during Hue integration", e)
+                // Hue-Fehler sollen den Alarm nicht beeinträchtigen
+            }
+        }
+    }
+    
+    /**
+     * Erstellt ShiftMatch-Objekt aus Alarm-Informationen
+     * 
+     * @param shiftPattern Schichtmuster
+     * @param shiftStartTime Schichtbeginn (kann null sein)
+     * @param shiftEndTime Schichtende (kann null sein)
+     * @param alarmTime Alarm-Zeit
+     * @return ShiftMatch für Rule-Evaluation
+     */
+    private fun createShiftMatchFromAlarm(
+        shiftPattern: String,
+        shiftStartTime: String?,
+        shiftEndTime: String?,
+        alarmTime: String
+    ): ShiftMatch {
+        return try {
+            // Parse Zeitstempel falls verfügbar
+            val startTime = shiftStartTime?.let { 
+                java.time.LocalDateTime.parse(it) 
+            } ?: java.time.LocalDateTime.now()
+            
+            val endTime = shiftEndTime?.let { 
+                java.time.LocalDateTime.parse(it) 
+            } ?: java.time.LocalDateTime.now().plusHours(8)
+            
+            // Erstelle ShiftDefinition für das Pattern
+            val shiftDefinition = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+                id = "alarm_shift_$shiftPattern",
+                name = "$shiftPattern Schicht",
+                keywords = listOf(shiftPattern.lowercase()),
+                alarmTime = java.time.LocalTime.now(), // Alarm ist jetzt
+                isEnabled = true
+            )
+            
+            // Erstelle CalendarEvent für das Shift
+            val calendarEvent = com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent(
+                id = "alarm_event_${System.currentTimeMillis()}",
+                title = "$shiftPattern Schicht",
+                startTime = startTime,
+                endTime = endTime,
+                calendarId = "alarm_calendar",
+                isAllDay = false
+            )
+            
+            // Erstelle ShiftMatch mit allen erforderlichen Parametern
+            ShiftMatch(
+                shiftDefinition = shiftDefinition,
+                calendarEvent = calendarEvent,
+                calculatedAlarmTime = java.time.LocalDateTime.now() // Alarm ist jetzt
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_INTEGRATION, "Error creating ShiftMatch from alarm data", e)
+            
+            // Fallback ShiftMatch
+            val fallbackDefinition = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+                id = "alarm_fallback",
+                name = "Fallback Schicht",
+                keywords = listOf("fallback"),
+                alarmTime = java.time.LocalTime.now(),
+                isEnabled = true
+            )
+            
+            val fallbackEvent = com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent(
+                id = "alarm_fallback_event",
+                title = "$shiftPattern Schicht",
+                startTime = java.time.LocalDateTime.now(),
+                endTime = java.time.LocalDateTime.now().plusHours(8),
+                calendarId = "alarm_calendar",
+                isAllDay = false
+            )
+            
+            ShiftMatch(
+                shiftDefinition = fallbackDefinition,
+                calendarEvent = fallbackEvent,
+                calculatedAlarmTime = java.time.LocalDateTime.now()
+            )
+        }
     }
     
     private fun startVibration(context: Context) {

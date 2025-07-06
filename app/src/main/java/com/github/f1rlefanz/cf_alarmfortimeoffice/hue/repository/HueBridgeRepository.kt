@@ -1,216 +1,73 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository
 
+import android.content.Context
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiClient
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.*
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery.OfficialHueDiscoveryService
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueBridgeRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 /**
- * Repository for Hue Bridge operations
+ * Repository for Hue Bridge operations using OFFICIAL Philips Discovery Methods
+ * 
+ * REPLACED: Primitive IP scanning approach
+ * WITH: Official N-UPnP and mDNS discovery methods
+ * 
  * Implements Clean Architecture with Interface-based DI and Logger integration
  */
-class HueBridgeRepository : IHueBridgeRepository {
+class HueBridgeRepository(private val context: Context) : IHueBridgeRepository {
     
     companion object {
         private const val APP_NAME = "CFAlarmForTimeOffice"
-        private const val DISCOVERY_TIMEOUT_MS = 30000L
         private const val CONNECTION_TIMEOUT_MS = 10000L
     }
     
     // API Client for Hue communication
     private val apiClient = HueApiClient()
     
+    // Official Discovery Service (replaces primitive IP scanning)
+    private val officialDiscoveryService = OfficialHueDiscoveryService(context)
+    
     // Current connection state
     private var currentBridgeIp: String? = null
     private var currentUsername: String? = null
     
-    // Discovery status flow
-    private val _discoveryStatus = MutableSharedFlow<DiscoveryStatus>(replay = 1)
+    override fun getDiscoveryStatus(): Flow<DiscoveryStatus> = 
+        officialDiscoveryService.getDiscoveryStatus()
     
-    override fun getDiscoveryStatus(): Flow<DiscoveryStatus> = _discoveryStatus.asSharedFlow()
-    
+    /**
+     * IMPROVED: Uses official Philips discovery methods instead of IP scanning
+     */
     override suspend fun discoverBridges(): Result<List<HueBridge>> = withContext(Dispatchers.IO) {
-        Logger.d(LogTags.HUE_DISCOVERY, "Starting bridge discovery")
+        Logger.i(LogTags.HUE_DISCOVERY, "Starting official Hue bridge discovery")
         
         try {
-            // Emit starting status
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.ONLINE_DISCOVERY,
-                stage = DiscoveryStage.STARTING,
-                message = "Starting online bridge discovery..."
-            ))
+            // Use official discovery service (N-UPnP + mDNS)
+            val discoveryResult = officialDiscoveryService.discoverBridges()
             
-            // Try online discovery first
-            val onlineResult = discoverBridgesOnline()
-            
-            if (onlineResult.isSuccess && onlineResult.getOrNull()?.isNotEmpty() == true) {
-                Logger.i(LogTags.HUE_DISCOVERY, "Online discovery successful: ${onlineResult.getOrNull()?.size} bridges found")
+            if (discoveryResult.isSuccess) {
+                val bridges = discoveryResult.getOrNull() ?: emptyList()
+                Logger.i(LogTags.HUE_DISCOVERY, "Official discovery completed: ${bridges.size} bridges found")
                 
-                _discoveryStatus.emit(DiscoveryStatus(
-                    method = DiscoveryMethod.ONLINE_DISCOVERY,
-                    stage = DiscoveryStage.COMPLETED,
-                    message = "Found ${onlineResult.getOrNull()?.size} bridges online",
-                    progress = 1.0f,
-                    isComplete = true
-                ))
-                
-                return@withContext onlineResult
-            }
-            
-            // Fallback to local network discovery
-            Logger.d(LogTags.HUE_DISCOVERY, "Online discovery failed, trying local network scan")
-            
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.LOCAL_NETWORK,
-                stage = DiscoveryStage.STARTING,
-                message = "Scanning local network for bridges..."
-            ))
-            
-            val localResult = discoverBridgesLocal()
-            
-            if (localResult.isSuccess) {
-                val bridges = localResult.getOrNull() ?: emptyList()
-                Logger.i(LogTags.HUE_DISCOVERY, "Local discovery completed: ${bridges.size} bridges found")
-                
-                _discoveryStatus.emit(DiscoveryStatus(
-                    method = DiscoveryMethod.LOCAL_NETWORK,
-                    stage = DiscoveryStage.COMPLETED,
-                    message = if (bridges.isNotEmpty()) "Found ${bridges.size} bridges on local network" else "No bridges found",
-                    progress = 1.0f,
-                    isComplete = true
-                ))
-                
-                return@withContext Result.success(bridges)
-            }
-            
-            // Both methods failed
-            Logger.w(LogTags.HUE_DISCOVERY, "Both online and local discovery failed")
-            
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.LOCAL_NETWORK,
-                stage = DiscoveryStage.FAILED,
-                message = "No bridges found. Make sure bridge is connected and press link button.",
-                isError = true,
-                isComplete = true
-            ))
-            
-            return@withContext Result.success(emptyList())
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.HUE_DISCOVERY, "Discovery failed with exception", e)
-            
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.LOCAL_NETWORK,
-                stage = DiscoveryStage.FAILED,
-                message = "Discovery failed: ${e.message}",
-                isError = true,
-                isComplete = true
-            ))
-            
-            return@withContext Result.failure(e)
-        }
-    }
-    
-    private suspend fun discoverBridgesOnline(): Result<List<HueBridge>> {
-        return try {
-            // Update progress
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.ONLINE_DISCOVERY,
-                stage = DiscoveryStage.IN_PROGRESS,
-                message = "Contacting Philips discovery service...",
-                progress = 0.3f
-            ))
-            
-            val discoveryResponse = apiClient.discoverBridgesOnline()
-            val bridges = discoveryResponse.map { response ->
-                HueBridge(
-                    id = response.id,
-                    internalipaddress = response.internalipaddress,
-                    name = "Philips Hue Bridge"
-                )
-            }
-            
-            // Test each bridge connection
-            val validBridges = mutableListOf<HueBridge>()
-            bridges.forEachIndexed { index, bridge ->
-                _discoveryStatus.emit(DiscoveryStatus(
-                    method = DiscoveryMethod.ONLINE_DISCOVERY,
-                    stage = DiscoveryStage.TESTING_CONNECTION,
-                    message = "Testing bridge ${index + 1}/${bridges.size}...",
-                    progress = 0.5f + (index.toFloat() / bridges.size) * 0.4f
-                ))
-                
-                if (coroutineContext.isActive) {
+                // Test each discovered bridge for actual connectivity
+                val validBridges = bridges.filter { bridge ->
                     val testResult = testBridgeConnection(bridge)
-                    if (testResult.isSuccess && testResult.getOrDefault(false)) {
-                        validBridges.add(bridge)
-                        Logger.d(LogTags.HUE_BRIDGE, "Bridge ${bridge.internalipaddress} connection test passed")
-                    } else {
-                        Logger.w(LogTags.HUE_BRIDGE, "Bridge ${bridge.internalipaddress} connection test failed")
-                    }
+                    testResult.isSuccess && testResult.getOrDefault(false)
                 }
+                
+                Logger.i(LogTags.HUE_DISCOVERY, "Bridge connectivity test: ${validBridges.size}/${bridges.size} bridges reachable")
+                Result.success(validBridges)
+            } else {
+                Logger.w(LogTags.HUE_DISCOVERY, "Official discovery failed", discoveryResult.exceptionOrNull())
+                discoveryResult
             }
             
-            Result.success(validBridges)
-            
         } catch (e: Exception) {
-            Logger.w(LogTags.HUE_DISCOVERY, "Online discovery failed", e)
-            Result.failure(e)
-        }
-    }
-    
-    private suspend fun discoverBridgesLocal(): Result<List<HueBridge>> {
-        return try {
-            _discoveryStatus.emit(DiscoveryStatus(
-                method = DiscoveryMethod.LOCAL_NETWORK,
-                stage = DiscoveryStage.IN_PROGRESS,
-                message = "Scanning IP addresses...",
-                progress = 0.2f
-            ))
-            
-            // Simple local network scan (this is a placeholder - real implementation would scan network)
-            val commonIPs = listOf(
-                "192.168.1.2", "192.168.1.3", "192.168.1.4", "192.168.1.5",
-                "192.168.0.2", "192.168.0.3", "192.168.0.4", "192.168.0.5"
-            )
-            
-            val foundBridges = mutableListOf<HueBridge>()
-            
-            commonIPs.forEachIndexed { index, ip ->
-                if (coroutineContext.isActive) {
-                    _discoveryStatus.emit(DiscoveryStatus(
-                        method = DiscoveryMethod.IP_TEST,
-                        stage = DiscoveryStage.TESTING_CONNECTION,
-                        message = "Testing $ip...",
-                        progress = 0.3f + (index.toFloat() / commonIPs.size) * 0.6f
-                    ))
-                    
-                    val bridge = HueBridge(
-                        id = "local_$ip",
-                        internalipaddress = ip,
-                        name = "Local Hue Bridge"
-                    )
-                    
-                    val testResult = testBridgeConnection(bridge)
-                    if (testResult.isSuccess && testResult.getOrDefault(false)) {
-                        foundBridges.add(bridge)
-                        Logger.i(LogTags.HUE_BRIDGE, "Found bridge at $ip")
-                    }
-                }
-            }
-            
-            Result.success(foundBridges)
-            
-        } catch (e: Exception) {
-            Logger.w(LogTags.HUE_DISCOVERY, "Local discovery failed", e)
+            Logger.e(LogTags.HUE_DISCOVERY, "Bridge discovery failed with exception", e)
             Result.failure(e)
         }
     }
@@ -250,6 +107,11 @@ class HueBridgeRepository : IHueBridgeRepository {
     override fun setUsername(username: String) {
         currentUsername = username
         Logger.d(LogTags.HUE_BRIDGE, "Username set for API requests")
+    }
+    
+    override fun setBridgeIp(bridgeIp: String) {
+        currentBridgeIp = bridgeIp
+        Logger.d(LogTags.HUE_BRIDGE, "Bridge IP set for API requests")
     }
     
     override fun getCurrentBridgeIp(): String? = currentBridgeIp

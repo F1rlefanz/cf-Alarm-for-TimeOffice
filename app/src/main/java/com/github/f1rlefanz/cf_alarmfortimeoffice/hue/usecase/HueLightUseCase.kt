@@ -2,31 +2,43 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase
 
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueLightRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.*
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.util.HueColorConverter
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.util.HueConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.util.HueDurationController
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.util.DurationControlInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.minutes
 
 /**
- * UseCase for Hue Light operations
- * Implements business logic layer with validation, batch operations, and error handling
+ * Enhanced UseCase for Hue Light operations
+ * 
+ * Implements business logic layer with:
+ * - Validation and batch operations
+ * - Color conversion utilities integration
+ * - Duration-based control with automatic revert
+ * - Advanced error handling and resilience
+ * 
+ * @author CF-Alarm Development Team
+ * @since Hue Integration v2.1
  */
 class HueLightUseCase(
     private val lightRepository: IHueLightRepository
-) : IHueLightUseCase {
+) : IHueLightUseCaseAdvanced {
+    
+    /**
+     * Duration controller for automatic light revert functionality
+     */
+    private val durationController = HueDurationController(lightRepository)
     
     companion object {
         private const val LIGHT_OPERATION_TIMEOUT_MS = 10000L
         private const val BATCH_OPERATION_TIMEOUT_MS = 30000L
         private const val MAX_BATCH_SIZE = 20
-        private const val BRIGHTNESS_MIN = 0
-        private const val BRIGHTNESS_MAX = 254
-        private const val HUE_MIN = 0
-        private const val HUE_MAX = 65535
-        private const val SATURATION_MIN = 0
-        private const val SATURATION_MAX = 254
     }
     
     override suspend fun getAllLightTargets(): Result<LightTargets> {
@@ -248,6 +260,252 @@ class HueLightUseCase(
         return getAllLightTargets()
     }
     
+    // =============================================================================
+    // ENHANCED FEATURES: COLOR CONVERSION & DURATION CONTROL
+    // =============================================================================
+    
+    /**
+     * Sets a light to a specific RGB color
+     * 
+     * @param lightId ID of the light
+     * @param red Red component (0-255)
+     * @param green Green component (0-255)
+     * @param blue Blue component (0-255)
+     * @param brightness Optional brightness override (1-254)
+     * @return Result indicating success or failure
+     */
+    override suspend fun setLightRgbColor(
+        lightId: String,
+        red: Int,
+        green: Int,
+        blue: Int,
+        brightness: Int?
+    ): Result<Unit> {
+        Logger.d(LogTags.HUE_USECASE, "Setting light $lightId to RGB($red, $green, $blue)")
+        
+        return try {
+            // Convert RGB to Hue color space
+            val hueColor = HueColorConverter.rgbToHueColor(red, green, blue)
+            
+            // Execute light control with converted values
+            lightRepository.controlLight(
+                lightId = lightId,
+                on = true,
+                brightness = brightness ?: HueConstants.Lights.DEFAULT_BRIGHTNESS,
+                hue = hueColor.hue,
+                saturation = hueColor.saturation
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to set RGB color for light $lightId", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Sets a group to a specific RGB color
+     */
+    override suspend fun setGroupRgbColor(
+        groupId: String,
+        red: Int,
+        green: Int,
+        blue: Int,
+        brightness: Int?
+    ): Result<Unit> {
+        Logger.d(LogTags.HUE_USECASE, "Setting group $groupId to RGB($red, $green, $blue)")
+        
+        return try {
+            val hueColor = HueColorConverter.rgbToHueColor(red, green, blue)
+            
+            lightRepository.controlGroup(
+                groupId = groupId,
+                on = true,
+                brightness = brightness ?: HueConstants.Lights.DEFAULT_BRIGHTNESS,
+                hue = hueColor.hue,
+                saturation = hueColor.saturation
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to set RGB color for group $groupId", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Sets a light to a color preset
+     */
+    override suspend fun setLightColorPreset(
+        lightId: String,
+        colorPreset: HueColorConverter.ColorPreset,
+        brightness: Int?
+    ): Result<Unit> {
+        Logger.d(LogTags.HUE_USECASE, "Setting light $lightId to color preset $colorPreset")
+        
+        return try {
+            val hueColor = HueColorConverter.getPresetColor(colorPreset)
+            
+            lightRepository.controlLight(
+                lightId = lightId,
+                on = true,
+                brightness = brightness ?: HueConstants.Lights.DEFAULT_BRIGHTNESS,
+                hue = hueColor.hue,
+                saturation = hueColor.saturation
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to set color preset for light $lightId", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Sets a light with automatic revert after specified duration
+     * 
+     * @param lightId ID of the light
+     * @param colorPreset Color to set temporarily
+     * @param brightness Brightness level (1-254)
+     * @param durationMinutes How long to maintain the state before reverting
+     * @return Result indicating success or failure
+     */
+    override suspend fun setLightWithDuration(
+        lightId: String,
+        colorPreset: HueColorConverter.ColorPreset,
+        brightness: Int,
+        durationMinutes: Int
+    ): Result<Unit> {
+        Logger.i(LogTags.HUE_USECASE, "Setting light $lightId with ${durationMinutes}min duration")
+        
+        return try {
+            // Create temporary light state
+            val temporaryState = HueDurationController.createAlarmLightState(
+                brightness = HueConstants.Utils.clampBrightness(brightness),
+                colorPreset = colorPreset
+            )
+            
+            // Apply with duration control
+            durationController.setLightWithDuration(
+                lightId = lightId,
+                temporaryState = temporaryState,
+                duration = durationMinutes.minutes
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to set light with duration", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Sets a group with automatic revert after specified duration
+     */
+    override suspend fun setGroupWithDuration(
+        groupId: String,
+        colorPreset: HueColorConverter.ColorPreset,
+        brightness: Int,
+        durationMinutes: Int
+    ): Result<Unit> {
+        Logger.i(LogTags.HUE_USECASE, "Setting group $groupId with ${durationMinutes}min duration")
+        
+        return try {
+            val temporaryAction = HueDurationController.createAlarmGroupAction(
+                brightness = HueConstants.Utils.clampBrightness(brightness),
+                colorPreset = colorPreset
+            )
+            
+            durationController.setGroupWithDuration(
+                groupId = groupId,
+                temporaryAction = temporaryAction,
+                duration = durationMinutes.minutes
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to set group with duration", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Creates a pulsing notification light effect
+     */
+    override suspend fun createNotificationEffect(
+        lightId: String,
+        colorPreset: HueColorConverter.ColorPreset,
+        durationMinutes: Int
+    ): Result<Unit> {
+        Logger.i(LogTags.HUE_USECASE, "Creating notification effect for light $lightId")
+        
+        return try {
+            val pulsingState = HueDurationController.createPulsingLightState(colorPreset)
+            
+            durationController.setLightWithDuration(
+                lightId = lightId,
+                temporaryState = pulsingState,
+                duration = durationMinutes.minutes
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to create notification effect", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Manually reverts all lights and groups to their original states
+     */
+    override suspend fun revertAllLights(): Result<Unit> {
+        Logger.i(LogTags.HUE_USECASE, "Reverting all lights to original states")
+        
+        return try {
+            val activeControls = durationController.getActiveControls()
+            
+            // Revert all active lights
+            activeControls.activeLights.forEach { lightId ->
+                val revertResult = durationController.revertLight(lightId)
+                if (revertResult.isFailure) {
+                    Logger.w(LogTags.HUE_USECASE, "Failed to revert light $lightId", revertResult.exceptionOrNull())
+                }
+            }
+            
+            // Revert all active groups
+            activeControls.activeGroups.forEach { groupId ->
+                val revertResult = durationController.revertGroup(groupId)
+                if (revertResult.isFailure) {
+                    Logger.w(LogTags.HUE_USECASE, "Failed to revert group $groupId", revertResult.exceptionOrNull())
+                }
+            }
+            
+            Logger.i(LogTags.HUE_USECASE, "Reverted ${activeControls.activeLights.size} lights and ${activeControls.activeGroups.size} groups")
+            Result.success(Unit)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_USECASE, "Failed to revert all lights", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Gets information about active duration controls
+     */
+    override fun getActiveDurationControls(): DurationControlInfo {
+        return durationController.getActiveControls()
+    }
+    
+    /**
+     * Cancels all pending automatic reverts
+     */
+    override fun cancelAllDurationControls() {
+        Logger.i(LogTags.HUE_USECASE, "Cancelling all duration controls")
+        durationController.cancelAllReverts()
+    }
+    
+    /**
+     * Cleanup method to be called when UseCase is no longer needed
+     */
+    fun cleanup() {
+        Logger.d(LogTags.HUE_USECASE, "Cleaning up HueLightUseCase")
+        durationController.cleanup()
+    }
+    
     /**
      * Validates a light action for business logic compliance
      */
@@ -260,27 +518,27 @@ class HueLightUseCase(
             
             // Validate brightness range
             action.brightness?.let { brightness ->
-                if (brightness !in BRIGHTNESS_MIN..BRIGHTNESS_MAX) {
+                if (!HueConstants.Validation.isValidBrightness(brightness)) {
                     return Result.failure(
-                        IllegalArgumentException("Brightness must be between $BRIGHTNESS_MIN and $BRIGHTNESS_MAX")
+                        IllegalArgumentException("Brightness must be between ${HueConstants.Lights.MIN_BRIGHTNESS} and ${HueConstants.Lights.MAX_BRIGHTNESS}")
                     )
                 }
             }
             
             // Validate hue range
             action.hue?.let { hue ->
-                if (hue !in HUE_MIN..HUE_MAX) {
+                if (!HueConstants.Validation.isValidHue(hue)) {
                     return Result.failure(
-                        IllegalArgumentException("Hue must be between $HUE_MIN and $HUE_MAX")
+                        IllegalArgumentException("Hue must be between ${HueConstants.Lights.MIN_HUE} and ${HueConstants.Lights.MAX_HUE}")
                     )
                 }
             }
             
             // Validate saturation range
             action.saturation?.let { saturation ->
-                if (saturation !in SATURATION_MIN..SATURATION_MAX) {
+                if (!HueConstants.Validation.isValidSaturation(saturation)) {
                     return Result.failure(
-                        IllegalArgumentException("Saturation must be between $SATURATION_MIN and $SATURATION_MAX")
+                        IllegalArgumentException("Saturation must be between ${HueConstants.Lights.MIN_SATURATION} and ${HueConstants.Lights.MAX_SATURATION}")
                     )
                 }
             }

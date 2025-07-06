@@ -9,6 +9,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
 
 /**
  * ViewModel for Hue Integration following Clean Architecture
@@ -45,10 +46,30 @@ class HueViewModel(
             }
         }
         
-        // Load initial state
-        refreshBridgeConnectionInfo()
-        refreshLightTargets()
-        refreshRules()
+        // Load initial state - but only if not connecting
+        loadInitialState()
+    }
+    
+    private fun loadInitialState() {
+        viewModelScope.launch {
+            try {
+                // Try to get saved bridge connection info
+                val result = hueBridgeUseCase.getBridgeConnectionInfo()
+                if (result.isSuccess) {
+                    val connectionInfo = result.getOrNull()
+                    _uiState.update { it.copy(bridgeConnectionInfo = connectionInfo) }
+                    Logger.d(LogTags.HUE_VIEWMODEL, "Initial bridge connection loaded: connected=${connectionInfo?.isConnected}")
+                    
+                    // Only refresh lights and rules if we have a valid connection
+                    if (connectionInfo?.isConnected == true) {
+                        refreshLightTargets()
+                        refreshRules()
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_VIEWMODEL, "Failed to load initial state", e)
+            }
+        }
     }
     
     // ==============================
@@ -110,9 +131,7 @@ class HueViewModel(
                         )
                     }
                     
-                    // Refresh light targets after successful bridge setup
-                    refreshLightTargets()
-                    
+                    // DON'T call refreshLightTargets immediately - let UI show success first
                     Logger.i(LogTags.HUE_VIEWMODEL, "Bridge setup completed successfully")
                 } else {
                     val error = result.exceptionOrNull()?.message ?: "Bridge setup failed"
@@ -145,25 +164,19 @@ class HueViewModel(
                 }
                 
                 Logger.d(LogTags.HUE_VIEWMODEL, "Bridge connection validation result: $isValid")
+                
+                // If validation successful, refresh lights and rules
+                if (isValid) {
+                    refreshLightTargets()
+                    refreshRules()
+                }
             } catch (e: Exception) {
                 Logger.e(LogTags.HUE_VIEWMODEL, "Bridge validation exception", e)
             }
         }
     }
     
-    private fun refreshBridgeConnectionInfo() {
-        viewModelScope.launch {
-            try {
-                val result = hueBridgeUseCase.getBridgeConnectionInfo()
-                if (result.isSuccess) {
-                    val connectionInfo = result.getOrNull()
-                    _uiState.update { it.copy(bridgeConnectionInfo = connectionInfo) }
-                }
-            } catch (e: Exception) {
-                Logger.e(LogTags.HUE_VIEWMODEL, "Failed to refresh bridge connection info", e)
-            }
-        }
-    }
+    // REMOVED: refreshBridgeConnectionInfo() - replaced by loadInitialState() and direct setup
     
     // ==============================
     // LIGHT OPERATIONS

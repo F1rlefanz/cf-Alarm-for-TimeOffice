@@ -38,6 +38,14 @@ class ViewModelFactory(
             shiftUseCase = appContainer.shiftUseCase
         ).also { _calendarViewModel = it }
     }
+    
+    private fun getOrCreateHueViewModel(): HueViewModel {
+        return _hueViewModel ?: HueViewModel(
+            hueBridgeUseCase = appContainer.hueBridgeUseCase,
+            hueLightUseCase = appContainer.hueLightUseCase,
+            hueRuleUseCase = appContainer.hueRuleUseCase
+        ).also { _hueViewModel = it }
+    }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

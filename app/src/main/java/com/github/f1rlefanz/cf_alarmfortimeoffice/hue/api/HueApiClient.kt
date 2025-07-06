@@ -145,8 +145,15 @@ class HueApiClient {
         
         if (response.isSuccessful) {
             val responseBody = response.body?.string() ?: "{}"
-            val type = object : TypeToken<Map<String, HueLight>>() {}.type
-            return@withContext gson.fromJson(responseBody, type)
+            Logger.d(LogTags.HUE_LIGHTS, "Lights API response: $responseBody")
+            
+            return@withContext try {
+                val type = object : TypeToken<Map<String, HueLight>>() {}.type
+                gson.fromJson(responseBody, type) ?: emptyMap()
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_LIGHTS, "Failed to parse lights response: $responseBody", e)
+                emptyMap()
+            }
         } else {
             throw IOException("Failed to get lights: ${response.code}")
         }
@@ -165,8 +172,15 @@ class HueApiClient {
         
         if (response.isSuccessful) {
             val responseBody = response.body?.string() ?: "{}"
-            val type = object : TypeToken<Map<String, HueGroup>>() {}.type
-            return@withContext gson.fromJson(responseBody, type)
+            Logger.d(LogTags.HUE_LIGHTS, "Groups API response: $responseBody")
+            
+            return@withContext try {
+                val type = object : TypeToken<Map<String, HueGroup>>() {}.type
+                gson.fromJson(responseBody, type) ?: emptyMap()
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_LIGHTS, "Failed to parse groups response: $responseBody", e)
+                emptyMap()
+            }
         } else {
             throw IOException("Failed to get groups: ${response.code}")
         }
@@ -217,6 +231,112 @@ class HueApiClient {
         } catch (e: Exception) {
             Logger.e(LogTags.HUE_LIGHTS, "Error controlling group $groupId", e)
             false
+        }
+    }
+    
+    /**
+     * Get specific light from bridge
+     */
+    suspend fun getLight(bridgeIp: String, username: String, lightId: String): HueLight = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("http://$bridgeIp/api/$username/lights/$lightId")
+            .get()
+            .build()
+        
+        val response = client.newCall(request).execute()
+        
+        if (response.isSuccessful) {
+            val responseBody = response.body?.string() ?: "{}"
+            Logger.d(LogTags.HUE_LIGHTS, "Light $lightId API response: $responseBody")
+            
+            return@withContext try {
+                gson.fromJson(responseBody, HueLight::class.java)
+                    ?: throw IOException("Failed to parse light response")
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_LIGHTS, "Failed to parse light $lightId response: $responseBody", e)
+                throw IOException("Failed to parse light $lightId: ${e.message}", e)
+            }
+        } else {
+            throw IOException("Failed to get light $lightId: ${response.code}")
+        }
+    }
+    
+    /**
+     * Get specific group from bridge
+     */
+    suspend fun getGroup(bridgeIp: String, username: String, groupId: String): HueGroup = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("http://$bridgeIp/api/$username/groups/$groupId")
+            .get()
+            .build()
+        
+        val response = client.newCall(request).execute()
+        
+        if (response.isSuccessful) {
+            val responseBody = response.body?.string() ?: "{}"
+            Logger.d(LogTags.HUE_LIGHTS, "Group $groupId API response: $responseBody")
+            
+            return@withContext try {
+                gson.fromJson(responseBody, HueGroup::class.java)
+                    ?: throw IOException("Failed to parse group response")
+            } catch (e: Exception) {
+                Logger.e(LogTags.HUE_LIGHTS, "Failed to parse group $groupId response: $responseBody", e)
+                throw IOException("Failed to parse group $groupId: ${e.message}", e)
+            }
+        } else {
+            throw IOException("Failed to get group $groupId: ${response.code}")
+        }
+    }
+    
+    /**
+     * Set light state using raw Map (for Repository compatibility)
+     */
+    suspend fun setLightState(
+        bridgeIp: String,
+        username: String,
+        lightId: String,
+        stateChange: Map<String, Any>
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val json = gson.toJson(stateChange)
+            val request = Request.Builder()
+                .url("http://$bridgeIp/api/$username/lights/$lightId/state")
+                .put(json.toRequestBody("application/json".toMediaType()))
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Light state update response: ${response.code}")
+            return@withContext response.isSuccessful
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Error setting light state for $lightId", e)
+            return@withContext false
+        }
+    }
+    
+    /**
+     * Set group action using raw Map (for Repository compatibility)
+     */
+    suspend fun setGroupAction(
+        bridgeIp: String,
+        username: String,
+        groupId: String,
+        actionChange: Map<String, Any>
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val json = gson.toJson(actionChange)
+            val request = Request.Builder()
+                .url("http://$bridgeIp/api/$username/groups/$groupId/action")
+                .put(json.toRequestBody("application/json".toMediaType()))
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            Logger.d(LogTags.HUE_LIGHTS, "Group action update response: ${response.code}")
+            return@withContext response.isSuccessful
+        } catch (e: Exception) {
+            Logger.e(LogTags.HUE_LIGHTS, "Error setting group action for $groupId", e)
+            return@withContext false
         }
     }
     

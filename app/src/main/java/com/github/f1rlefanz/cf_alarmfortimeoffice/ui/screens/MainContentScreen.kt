@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.HomeTabContent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.StatusTabContent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.SettingsTabContent
@@ -26,6 +25,7 @@ fun MainContentScreen(
     shiftViewModel: ShiftViewModel,
     alarmViewModel: AlarmViewModel,
     mainViewModel: MainViewModel,
+    viewModelFactory: ViewModelFactory,
     selectedTab: MainTab,
     onSelectedTabChange: (MainTab) -> Unit,
     onShowShiftConfig: () -> Unit,

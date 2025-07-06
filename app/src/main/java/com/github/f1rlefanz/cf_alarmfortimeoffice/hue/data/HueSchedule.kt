@@ -4,6 +4,11 @@ import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /**
+ * Type alias for backward compatibility
+ */
+typealias HueSchedule = HueScheduleRule
+
+/**
  * Hue Schedule Rule for shift-based automation
  * @Immutable annotation optimizes Compose performance
  */
@@ -21,6 +26,13 @@ data class HueScheduleRule(
     companion object {
         fun generateId(): String = "rule_${System.currentTimeMillis()}"
     }
+    
+    /**
+     * Computed property for compatibility with HueRuleUseCase
+     * Extracts all light actions from time ranges
+     */
+    val lightActions: List<HueLightAction>
+        get() = timeRanges.flatMap { it.actions }
 }
 
 /**
@@ -59,12 +71,19 @@ data class HueLightAction(
     val targetId: String, // Light ID, Group ID, or Zone ID
     val targetName: String? = null, // For display purposes
     val actionType: ActionType,
+    val on: Boolean? = null, // Turn on/off state
     val brightness: Int? = null, // 0-254
+    val hue: Int? = null, // 0-65535
+    val saturation: Int? = null, // 0-254
     val colorTemperature: Int? = null, // 153-500
     val color: HueColor? = null,
     val transitionTime: Int = 10, // in deciseconds (1/10 second)
-    val duration: Int? = null // Duration in minutes before reverting
-)
+    val duration: Int? = null, // Duration in minutes before reverting
+    val isGroup: Boolean = false // For UseCase compatibility
+) {
+    // Computed property for targetId access
+    val lightId: String get() = targetId
+}
 
 /**
  * Color representation

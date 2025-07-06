@@ -9,6 +9,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /**
  * Repository for Hue Light operations
@@ -37,11 +38,13 @@ class HueLightRepository(
                 HueLight(
                     id = id,
                     name = lightData.name,
-                    on = lightData.state.on,
-                    brightness = lightData.state.bri,
-                    hue = lightData.state.hue,
-                    saturation = lightData.state.sat,
-                    reachable = lightData.state.reachable
+                    type = lightData.type,
+                    modelid = lightData.modelid,
+                    manufacturername = lightData.manufacturername,
+                    productname = lightData.productname,
+                    state = lightData.state,
+                    capabilities = lightData.capabilities,
+                    uniqueid = lightData.uniqueid
                 )
             }
             
@@ -71,11 +74,13 @@ class HueLightRepository(
                 HueGroup(
                     id = id,
                     name = groupData.name,
-                    lightIds = groupData.lights,
-                    on = groupData.action?.on ?: false,
-                    brightness = groupData.action?.bri,
-                    hue = groupData.action?.hue,
-                    saturation = groupData.action?.sat
+                    type = groupData.type,
+                    roomClass = groupData.roomClass,
+                    lights = groupData.lights,
+                    sensors = groupData.sensors,
+                    state = groupData.state,
+                    action = groupData.action,
+                    recycle = groupData.recycle
                 )
             }
             
@@ -128,10 +133,15 @@ class HueLightRepository(
             
             Logger.d(LogTags.HUE_LIGHTS, "Controlling light $lightId with changes: $stateChange")
             
-            apiClient.setLightState(bridgeIp, username, lightId, stateChange)
+            val success = apiClient.setLightState(bridgeIp, username, lightId, stateChange)
             
-            Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled light $lightId")
-            Result.success(Unit)
+            if (success) {
+                Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled light $lightId")
+                Result.success(Unit)
+            } else {
+                Logger.w(LogTags.HUE_LIGHTS, "Failed to control light $lightId - API returned false")
+                Result.failure(IOException("Light control failed"))
+            }
             
         } catch (e: Exception) {
             Logger.e(LogTags.HUE_LIGHTS, "Failed to control light $lightId", e)
@@ -179,10 +189,15 @@ class HueLightRepository(
             
             Logger.d(LogTags.HUE_LIGHTS, "Controlling group $groupId with changes: $actionChange")
             
-            apiClient.setGroupAction(bridgeIp, username, groupId, actionChange)
+            val success = apiClient.setGroupAction(bridgeIp, username, groupId, actionChange)
             
-            Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled group $groupId")
-            Result.success(Unit)
+            if (success) {
+                Logger.i(LogTags.HUE_LIGHTS, "Successfully controlled group $groupId")
+                Result.success(Unit)
+            } else {
+                Logger.w(LogTags.HUE_LIGHTS, "Failed to control group $groupId - API returned false")
+                Result.failure(IOException("Group control failed"))
+            }
             
         } catch (e: Exception) {
             Logger.e(LogTags.HUE_LIGHTS, "Failed to control group $groupId", e)
@@ -206,11 +221,13 @@ class HueLightRepository(
             val light = HueLight(
                 id = lightId,
                 name = lightData.name,
-                on = lightData.state.on,
-                brightness = lightData.state.bri,
-                hue = lightData.state.hue,
-                saturation = lightData.state.sat,
-                reachable = lightData.state.reachable
+                type = lightData.type,
+                modelid = lightData.modelid,
+                manufacturername = lightData.manufacturername,
+                productname = lightData.productname,
+                state = lightData.state,
+                capabilities = lightData.capabilities,
+                uniqueid = lightData.uniqueid
             )
             
             Logger.d(LogTags.HUE_LIGHTS, "Successfully retrieved state for light $lightId")
@@ -238,11 +255,13 @@ class HueLightRepository(
             val group = HueGroup(
                 id = groupId,
                 name = groupData.name,
-                lightIds = groupData.lights,
-                on = groupData.action?.on ?: false,
-                brightness = groupData.action?.bri,
-                hue = groupData.action?.hue,
-                saturation = groupData.action?.sat
+                type = groupData.type,
+                roomClass = groupData.roomClass,
+                lights = groupData.lights,
+                sensors = groupData.sensors,
+                state = groupData.state,
+                action = groupData.action,
+                recycle = groupData.recycle
             )
             
             Logger.d(LogTags.HUE_LIGHTS, "Successfully retrieved state for group $groupId")

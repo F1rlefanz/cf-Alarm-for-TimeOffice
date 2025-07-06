@@ -126,7 +126,7 @@ class AppContainer(private val context: Context) {
     // ==============================
     
     val hueBridgeRepository: IHueBridgeRepository by lazy {
-        HueBridgeRepository()
+        HueBridgeRepository(context)
     }
     
     val hueConfigRepository: IHueConfigRepository by lazy {

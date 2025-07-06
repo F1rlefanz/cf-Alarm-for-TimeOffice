@@ -4,7 +4,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueBridgeRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.interfaces.IHueConfigRepository
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.BridgeConnectionInfo
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.IHueBridgeUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -170,6 +170,7 @@ class HueBridgeUseCase(
             }
             
             // 2. Set repository credentials
+            bridgeRepository.setBridgeIp(config.bridgeIp)
             bridgeRepository.setUsername(config.username)
             
             // 3. Test actual connection
@@ -200,8 +201,11 @@ class HueBridgeUseCase(
             val config = configRepository.getConfiguration().first()
             
             val connectionInfo = if (config.isConfigured) {
-                // Test if connection is still valid
+                // Set repository credentials from saved config before validation
+                bridgeRepository.setBridgeIp(config.bridgeIp)
                 bridgeRepository.setUsername(config.username)
+                
+                // Test if connection is still valid
                 val isConnected = validateBridgeConnection().getOrNull() ?: false
                 
                 BridgeConnectionInfo(

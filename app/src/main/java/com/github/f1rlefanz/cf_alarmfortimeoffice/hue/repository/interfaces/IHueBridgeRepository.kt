@@ -34,6 +34,11 @@ interface IHueBridgeRepository {
     fun setUsername(username: String)
     
     /**
+     * Set the bridge IP for API requests
+     */
+    fun setBridgeIp(bridgeIp: String)
+    
+    /**
      * Get current bridge IP address
      */
     fun getCurrentBridgeIp(): String?

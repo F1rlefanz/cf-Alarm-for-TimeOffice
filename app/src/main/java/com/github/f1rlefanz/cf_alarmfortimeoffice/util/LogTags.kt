@@ -21,6 +21,7 @@ object LogTags {
     
     // === HUE INTEGRATION ===
     const val HUE = "CFAlarm.Hue"
+    const val HUE_INTEGRATION = "CFAlarm.Hue.Integration"
     const val HUE_BRIDGE = "CFAlarm.Hue.Bridge"
     const val HUE_LIGHTS = "CFAlarm.Hue.Lights"
     const val HUE_RULES = "CFAlarm.Hue.Rules"
@@ -59,6 +60,7 @@ object LogTags {
     const val PERFORMANCE = "CFAlarm.Performance"
     const val CACHE = "CFAlarm.Cache"
     const val NETWORK = "CFAlarm.Network"
+    const val HUE_NETWORK = "CFAlarm.Hue.Network"
     const val BACKGROUND_SYNC = "CFAlarm.Background.Sync"
     
     // === ERROR & RECOVERY ===
