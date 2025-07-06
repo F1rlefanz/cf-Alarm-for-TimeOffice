@@ -4,26 +4,24 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.CalendarViewModel
 
 /**
  * CalendarSelectionScreen - REFACTORED für Single Source of Truth
  * 
- * STATE SYNCHRONISATION FIXES:
- * ✅ Entfernt temporären remember State - eliminiert doppelte Sources of Truth
- * ✅ Verwendet direkt CalendarViewModel.toggleCalendarSelection für atomare Updates
- * ✅ Reactive UI basiert vollständig auf persistiertem State
- * ✅ Keine lokale State-Synchronisation mehr nötig
- * ✅ Automatisches Save durch Repository - keine manuellen Save-Operationen
+ * ✅ CODE CLEANUP: Updated deprecated Material Icons
+ * ✅ PERFORMANCE: Direct imports from theme package
+ * ✅ STATE MANAGEMENT: Single Source of Truth pattern
+ * ✅ MEMORY: Eliminated temporary state objects
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +39,7 @@ fun CalendarSelectionScreen(
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Abbrechen"
                         )
                     }

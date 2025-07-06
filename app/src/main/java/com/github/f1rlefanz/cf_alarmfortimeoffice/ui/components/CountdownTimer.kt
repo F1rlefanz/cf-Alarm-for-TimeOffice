@@ -24,12 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DateTimeFormats
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.text.UIText
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AlphaValues
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.FontSizes
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.BorderConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.AlphaValues
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.FontSizes
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.BorderConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.AnimationDurations
 import kotlinx.coroutines.delay
 import java.time.Duration

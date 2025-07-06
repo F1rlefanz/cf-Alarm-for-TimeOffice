@@ -112,17 +112,27 @@ class HueApiClient {
             responseList.firstOrNull()?.let { firstResponse ->
                 when {
                     firstResponse.containsKey("success") -> {
-                        val successMap = firstResponse["success"] as? Map<String, Any>
-                        val username = successMap?.get("username") as? String
-                        return@withContext username ?: throw IOException("Username not found in response")
+                        // TYPE SAFE: Eliminiert unchecked cast warning
+                        val successMap = firstResponse["success"]
+                        if (successMap is Map<*, *>) {
+                            val username = successMap["username"] as? String
+                            return@withContext username ?: throw IOException("Username not found in response")
+                        } else {
+                            throw IOException("Invalid success response format")
+                        }
                     }
                     firstResponse.containsKey("error") -> {
-                        val errorMap = firstResponse["error"] as? Map<String, Any>
-                        val errorType = errorMap?.get("type") as? Double
-                        if (errorType == 101.0) {
-                            throw IOException("Link button not pressed. Please press the link button on your Hue bridge and try again.")
+                        // TYPE SAFE: Eliminiert unchecked cast warning  
+                        val errorMap = firstResponse["error"]
+                        if (errorMap is Map<*, *>) {
+                            val errorType = errorMap["type"] as? Double
+                            if (errorType == 101.0) {
+                                throw IOException("Link button not pressed. Please press the link button on your Hue bridge and try again.")
+                            } else {
+                                throw IOException("Bridge error: ${errorMap["description"]}")
+                            }
                         } else {
-                            throw IOException("Bridge error: ${errorMap?.get("description")}")
+                            throw IOException("Invalid error response format")
                         }
                     }
                 }
