@@ -1,9 +1,7 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,6 +23,8 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSetupM
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSuccessCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ViewModelFactory
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
 
 /**
  * Enhanced Hue Tab Content with modern UX
@@ -54,7 +54,7 @@ fun HueTabContent(
             showSuccessCard = true
             // Clear discovered bridges when connected to avoid UI confusion
             hueViewModel.clearDiscoveredBridges()
-            kotlinx.coroutines.delay(5000) // Show success for 5 seconds
+            kotlinx.coroutines.delay(UIConstants.ERROR_MESSAGE_AUTO_DISMISS_MS) // Show success for 5 seconds
             showSuccessCard = false
         }
     }
@@ -63,8 +63,8 @@ fun HueTabContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(SpacingConstants.SPACING_LARGE),
+            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
         ) {
             // Header
             Text(
@@ -105,7 +105,7 @@ fun HueTabContent(
                     ConnectedStatusCard(
                         connectionInfo = uiState.bridgeConnectionInfo!!,
                         onDisconnect = { 
-                            // TODO: Implement disconnect functionality
+                            hueViewModel.clearDiscoveredBridges()
                         }
                     )
                 }
@@ -116,7 +116,7 @@ fun HueTabContent(
                 discoveryStatus?.stage != "STARTING" &&
                 uiState.bridgeConnectionInfo?.isConnected != true -> {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
                     ) {
                         item {
                             EnhancedBridgeConnectionCard(
@@ -177,8 +177,8 @@ private fun EnhancedBridgeConnectionCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(SpacingConstants.SPACING_LARGE),
+        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_EXTRA_LARGE)
     ) {
         // Simple Header
         Text(
@@ -192,7 +192,7 @@ private fun EnhancedBridgeConnectionCard(
         if (connectionInfo != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
             ) {
                 Icon(
                     imageVector = if (connectionInfo.isConnected) 
@@ -200,7 +200,7 @@ private fun EnhancedBridgeConnectionCard(
                     contentDescription = null,
                     tint = if (connectionInfo.isConnected) 
                         Color.Green else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_LARGE)
                 )
                 Column {
                     Text(
@@ -238,13 +238,13 @@ private fun EnhancedBridgeConnectionCard(
             discoveredBridges.forEach { bridge ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(SpacingConstants.SPACING_LARGE),
+                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
                     ) {
                         // Bridge info - larger, readable text
                         Text(
@@ -262,20 +262,20 @@ private fun EnhancedBridgeConnectionCard(
                         // Action buttons - CLEAR unterschied zwischen Connect und Direct
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
                         ) {
                             // DIRECT Connect - sofort verbinden (für Link Button bereits gedrückt)
                             Button(
                                 onClick = { onDirectConnect(bridge) },
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.FlashOn,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                                 Text(
                                     text = "Jetzt verbinden",
                                     style = MaterialTheme.typography.labelLarge,
@@ -287,14 +287,14 @@ private fun EnhancedBridgeConnectionCard(
                             OutlinedButton(
                                 onClick = { onSetupBridge(bridge) },
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Help,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                                 Text(
                                     text = "Hilfe?",
                                     style = MaterialTheme.typography.labelLarge,
@@ -484,19 +484,19 @@ private fun ConnectedStatusCard(
             }
         }
 
-        // Validate button
+        // Disconnect controls
         OutlinedButton(
-            onClick = { /* TODO: Add validation or disconnect */ },
-            shape = RoundedCornerShape(8.dp)
+            onClick = onDisconnect,
+            shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
         ) {
             Icon(
-                imageVector = Icons.Default.Refresh,
+                imageVector = Icons.Default.Close,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
             Text(
-                text = "Verbindung prüfen",
+                text = "Zurücksetzen",
                 style = MaterialTheme.typography.labelLarge
             )
         }

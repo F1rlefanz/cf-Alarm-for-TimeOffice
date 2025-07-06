@@ -21,6 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AlphaValues
 
 /**
  * Enhanced animated discovery card with visual progress indicators
@@ -38,7 +41,7 @@ fun AnimatedDiscoveryCard(
         initialValue = 1f,
         targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = EaseInOut),
+            animation = tween(UIConstants.ANIMATION_DURATION_MS.toInt(), easing = EaseInOut),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
@@ -54,21 +57,21 @@ fun AnimatedDiscoveryCard(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
+                    .padding(SpacingConstants.SPACING_LARGE),
+                shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
                 elevation = CardDefaults.cardElevation(
-                    defaultElevation = 12.dp
+                    defaultElevation = SpacingConstants.CARD_CORNER_RADIUS
                 )
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(SpacingConstants.SPACING_EXTRA_LARGE),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_EXTRA_LARGE)
                 ) {
                     // Animated Icon Section
                     Box(
@@ -77,13 +80,13 @@ fun AnimatedDiscoveryCard(
                         // Outer pulsing circle
                         Box(
                             modifier = Modifier
-                                .size(120.dp)
+                                .size(SpacingConstants.APP_ICON_SIZE)
                                 .scale(pulseScale)
                                 .background(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.STRONG),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.LIGHT),
                                             Color.Transparent
                                         )
                                     ),
@@ -93,12 +96,12 @@ fun AnimatedDiscoveryCard(
 
                         // Main discovery icon
                         Card(
-                            modifier = Modifier.size(80.dp),
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_GIANT),
                             shape = CircleShape,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             ),
-                            elevation = CardDefaults.cardElevation(8.dp)
+                            elevation = CardDefaults.cardElevation(SpacingConstants.SPACING_SMALL)
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
@@ -110,32 +113,32 @@ fun AnimatedDiscoveryCard(
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                                             .scale(pulseScale * 0.8f)
                                     )
                                     "N_UPNP_SEARCH" -> Icon(
                                         imageVector = Icons.Default.CloudSync,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                                     )
                                     "MDNS_SEARCH" -> Icon(
                                         imageVector = Icons.Default.Router,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                                     )
                                     "VALIDATING" -> Icon(
                                         imageVector = Icons.Default.Verified,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                                     )
                                     else -> Icon(
                                         imageVector = Icons.Default.Search,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
                                     )
                                 }
                             }
@@ -143,7 +146,7 @@ fun AnimatedDiscoveryCard(
 
                         // Scanning radar effect for mDNS
                         if (status.stage == "MDNS_SEARCH") {
-                            Canvas(modifier = Modifier.size(100.dp)) {
+                            Canvas(modifier = Modifier.size(SpacingConstants.FULLSCREEN_ELEMENT_SIZE)) {
                                 // Add radar sweep animation here if needed
                             }
                         }
@@ -152,7 +155,7 @@ fun AnimatedDiscoveryCard(
                     // Status Text with Typing Animation
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
                     ) {
                         Text(
                             text = getDiscoveryTitle(status.stage),
@@ -174,21 +177,21 @@ fun AnimatedDiscoveryCard(
                     if (status.progress > 0) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
                         ) {
                             LinearProgressIndicator(
                                 progress = { status.progress },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(8.dp),
+                                    .height(SpacingConstants.SPACING_SMALL),
                                 color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.STRONG)
                             )
                             
                             Text(
                                 text = "${(status.progress * 100).toInt()}% complete",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = AlphaValues.SURFACE_VARIANT)
                             )
                         }
                     }
@@ -199,18 +202,18 @@ fun AnimatedDiscoveryCard(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(SpacingConstants.SPACING_LARGE)
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(SpacingConstants.SPACING_MEDIUM),
+                                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = getMethodIcon(method),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                                 )
                                 Text(
                                     text = "Using $method",
@@ -231,9 +234,9 @@ fun AnimatedDiscoveryCard(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                         Text("Cancel Discovery")
                     }
                 }
@@ -256,7 +259,7 @@ private fun AnimatedTypingText(
         displayedText = ""
         for (i in text.indices) {
             displayedText = text.substring(0, i + 1)
-            kotlinx.coroutines.delay(30) // Typing speed
+            kotlinx.coroutines.delay(UIConstants.INPUT_DEBOUNCE_MS / 10) // Typing speed
         }
     }
     

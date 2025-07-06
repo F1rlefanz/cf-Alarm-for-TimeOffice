@@ -112,7 +112,7 @@ fun EventListScreen(
                     Icon(
                         Icons.Default.CalendarMonth,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
+                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_XXXL),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Text(
@@ -198,7 +198,7 @@ fun EventListScreen(
                                         ),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                        CircularProgressIndicator(modifier = Modifier.size(SpacingConstants.SPACING_LARGE))
                                         Text("Lade...")
                                     }
                                 } else {
