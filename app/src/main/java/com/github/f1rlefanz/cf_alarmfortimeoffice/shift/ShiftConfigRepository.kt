@@ -113,24 +113,4 @@ class ShiftConfigRepository(
             config.definitions.isNotEmpty() && 
             config.definitions.any { it.name.isNotBlank() }
         }
-    
-    /**
-     * Legacy method für Kompatibilität mit bestehendem Code
-     * @deprecated Verwende getCurrentShiftConfig() stattdessen
-     */
-    @Deprecated("Use getCurrentShiftConfig() instead", ReplaceWith("getCurrentShiftConfig()"))
-    suspend fun getShiftConfig(): ShiftConfig {
-        return getCurrentShiftConfig().getOrElse { ShiftConfig.getDefaultConfig() }
-    }
-    
-    /**
-     * Legacy method für Kompatibilität mit bestehendem Code
-     * @deprecated Verwende getCurrentShiftConfig().map { it.definitions } stattdessen
-     */
-    @Deprecated("Use getCurrentShiftConfig() instead")
-    suspend fun getShiftDefinitions(): Result<List<com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition>> =
-        SafeExecutor.safeExecute("ShiftConfigRepository.getShiftDefinitions") {
-            val config = getCurrentShiftConfig().getOrThrow()
-            config.definitions
-        }
 }

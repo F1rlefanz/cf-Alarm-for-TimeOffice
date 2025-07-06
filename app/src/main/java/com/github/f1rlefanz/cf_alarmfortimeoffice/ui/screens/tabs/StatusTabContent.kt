@@ -177,14 +177,12 @@ private fun StatusCard(
 private fun CacheStatusCard(calendarViewModel: CalendarViewModel?) {
     val context = LocalContext.current
     var cacheStats by remember { mutableStateOf("Cache-Statistiken laden...") }
-    var isOffline by remember { mutableStateOf(false) }
-    
-    // Offline-Erkennung
-    LaunchedEffect(Unit) {
-        isOffline = !isNetworkAvailable(context)
+    val isOffline by remember { 
+        derivedStateOf { !isNetworkAvailable(context) }
     }
     
-    LaunchedEffect(Unit) {
+    // Nur einmal laden, nicht bei jeder Recomposition
+    LaunchedEffect(calendarViewModel) {
         calendarViewModel?.let { viewModel ->
             try {
                 viewModel.getCacheStats()

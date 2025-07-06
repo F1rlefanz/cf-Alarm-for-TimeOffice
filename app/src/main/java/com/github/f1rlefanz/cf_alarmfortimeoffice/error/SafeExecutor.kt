@@ -108,11 +108,6 @@ fun <T> Flow<T>.catchWithDefault(
 }
 
 /**
- * Extension function to map Result to nullable
- */
-fun <T> Result<T>.getOrNull(): T? = if (isSuccess) getOrNull() else null
-
-/**
  * Extension function to handle Result with error callback
  */
 inline fun <T> Result<T>.onError(

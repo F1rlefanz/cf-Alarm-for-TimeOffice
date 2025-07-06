@@ -460,65 +460,64 @@ class CalendarViewModel(
                 var processedCalendars = 0
                 var totalEventCount = 0
                 
-                // BATCHED PROCESSING: Process calendars one by one for progressive updates
-                selectedIds.forEach { calendarId ->
-                    try {
-                        // LAZY LOADING: Use new lazy loading method for initial load
-                        val singleCalendarResult = if (loadAll) {
-                            calendarUseCase.getCalendarEventsWithCache(
-                                calendarIds = setOf(calendarId),
-                                daysAhead = effectiveDaysAhead,
-                                forceRefresh = forceRefresh
-                            )
-                        } else {
-                            // LAZY LOADING: Load only initial page size
-                            calendarUseCase.getCalendarEventsLazy(
-                                calendarIds = setOf(calendarId),
-                                daysAhead = effectiveDaysAhead,
-                                maxEvents = initialPageSize,
-                                offset = 0
-                            ).map { eventPage ->
-                                totalEventCount += eventPage.totalEvents
-                                eventPage.events
-                            }
-                        }
-                        
-                        singleCalendarResult.onSuccess { events ->
-                            allEvents.addAll(events)
-                            processedCalendars++
-                            
-                            // PROGRESSIVE UI UPDATE: Update UI with partial results
-                            val sortedEvents = allEvents.sortedBy { it.startTime }
-                            
-                            // LAZY LOADING: Calculate if more events are available
-                            val hasMore = if (loadAll) {
-                                false // No more events when loading all
-                            } else {
-                                // Check if we loaded the max for this calendar, indicating more might be available
-                                events.size >= initialPageSize || totalEventCount > sortedEvents.size
-                            }
-                            
-                            updateLocalState { 
-                                it.copy(
-                                    events = sortedEvents,
-                                    totalEvents = if (loadAll) sortedEvents.size else totalEventCount,
-                                    hasMoreEvents = hasMore && processedCalendars < selectedIds.size,
-                                    eventOffset = sortedEvents.size
+                // PERFORMANCE OPTIMIZATION: Process all calendars in parallel instead of sequentially
+                val calendarJobs = selectedIds.map { calendarId ->
+                    kotlinx.coroutines.async {
+                        try {
+                            val singleCalendarResult = if (loadAll) {
+                                calendarUseCase.getCalendarEventsWithCache(
+                                    calendarIds = setOf(calendarId),
+                                    daysAhead = effectiveDaysAhead,
+                                    forceRefresh = forceRefresh
                                 )
+                            } else {
+                                // LAZY LOADING: Load only initial page size
+                                calendarUseCase.getCalendarEventsLazy(
+                                    calendarIds = setOf(calendarId),
+                                    daysAhead = effectiveDaysAhead,
+                                    maxEvents = initialPageSize,
+                                    offset = 0
+                                ).map { eventPage ->
+                                    totalEventCount += eventPage.totalEvents
+                                    eventPage.events
+                                }
                             }
                             
-                            Logger.d(LogTags.CALENDAR, "Progressive loading: ${events.size} events from calendar ${calendarId.take(8)}..., total: ${sortedEvents.size}")
-                            
-                            // YIELD TO UI THREAD: Allow UI updates between calendar processing
-                            kotlinx.coroutines.delay(50) // 50ms yield for UI responsiveness
-                        }.onFailure { error ->
-                            Logger.e(LogTags.CALENDAR, "Failed to load events for calendar ${calendarId.take(8)}...", error)
-                            processedCalendars++
+                            singleCalendarResult.getOrNull()
+                        } catch (e: Exception) {
+                            Logger.e(LogTags.CALENDAR, "Exception loading calendar ${calendarId.take(8)}...", e)
+                            null
+                        }
+                    }
+                }
+                
+                // Wait for all calendars to complete and process results
+                calendarJobs.forEach { job ->
+                    val events = job.await()
+                    if (events != null) {
+                        allEvents.addAll(events)
+                        processedCalendars++
+                        
+                        // PROGRESSIVE UI UPDATE: Update UI with partial results
+                        val sortedEvents = allEvents.sortedBy { it.startTime }
+                        
+                        // LAZY LOADING: Calculate if more events are available
+                        val hasMore = if (loadAll) {
+                            false // No more events when loading all
+                        } else {
+                            events.size >= initialPageSize || totalEventCount > sortedEvents.size
                         }
                         
-                    } catch (e: Exception) {
-                        Logger.e(LogTags.CALENDAR, "Exception loading calendar ${calendarId.take(8)}...", e)
-                        processedCalendars++
+                        updateLocalState { 
+                            it.copy(
+                                events = sortedEvents,
+                                totalEvents = if (loadAll) sortedEvents.size else totalEventCount,
+                                hasMoreEvents = hasMore && processedCalendars < selectedIds.size,
+                                eventOffset = sortedEvents.size
+                            )
+                        }
+                        
+                        Logger.d(LogTags.CALENDAR, "Progressive loading: ${events.size} events loaded, total: ${sortedEvents.size}")
                     }
                 }
                 
