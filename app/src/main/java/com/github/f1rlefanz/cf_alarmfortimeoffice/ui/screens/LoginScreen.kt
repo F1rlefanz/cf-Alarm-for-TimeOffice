@@ -13,7 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.R
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIText
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.text.UIText
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 
 @Composable

@@ -4,7 +4,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.error.AppError
 import com.github.f1rlefanz.cf_alarmfortimeoffice.error.SafeExecutor
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalendarRepository
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.CalendarConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.CalendarConstants
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.HttpRequest
 import com.google.api.client.http.HttpRequestInitializer

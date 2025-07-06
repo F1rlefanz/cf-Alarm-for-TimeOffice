@@ -2,7 +2,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces
 
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AndroidCalendar
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.CalendarConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.CalendarConstants
 
 /**
  * PAGINATION SUPPORT: Data classes für paginierte Ergebnisse

@@ -13,9 +13,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LayoutFractions
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AlarmConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.LayoutFractions
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.AlarmConstants
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID

@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmStopService
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AnimationDurations
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.AnimationDurations
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import java.text.SimpleDateFormat

@@ -7,7 +7,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalenda
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAuthDataStoreRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.ICalendarAuthUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.error.SafeExecutor
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.CalendarConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.CalendarConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount

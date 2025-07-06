@@ -19,7 +19,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AuthState
 

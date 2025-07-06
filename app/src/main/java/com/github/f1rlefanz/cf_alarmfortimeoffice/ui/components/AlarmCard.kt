@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DateTimeFormats
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIText
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.text.UIText
 import java.time.format.DateTimeFormatter
 
 /**
