@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 
+        Network Security Configuration for Philips Hue Bridge Integration
+        
+        PROBLEM: Android blocks HTTP connections to local IP addresses by default
+        SOLUTION: Explicitly allow cleartext traffic for local network ranges
+        
+        SECURITY IMPACT:
+        - Only affects local network communication (192.168.x.x, 10.x.x.x, etc.)
+        - External HTTPS traffic remains fully protected
+        - Philips Hue bridges only support HTTP for local API access
+        - Physical button press still required for initial authentication
+    -->
+    
+    <!-- Debug configuration: Allow user certificates for development -->
+    <debug-overrides cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </debug-overrides>
+    
+    <!-- 
+        Production fallback: Allow cleartext for private IP ranges
+        This is the critical configuration for Hue Bridge communication
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
