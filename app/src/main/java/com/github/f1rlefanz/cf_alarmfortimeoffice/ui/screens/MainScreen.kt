@@ -7,11 +7,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.NavigationState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.MainTab
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftUiState
-import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AlarmUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
@@ -26,7 +24,6 @@ fun MainScreen(
     mainViewModel: MainViewModel,
     navigationViewModel: NavigationViewModel,
     viewModelFactory: ViewModelFactory,
-    authDataStoreRepository: AuthDataStoreRepository,
     onRequestCalendarPermission: () -> Unit
 ) {
     // MEMORY LEAK FIX: Consolidated State Collection
@@ -44,14 +41,6 @@ fun MainScreen(
             flowOf(ShiftUiState()) // Empty state wenn nicht benötigt
         }
     }.collectAsState(initial = ShiftUiState())
-    
-    val alarmState by remember(navigationState) {
-        if (navigationState is NavigationState.MainContent) {
-            alarmViewModel.uiState
-        } else {
-            flowOf(AlarmUiState()) // Empty state wenn nicht benötigt
-        }
-    }.collectAsState(initial = AlarmUiState())
 
     // PERFORMANCE FIX: Separate LaunchedEffects to prevent reactivity loops
     // Split authentication handling from daysAhead observation
@@ -76,21 +65,21 @@ fun MainScreen(
             return@LaunchedEffect
         }
         
-        // 1. CALENDAR DATA: Load only if really needed and not loading
+        // 1. CALENDAR DATA: Load only if really needed
         if (calendarState.availableCalendars.isEmpty()) {
             Logger.d(LogTags.UI, "Loading calendar data due to empty calendar list")
             calendarViewModel.refreshData()
             
             // 2. PERMISSION: Only request if refresh doesn't start loading process
             delay(200) // Brief delay to check if loading started
-            if (!calendarState.isLoading && calendarState.availableCalendars.isEmpty()) {
+            if (calendarState.availableCalendars.isEmpty()) {
                 Logger.d(LogTags.UI, "Requesting calendar permission as fallback")
                 onRequestCalendarPermission()
             }
         }
         
         // 3. NAVIGATION: Handle after data operations complete
-        if (calendarState.availableCalendars.isNotEmpty() || !calendarState.isLoading) {
+        if (calendarState.availableCalendars.isNotEmpty()) {
             delay(100) // Minimal delay for UI stability
             navigationViewModel.handleAuthenticationSuccess(mainState.hasSelectedCalendars)
         }
@@ -176,8 +165,3 @@ fun MainScreen(
     }
 }
 
-// DEPRECATED: Use MainTab from navigation package instead
-@Deprecated("Use MainTab from navigation package", ReplaceWith("MainTab", "com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.MainTab"))
-enum class MainTabs {
-    HOME, STATUS, SETTINGS
-}

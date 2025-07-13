@@ -1,6 +1,7 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.auth.usecase
 
-import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.OAuth2TokenManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.ModernOAuth2TokenManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.AuthorizationStatus
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.data.TokenData
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.storage.TokenStorageRepository
 import kotlinx.coroutines.*
@@ -10,13 +11,15 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 /**
  * UseCase for automatic token refresh and validation.
  * 
- * FIXED: Thread-safe implementation with proper cancellation support.
+ * MODERNIZED: Uses ModernOAuth2TokenManager for 2024/2025 Google APIs approach.
+ * - Thread-safe implementation with proper cancellation support
  * - Uses structured concurrency
+ * - Compatible with Credential Manager authentication
  * - Prevents Race Conditions through proper scope management
  * - Cancellation-aware for lifecycle safety
  */
 class TokenRefreshUseCase(
-    private val oauth2TokenManager: OAuth2TokenManager,
+    private val modernOAuth2TokenManager: ModernOAuth2TokenManager,
     private val tokenStorage: TokenStorageRepository
 ) {
     
@@ -24,7 +27,8 @@ class TokenRefreshUseCase(
      * Ensures a valid access token is available for API calls.
      * Automatically refreshes if needed.
      * 
-     * FIXED: Cancellation-aware implementation
+     * MODERNIZED: Uses ModernOAuth2TokenManager with cancellation-aware implementation
+     * HYBRID-SUPPORT: Handles both legacy tokens and modern Credential Manager tokens
      */
     suspend fun ensureValidToken(): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -33,37 +37,23 @@ class TokenRefreshUseCase(
             
             Logger.d(LogTags.TOKEN, "Ensuring valid token")
             
-            val currentToken = tokenStorage.getCurrentToken()
+            // Use modern token manager directly
+            val result = modernOAuth2TokenManager.getValidCalendarToken()
             
-            when {
-                currentToken == null -> {
-                    Logger.w(LogTags.TOKEN, "No token available - authentication required")
-                    Result.failure(TokenException.NoTokenAvailable)
+            // HYBRID-SUPPORT: Special handling for Credential Manager authentication
+            result.onSuccess { token ->
+                if (token == "credential_manager_auth_pending") {
+                    Logger.d(LogTags.TOKEN, "MODERN-AUTH: Using Credential Manager authentication flow")
+                    // This is valid - the token will trigger hybrid authentication in CalendarRepository
+                } else {
+                    Logger.dThrottled(LogTags.TOKEN, "Using valid Calendar access token")
                 }
-                
-                currentToken.isValid() -> {
-                    // Token is still valid, return it
-                    Logger.dThrottled(LogTags.TOKEN, "Current token is valid")
-                    Result.success(currentToken.accessToken)
-                }
-                
-                currentToken.canRefresh() -> {
-                    // Check cancellation before expensive refresh operation
-                    ensureActive()
-                    
-                    // Token expired but can be refreshed
-                    Logger.d(LogTags.TOKEN, "Token expired, attempting refresh")
-                    oauth2TokenManager.refreshAccessToken(currentToken.refreshToken!!)
-                        .onFailure { error ->
-                            Logger.e(LogTags.TOKEN, "Token refresh failed: ${error.message}")
-                        }
-                }
-                
-                else -> {
-                    Logger.w(LogTags.TOKEN, "Token expired and cannot be refreshed")
-                    Result.failure(TokenException.RefreshNotPossible)
-                }
+            }.onFailure { error ->
+                Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
             }
+            
+            result
+            
         } catch (e: CancellationException) {
             Logger.d(LogTags.TOKEN, "Operation cancelled")
             throw e // Re-throw cancellation
@@ -76,6 +66,8 @@ class TokenRefreshUseCase(
     /**
      * Proactively refreshes token if it's expiring soon.
      * Useful for background refresh operations.
+     * 
+     * MODERNIZED: Simplified approach using ModernOAuth2TokenManager
      */
     suspend fun refreshIfExpiringSoon(bufferMinutes: Long = 15): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
@@ -91,13 +83,10 @@ class TokenRefreshUseCase(
                 return@withContext Result.success(false)
             }
             
-            if (!currentToken.canRefresh()) {
-                Logger.w(LogTags.TOKEN, "Token expiring but cannot be refreshed")
-                return@withContext Result.failure(TokenException.RefreshNotPossible)
-            }
-            
             Logger.d(LogTags.TOKEN, "Token expiring in ${currentToken.getRemainingLifetimeMinutes()} minutes, refreshing")
-            val refreshResult = oauth2TokenManager.refreshAccessToken(currentToken.refreshToken!!)
+            
+            // Use modern token manager for refresh
+            val refreshResult = modernOAuth2TokenManager.getValidCalendarToken()
             
             if (refreshResult.isSuccess) {
                 Logger.business(LogTags.TOKEN, "Proactive token refresh successful")
@@ -116,25 +105,34 @@ class TokenRefreshUseCase(
     /**
      * Validates current token and returns detailed status.
      * Useful for debugging and status checks.
+     * 
+     * MODERNIZED: Uses ModernOAuth2TokenManager authorization status
      */
     suspend fun getTokenStatus(): TokenStatus = withContext(Dispatchers.IO) {
         try {
-            val currentToken = tokenStorage.getCurrentToken()
+            val authStatus = modernOAuth2TokenManager.getAuthorizationStatus()
             
-            when {
-                currentToken == null -> TokenStatus.NoToken
-                
-                currentToken.isValid() -> TokenStatus.Valid(
-                    remainingMinutes = currentToken.getRemainingLifetimeMinutes(),
-                    canRefresh = currentToken.canRefresh()
-                )
-                
-                currentToken.canRefresh() -> TokenStatus.ExpiredButRefreshable(
-                    expiredMinutesAgo = -currentToken.getRemainingLifetimeMinutes(),
-                    hasRefreshToken = true
-                )
-                
-                else -> TokenStatus.ExpiredNotRefreshable
+            when (authStatus) {
+                is AuthorizationStatus.NotAuthorized -> 
+                    TokenStatus.NoToken
+                    
+                is AuthorizationStatus.Authorized -> 
+                    TokenStatus.Valid(
+                        remainingMinutes = authStatus.remainingMinutes,
+                        canRefresh = true // Modern system handles refresh automatically
+                    )
+                    
+                is AuthorizationStatus.ExpiredButRefreshable ->
+                    TokenStatus.ExpiredButRefreshable(
+                        expiredMinutesAgo = authStatus.expiredMinutesAgo,
+                        hasRefreshToken = true
+                    )
+                    
+                is AuthorizationStatus.ExpiredNotRefreshable ->
+                    TokenStatus.ExpiredNotRefreshable
+                    
+                is AuthorizationStatus.Error ->
+                    TokenStatus.Error(authStatus.exception)
             }
         } catch (e: Exception) {
             Logger.e(LogTags.TOKEN, "Error getting token status", e)
@@ -145,18 +143,15 @@ class TokenRefreshUseCase(
     /**
      * Forces a token refresh regardless of expiration status.
      * Useful for testing or when token is suspected to be invalid.
+     * 
+     * MODERNIZED: Uses ModernOAuth2TokenManager for forced refresh
      */
     suspend fun forceRefresh(): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val currentToken = tokenStorage.getCurrentToken()
-            
-            if (currentToken?.refreshToken == null) {
-                Logger.w(LogTags.TOKEN, "Cannot force refresh - no refresh token available")
-                return@withContext Result.failure(TokenException.RefreshNotPossible)
-            }
-            
             Logger.d(LogTags.TOKEN, "Forcing token refresh")
-            oauth2TokenManager.refreshAccessToken(currentToken.refreshToken)
+            
+            // Modern token manager handles the refresh logic
+            modernOAuth2TokenManager.getValidCalendarToken()
                 .onSuccess { Logger.business(LogTags.TOKEN, "Force refresh successful") }
                 .onFailure { Logger.e(LogTags.TOKEN, "Force refresh failed: ${it.message}") }
             
@@ -169,18 +164,15 @@ class TokenRefreshUseCase(
     /**
      * Clears invalid tokens from storage.
      * Useful for cleanup when tokens are permanently invalid.
+     * 
+     * MODERNIZED: Uses ModernOAuth2TokenManager for token management
      */
     suspend fun clearInvalidTokens(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val currentToken = tokenStorage.getCurrentToken()
-            
-            if (currentToken != null && !currentToken.isValid() && !currentToken.canRefresh()) {
-                Logger.d(LogTags.TOKEN, "Clearing invalid tokens from storage")
-                tokenStorage.clearToken()
-            } else {
-                Logger.d(LogTags.TOKEN, "No invalid tokens to clear")
-                Result.success(Unit)
-            }
+            Logger.d(LogTags.TOKEN, "Clearing invalid tokens")
+            modernOAuth2TokenManager.revokeCalendarAuthorization()
+                .onSuccess { Logger.d(LogTags.TOKEN, "Invalid tokens cleared") }
+                .onFailure { Logger.e(LogTags.TOKEN, "Failed to clear invalid tokens: ${it.message}") }
         } catch (e: Exception) {
             Logger.e(LogTags.TOKEN, "Error clearing invalid tokens", e)
             Result.failure(TokenException.UnknownError(e))

@@ -46,13 +46,14 @@ class CalendarUseCase(
             
             // Try new token system first, fallback to old system
             val accessToken = if (tokenRefreshUseCase != null) {
-                Logger.d(LogTags.CALENDAR, "Using OAuth2 token system...")
+                Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for calendar access...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
+                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
+                    Logger.business(LogTags.CALENDAR, "🔄 FALLBACK: Using legacy token system...")
                     getLegacyAccessToken()
                 }
             } else {
-                Logger.d(LogTags.CALENDAR, "Using legacy auth system...")
+                Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system (no OAuth2 available)...")
                 getLegacyAccessToken()
             }
             
@@ -117,11 +118,13 @@ class CalendarUseCase(
         SafeExecutor.safeExecute("CalendarUseCase.getCalendarEventsWithCache") {
             
             val accessToken = if (tokenRefreshUseCase != null) {
+                Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for events...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
+                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
                     getLegacyAccessToken()
                 }
             } else {
+                Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system for events...")
                 getLegacyAccessToken()
             }
             
@@ -238,11 +241,13 @@ class CalendarUseCase(
         SafeExecutor.safeExecute("CalendarUseCase.getCalendarEventsLazy") {
             
             val accessToken = if (tokenRefreshUseCase != null) {
+                Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for events...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
+                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
                     getLegacyAccessToken()
                 }
             } else {
+                Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system for events...")
                 getLegacyAccessToken()
             }
             

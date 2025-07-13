@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
  * - Testbarkeit: ViewModel kann mit Mock-UseCase getestet werden
  * - Business Logic Separation: Kapselt Auth-spezifische Geschäftslogik
  * - Clean Architecture: Domain Layer Interface
+ * 
+ * MODERN ADDITIONS: Calendar authorization support
  */
 interface IAuthUseCase {
     
@@ -56,4 +58,19 @@ interface IAuthUseCase {
      * @return Result mit Erfolgs- oder Fehlerinformation
      */
     suspend fun migrateTokenExpiryIfNeeded(): Result<Unit>
+    
+    /**
+     * MODERN: Requests Calendar API authorization for signed-in user
+     * 
+     * @param userEmail Optional email address (uses current user if null)
+     * @return Result with Boolean (true if authorized) or error
+     */
+    suspend fun requestCalendarAuthorization(userEmail: String? = null): Result<Boolean>
+    
+    /**
+     * MODERN: Checks if Calendar authorization is available
+     * 
+     * @return Result with Boolean (true if calendar access authorized) or error
+     */
+    suspend fun hasCalendarAuthorization(): Result<Boolean>
 }

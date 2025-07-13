@@ -99,11 +99,13 @@ class AlarmManagerService(private val application: Application) {
         )
 
         if (!canSchedule) {
-            Logger.w(LogTags.ALARM_MANAGER, "No permission for exact alarms")
+            Logger.w(LogTags.ALARM_MANAGER, "❌ No permission for exact alarms - requesting permission")
+            // Auto-request permission for better UX
+            requestExactAlarmPermission()
             return AlarmStatus(
                 systemAlarmSet = false,
                 canScheduleExactAlarms = false,
-                alarmStatusMessage = "Alarm-Berechtigung fehlt"
+                alarmStatusMessage = "Alarm-Berechtigung fehlt - Berechtigung angefordert"
             )
         }
 
@@ -137,6 +139,9 @@ class AlarmManagerService(private val application: Application) {
             val alarmIntent = Intent(application, AlarmReceiver::class.java).apply {
                 putExtra("shift_name", shiftMatch.shiftDefinition.name)
                 putExtra("alarm_time", formatAlarmTime(shiftMatch.calculatedAlarmTime))
+                putExtra("shift_pattern", shiftMatch.shiftDefinition.id)
+                putExtra("shift_start_time", shiftMatch.calendarEvent.startTime.toString())
+                putExtra("shift_end_time", shiftMatch.calendarEvent.endTime.toString())
                 // Fix AttributionTag issue
                 setPackage(application.packageName)
             }
@@ -240,6 +245,21 @@ class AlarmManagerService(private val application: Application) {
 
     companion object {
         private const val ALARM_REQUEST_CODE = 1001
+    }
+
+    /**
+     * 🔍 DEBUG: Get current alarm status for debugging
+     */
+    fun getAlarmDebugInfo(): String {
+        return buildString {
+            appendLine("=== ALARM DEBUG INFO ===")
+            appendLine("Can schedule exact alarms: ${canScheduleExactAlarms()}")
+            appendLine("Next alarm info: ${getNextAlarmInfo()?.formattedTime ?: "None"}")
+            appendLine("Alarm manager: $alarmManager")
+            appendLine("App package: ${application.packageName}")
+            appendLine("Request code: $ALARM_REQUEST_CODE")
+            appendLine("========================")
+        }
     }
 
 

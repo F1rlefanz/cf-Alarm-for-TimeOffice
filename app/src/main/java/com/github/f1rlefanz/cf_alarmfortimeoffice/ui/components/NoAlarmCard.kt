@@ -22,10 +22,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIColors
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.GraphicsConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.UIColors
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.GraphicsConstants
 
 /**
  * Card shown when no alarm is set

@@ -12,7 +12,6 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.calendar.Calendar
 import com.google.api.services.calendar.model.CalendarList
-import com.google.api.services.calendar.model.CalendarListEntry
 import com.google.api.services.calendar.model.Events
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,180 +30,76 @@ import android.os.Build
 data class CalendarItem(val id: String, val displayName: String)
 
 /**
- * REFACTORED: CalendarRepository mit Event-Caching und Change Detection
- * 
- * ÄNDERUNGEN:
- * ✅ Kein Singleton mehr - jetzt via Dependency Injection
- * ✅ Implementiert ICalendarRepository Interface für bessere Testbarkeit
- * ✅ Transport und JsonFactory als Instanz-Variablen
- * ✅ Service-Caching pro Repository-Instanz
- * ✅ EVENT-CACHING: Intelligentes Caching für wiederholte Abfragen
- * ✅ FORCE-REFRESH: Bypass Cache für manuelle Aktualisierung
- * ✅ CHANGE-DETECTION: Bereit für ETag-basierte Änderungserkennung
- * ✅ Explizite cleanup() Methode
- * ✅ OFFLINE-SUPPORT: Echte Netzwerk-Erkennung implementiert
- * 
- * OPTIMIERUNGEN:
- * - Reduziert API-Aufrufe durch intelligentes Caching
- * - Verbesserte Performance bei wiederholten Abfragen
- * - Memory-effizientes Cache-Management
- * - Force-Refresh für manuelle Aktualisierung
- * - Thread-safe Cache-Operations
- * - Automatische Offline-Erkennung und Fallback-Strategien
- * 
- * VORTEILE:
- * - Bessere Testbarkeit durch Interface
- * - Konsistent mit anderen Repositories
- * - Lifecycle-Management durch ViewModel/UseCase
- * - Mock-fähig für Unit Tests
- * - Reduzierte Netzwerklast
- * - Robuste Offline-Funktionalität
+ * CalendarRepository implementiert ICalendarRepository Interface
+ * mit Event-Caching und Google Calendar API Integration
  */
-class CalendarRepository : ICalendarRepository {
+class CalendarRepository(private var context: Context? = null) : ICalendarRepository {
     
-    // Instanz-basierte Variablen statt Singleton
     private val transport = NetHttpTransport()
     private val jsonFactory = GsonFactory.getDefaultInstance()
-    
-    // Service Caching pro Instanz
-    private var cachedService: Calendar? = null
-    private var cachedToken: String? = null
-    
-    // Event-Cache für effiziente Abfragen
     private val eventCache = CalendarEventCache()
     
-    // Context für Netzwerk-Checks (wird über DI gesetzt)
-    private var context: Context? = null
-    
-    private val applicationName = "CF-Alarm for TimeOffice"
-    
-    /**
-     * Sets Android context for network connectivity checks
-     * Called by DI container during initialization
-     */
+    private var cachedService: Calendar? = null
+    private var cachedToken: String? = null
+
     override fun setContext(context: Context) {
         this.context = context
     }
-    
-    /**
-     * OFFLINE SUPPORT: Echte Netzwerk-Konnektivitätsprüfung
-     */
-    private fun isNetworkAvailable(): Boolean {
-        val context = this.context ?: return true // Fallback: assume online if no context
-        
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return true
-        
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val activeNetwork = connectivityManager.activeNetwork ?: return false
-            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-            
-            networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-        } else {
-            @Suppress("DEPRECATION")
-            val activeNetworkInfo = connectivityManager.activeNetworkInfo
-            activeNetworkInfo?.isConnected == true
-        }
-    }
 
-    private fun getCalendarService(accessToken: String): Calendar {
-        // Service wird nur neu erstellt wenn Token sich ändert
-        if (cachedService == null || cachedToken != accessToken) {
-            Logger.d(LogTags.CALENDAR_API, "Creating new Calendar service for token: ${accessToken.take(10)}...")
+    override suspend fun getCalendarsWithToken(accessToken: String): Result<List<CalendarItem>> = withContext(Dispatchers.IO) {
+        SafeExecutor.safeExecute("CalendarRepository.getCalendarsWithToken") {
+            Logger.d(LogTags.CALENDAR_API, "Loading available calendars...")
+            val service = getCalendarService(accessToken)
 
-            val requestInitializer = HttpRequestInitializer { httpRequest: HttpRequest ->
-                httpRequest.headers.authorization = "Bearer $accessToken"
-            }
+            try {
+                val calendarList: CalendarList = service.calendarList().list()
+                    .setFields("items(id,summary,primary,accessRole)")
+                    .setMinAccessRole("reader")
+                    .execute()
 
-            cachedToken = accessToken
-            cachedService = Calendar.Builder(transport, jsonFactory, requestInitializer)
-                .setApplicationName(applicationName)
-                .build()
-
-            Logger.d(LogTags.CALENDAR_API, "Calendar service created and cached")
-        } else {
-            Logger.d(LogTags.CALENDAR_API, "Using cached Calendar service")
-        }
-
-        return cachedService!!
-    }
-
-    /**
-     * Maps Google API exceptions to app-specific errors
-     */
-    private fun mapCalendarException(e: Exception): AppError = when (e) {
-        is GoogleJsonResponseException -> when (e.statusCode) {
-            401 -> AppError.AuthenticationError(
-                message = "Kalenderzugriff verweigert. Bitte neu anmelden.",
-                cause = e
-            )
-            403 -> AppError.PermissionError(
-                permission = "android.permission.READ_CALENDAR",
-                message = "Keine Berechtigung für Kalenderzugriff",
-                cause = e
-            )
-            404 -> AppError.CalendarNotFoundError(
-                message = "Kalender nicht gefunden",
-                cause = e
-            )
-            in 500..599 -> AppError.ApiError(
-                code = e.statusCode,
-                message = "Google Kalender Server-Fehler",
-                cause = e
-            )
-            else -> AppError.ApiError(
-                code = e.statusCode,
-                message = "Kalenderfehler: ${e.statusMessage}",
-                cause = e
-            )
-        }
-        is UnknownHostException -> AppError.NetworkError(
-            message = "Keine Internetverbindung",
-            cause = e
-        )
-        is IOException -> AppError.NetworkError(
-            message = "Netzwerkfehler beim Kalenderzugriff",
-            cause = e
-        )
-        else -> AppError.CalendarAccessError(
-            message = "Unerwarteter Fehler beim Kalenderzugriff",
-            cause = e
-        )
-    }
-
-    override suspend fun getCalendarsWithToken(accessToken: String): Result<List<CalendarItem>> =
-        withContext(Dispatchers.IO) {
-            SafeExecutor.safeExecute("CalendarRepository.getCalendars") {
-                Logger.d(LogTags.CALENDAR_API, "Loading calendar list with token...")
-                val service = getCalendarService(accessToken)
-
-                try {
-                    val result: CalendarList = service.calendarList().list()
-                        .setFields("items(id,summary,accessRole)")
-                        .execute()
-
-                    val calendarEntries: List<CalendarListEntry> = result.items ?: emptyList()
-                    Logger.i(LogTags.CALENDAR, "Loaded ${calendarEntries.size} calendars")
+                Logger.d(LogTags.CALENDAR_API, "Calendar API response received: ${calendarList.items?.size ?: 0} items")
+                
+                if (calendarList.items.isNullOrEmpty()) {
+                    Logger.w(LogTags.CALENDAR_API, "No calendars found in Google Calendar API response")
+                    Logger.d(LogTags.CALENDAR_API, "Full API response: $calendarList")
+                    Logger.i(LogTags.CALENDAR_API, "DIAGNOSTIC: User account appears to have no calendars or calendar access is restricted")
                     
-                    calendarEntries.map { calendarListEntry ->
-                        CalendarItem(
-                            id = calendarListEntry.id ?: "unknown_id_${System.currentTimeMillis()}",
-                            displayName = calendarListEntry.summary ?: "Unbenannter Kalender"
-                        )
-                    }
-                } catch (e: Exception) {
-                    throw mapCalendarException(e)
+                    // Enhanced diagnostic logging
+                    Logger.d(LogTags.CALENDAR_API, "DIAGNOSTIC: API Response Details:")
+                    Logger.d(LogTags.CALENDAR_API, "  - ETag: ${calendarList.etag}")
+                    Logger.d(LogTags.CALENDAR_API, "  - Kind: ${calendarList.kind}")
+                    Logger.d(LogTags.CALENDAR_API, "  - NextPageToken: ${calendarList.nextPageToken}")
+                    Logger.d(LogTags.CALENDAR_API, "  - NextSyncToken: ${calendarList.nextSyncToken}")
+                } else {
+                    Logger.d(LogTags.CALENDAR_API, "Found calendars: ${calendarList.items.map { "${it.summary} (${it.id})" }}")
+                    Logger.i(LogTags.CALENDAR_API, "DIAGNOSTIC: Successfully loaded ${calendarList.items.size} calendars")
                 }
+
+                val calendars = calendarList.items?.mapNotNull { calendarEntry ->
+                    try {
+                        CalendarItem(
+                            id = calendarEntry.id ?: return@mapNotNull null,
+                            displayName = calendarEntry.summary ?: "Unnamed Calendar"
+                        )
+                    } catch (e: Exception) {
+                        Logger.w(LogTags.CALENDAR_API, "Failed to parse calendar: ${calendarEntry.summary}", e)
+                        null
+                    }
+                } ?: emptyList()
+
+                Logger.i(LogTags.CALENDAR_API, "${calendars.size} calendars loaded successfully")
+                calendars
+            } catch (e: Exception) {
+                throw mapCalendarException(e)
             }
         }
+    }
 
     override suspend fun getCalendarEventsWithToken(
         accessToken: String,
         calendarId: String,
         daysAhead: Int
     ): Result<List<CalendarEvent>> {
-        // Delegation an Cache-Methode mit Standard-Verhalten (kein Force-Refresh)
         return getCalendarEventsWithCache(accessToken, calendarId, daysAhead, forceRefresh = false)
     }
 
@@ -215,11 +110,8 @@ class CalendarRepository : ICalendarRepository {
         forceRefresh: Boolean
     ): Result<List<CalendarEvent>> = withContext(Dispatchers.IO) {
         SafeExecutor.safeExecute("CalendarRepository.getEventsWithCache") {
-            
-            // OFFLINE SUPPORT: Check for network connectivity and adjust strategy
             val isOfflineMode = !isNetworkAvailable()
             
-            // Cache-Check: Nur wenn nicht Force-Refresh und Cache verfügbar
             if (!forceRefresh && eventCache.isCached(calendarId, daysAhead, allowStale = isOfflineMode)) {
                 val cachedEvents = eventCache.get(calendarId, daysAhead, allowStale = isOfflineMode)
                 if (cachedEvents != null) {
@@ -229,7 +121,6 @@ class CalendarRepository : ICalendarRepository {
                 }
             }
             
-            // OFFLINE SUPPORT: If offline and no cache available, return empty list with info
             if (isOfflineMode) {
                 Logger.w(LogTags.CALENDAR_API, "Offline mode: No cached data available for calendar $calendarId")
                 return@safeExecute emptyList<CalendarEvent>()
@@ -292,11 +183,10 @@ class CalendarRepository : ICalendarRepository {
                     }
                 }
                 
-                // OFFLINE SUPPORT: Cache mit Priorität basierend auf Aktualität
                 val priority = when {
-                    daysAhead <= 1 -> CalendarEventCache.CachePriority.HIGH // Next day events are high priority
-                    daysAhead <= 7 -> CalendarEventCache.CachePriority.NORMAL // Week events are normal
-                    else -> CalendarEventCache.CachePriority.LOW // Future events are low priority
+                    daysAhead <= 1 -> CalendarEventCache.CachePriority.HIGH
+                    daysAhead <= 7 -> CalendarEventCache.CachePriority.NORMAL
+                    else -> CalendarEventCache.CachePriority.LOW
                 }
                 
                 eventCache.put(calendarId, daysAhead, calendarEvents, result.etag, priority)
@@ -304,7 +194,6 @@ class CalendarRepository : ICalendarRepository {
                 
                 calendarEvents
             } catch (e: Exception) {
-                // OFFLINE SUPPORT: Try to return stale cache as fallback
                 val fallbackEvents = eventCache.get(calendarId, daysAhead, allowStale = true)
                 if (fallbackEvents != null) {
                     Logger.w(LogTags.CALENDAR_API, "API failed, returning ${fallbackEvents.size} stale cached events", e)
@@ -324,7 +213,6 @@ class CalendarRepository : ICalendarRepository {
         pageToken: String?
     ): Result<EventsPage> = withContext(Dispatchers.IO) {
         SafeExecutor.safeExecute("CalendarRepository.getCalendarEventsWithPagination") {
-            
             Logger.d(LogTags.CALENDAR_API, "Loading events with pagination: pageToken=${pageToken?.take(10)}..., maxResults=$maxResults")
             val service = getCalendarService(accessToken)
 
@@ -344,7 +232,6 @@ class CalendarRepository : ICalendarRepository {
                     .setMaxResults(maxResults)
                     .setFields("items(id,summary,start,end),nextPageToken")
 
-                // ECHTE LAZY LOADING: Setze pageToken für echte Pagination
                 if (pageToken != null) {
                     eventsRequest.pageToken = pageToken
                 }
@@ -412,14 +299,83 @@ class CalendarRepository : ICalendarRepository {
         return eventCache.getCacheStats()
     }
     
-    /**
-     * Cleanup method to clear cached resources
-     * Should be called when the repository is no longer needed
-     */
     override fun cleanup() {
         Logger.d(LogTags.REPOSITORY, "Clearing CalendarRepository resources")
         cachedService = null
         cachedToken = null
-        // Note: eventCache.clear() wird in clearEventCache() als suspend function aufgerufen
     }
+    
+    private fun getCalendarService(accessToken: String): Calendar {
+        if (cachedService == null || cachedToken != accessToken) {
+            Logger.business(LogTags.CALENDAR_API, "🔗 API-SERVICE: Creating Calendar service with token: ${accessToken.take(20)}...")
+            Logger.d(LogTags.CALENDAR_API, "📊 TOKEN-INFO: Token length=${accessToken.length}")
+            
+            // DIAGNOSTIC: Check if this looks like a real OAuth2 token
+            when {
+                accessToken == "valid_credential_token" -> {
+                    Logger.e(LogTags.CALENDAR_API, "❌ CRITICAL: Still using placeholder token 'valid_credential_token'!")
+                    Logger.e(LogTags.CALENDAR_API, "💡 FIX-HINT: OAuth2 token integration is broken - check AuthViewModel and ModernOAuth2TokenManager")
+                }
+                accessToken.startsWith("ya29.") -> {
+                    Logger.business(LogTags.CALENDAR_API, "✅ TOKEN-OK: Real Google OAuth2 access token detected (ya29.)")
+                }
+                accessToken.length < 10 -> {
+                    Logger.w(LogTags.CALENDAR_API, "⚠️ TOKEN-SUSPICIOUS: Token seems too short (${accessToken.length} chars)")
+                }
+                else -> {
+                    Logger.d(LogTags.CALENDAR_API, "🔍 TOKEN-INFO: Using token of ${accessToken.length} chars")
+                }
+            }
+            
+            // Use standard OAuth2 Bearer token authentication
+            Logger.d(LogTags.CALENDAR_API, "🔐 AUTH-METHOD: Using OAuth2 Bearer token authentication")
+            val requestInitializer = HttpRequestInitializer { request: HttpRequest ->
+                request.headers.authorization = "Bearer $accessToken"
+            }
+            
+            cachedService = Calendar.Builder(transport, jsonFactory, requestInitializer)
+                .setApplicationName("CF-Alarm for TimeOffice")
+                .build()
+            cachedToken = accessToken
+            
+            Logger.d(LogTags.CALENDAR_API, "✅ API-SERVICE: Calendar service ready for API calls")
+        }
+        return cachedService!!
+    }
+    
+    private fun mapCalendarException(e: Exception): AppError {
+        Logger.e(LogTags.CALENDAR_API, "Calendar API error", e)
+        return when (e) {
+            is GoogleJsonResponseException -> {
+                when (e.statusCode) {
+                    401 -> AppError.AuthenticationError("Google Calendar authentication failed")
+                    403 -> AppError.PermissionError("Insufficient permissions for Google Calendar")
+                    404 -> AppError.NetworkError("Calendar not found")
+                    else -> AppError.NetworkError("Google Calendar API error: ${e.statusMessage}")
+                }
+            }
+            is UnknownHostException -> AppError.NetworkError("No internet connection")
+            is IOException -> AppError.NetworkError("Network error: ${e.message}")
+            else -> AppError.UnknownError("Calendar error: ${e.message}")
+        }
+    }
+    
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+            context?.let { ctx ->
+                val connectivityManager = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val network = connectivityManager.activeNetwork
+                    val capabilities = connectivityManager.getNetworkCapabilities(network)
+                    capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                } else {
+                    @Suppress("DEPRECATION")
+                    connectivityManager.activeNetworkInfo?.isConnected == true
+                }
+            } ?: true
+        } catch (e: Exception) {
+            Logger.w(LogTags.REPOSITORY, "Error checking network availability", e)
+            true
+        }
+}
 }

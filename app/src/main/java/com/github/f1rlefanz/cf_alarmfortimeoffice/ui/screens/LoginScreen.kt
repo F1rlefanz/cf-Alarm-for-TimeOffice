@@ -12,7 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.R
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.text.UIText
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 
@@ -83,14 +83,14 @@ fun LoginScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Standard Google Sign-In icon
+                    // Modern credential icon
                     Icon(
                         painter = painterResource(id = android.R.drawable.ic_partial_secure),
                         contentDescription = null,
                         modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
                     )
                     Spacer(modifier = Modifier.width(SpacingConstants.SPACING_MEDIUM))
-                    Text(UIText.GOOGLE_SIGN_IN)
+                    Text("Mit Google anmelden")
                 }
             }
         }

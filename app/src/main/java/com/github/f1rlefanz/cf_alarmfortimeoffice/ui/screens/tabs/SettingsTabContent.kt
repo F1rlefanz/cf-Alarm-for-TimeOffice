@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +86,56 @@ fun SettingsTabContent(
                     Icons.Default.ChevronRight,
                     contentDescription = null
                 )
+            }
+        }
+
+        // Calendar Authorization Card (MODERN ADDITION)
+        if (authState.userAuth.isSignedIn && !authState.calendarOps.hasSelectedCalendars) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { authViewModel.requestCalendarAuthorization() },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(SpacingConstants.PADDING_CARD),
+                    horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Security,
+                        contentDescription = null,
+                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Calendar-Berechtigung",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            "Kalender-Zugriff autorisieren für Schichterkennung",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    if (authState.calendarOps.calendarsLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         }
 

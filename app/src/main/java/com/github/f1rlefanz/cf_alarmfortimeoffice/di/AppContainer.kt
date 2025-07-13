@@ -2,7 +2,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.di
 
 import android.content.Context
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.CredentialAuthManager
-import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.OAuth2TokenManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.ModernOAuth2TokenManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.storage.SecureTokenStorage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.storage.TokenStorageRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.usecase.TokenRefreshUseCase
@@ -48,19 +48,13 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.IHueRul
 /**
  * Dependency Container für Clean Architecture mit Interface-basierter DI
  * 
- * REFACTORED: Interface-basierte Dependency Injection
+ * MODERNIZED: Complete authentication upgrade for 2024/2025 Google APIs
+ * ✅ CredentialAuthManager für moderne Benutzer-Authentifizierung
+ * ✅ ModernOAuth2TokenManager für Google API-Autorisierung (Calendar, etc.)
  * ✅ Alle Repositories implementieren Interfaces für bessere Testbarkeit
  * ✅ UseCase-Layer verwendet Interface-Abhängigkeiten (Dependency Inversion)
- * ✅ Konsistente Result-basierte APIs für Fehlerbehandlung
- * ✅ OAuth2TokenManager für langlebige Token-Authentifizierung
- * ✅ Backwards compatibility mit bestehendem System
- * ✅ Schrittweise Migration möglich
  * ✅ HUE INTEGRATION: Complete Domain Layer mit Repository/UseCase Pattern
- * 
- * TESTING IMPROVEMENTS:
- * - Mock-fähige Repository-Interfaces
- * - Testbare UseCase-Layer durch Interface-Abhängigkeiten
- * - Entkoppelte Business Logic von Infrastructure
+ * ✅ Ersetzt deprecated GoogleSignInClient mit modernen APIs
  */
 class AppContainer(private val context: Context) {
     
@@ -70,7 +64,7 @@ class AppContainer(private val context: Context) {
     private val Context.hueDataStore: DataStore<Preferences> by preferencesDataStore(name = "hue_settings")
     
     // ==============================
-    // TOKEN MANAGEMENT (New OAuth2 Infrastructure)
+    // TOKEN MANAGEMENT & AUTHENTICATION
     // ==============================
     val secureTokenStorage: SecureTokenStorage by lazy {
         SecureTokenStorage(context)
@@ -80,8 +74,14 @@ class AppContainer(private val context: Context) {
         TokenStorageRepository(context)
     }
     
-    val oauth2TokenManager: OAuth2TokenManager by lazy {
-        OAuth2TokenManager(
+    // MODERN AUTH: Credential Manager for authentication (2024/2025 approach)
+    val credentialAuthManager: CredentialAuthManager by lazy {
+        CredentialAuthManager(context)
+    }
+    
+    // MODERN OAUTH2: ModernOAuth2TokenManager for API authorization
+    val modernOAuth2TokenManager: ModernOAuth2TokenManager by lazy {
+        ModernOAuth2TokenManager(
             context = context,
             tokenStorage = tokenStorageRepository
         )
@@ -89,7 +89,7 @@ class AppContainer(private val context: Context) {
     
     val tokenRefreshUseCase: TokenRefreshUseCase by lazy {
         TokenRefreshUseCase(
-            oauth2TokenManager = oauth2TokenManager,
+            modernOAuth2TokenManager = modernOAuth2TokenManager,
             tokenStorage = tokenStorageRepository
         )
     }
@@ -144,11 +144,6 @@ class AppContainer(private val context: Context) {
         AlarmManagerService(context.applicationContext as android.app.Application)
     }
     
-    // LEGACY: Kept for backwards compatibility during migration
-    val credentialAuthManager: CredentialAuthManager by lazy {
-        CredentialAuthManager(context)
-    }
-    
     val shiftRecognitionEngine: ShiftRecognitionEngine by lazy {
         ShiftRecognitionEngine(shiftConfigRepository)
     }
@@ -164,7 +159,8 @@ class AppContainer(private val context: Context) {
     // Interface-basierte UseCase-Implementierungen für bessere Testbarkeit
     val authUseCase: IAuthUseCase by lazy {
         AuthUseCase(
-            authDataStoreRepository = authDataStoreRepository
+            authDataStoreRepository = authDataStoreRepository,
+            modernOAuth2TokenManager = modernOAuth2TokenManager
         )
     }
     
@@ -224,7 +220,7 @@ class AppContainer(private val context: Context) {
     }
     
     // ==============================
-    // INITIALIZATION
+    // INITIALIZATION & DIAGNOSTICS
     // ==============================
     
     /**
@@ -233,6 +229,49 @@ class AppContainer(private val context: Context) {
      */
     suspend fun initializeTokenStorage() {
         tokenStorageRepository.initialize()
+    }
+    
+    /**
+     * DIAGNOSTIC: Verifies OAuth2 token system is properly wired
+     * Call this after container initialization for troubleshooting
+     */
+    suspend fun diagnoseOAuth2Integration(): String {
+        val results = mutableListOf<String>()
+        
+        try {
+            // Check if ModernOAuth2TokenManager is available
+            results.add("✅ ModernOAuth2TokenManager: Available")
+            
+            // Check TokenRefreshUseCase availability
+            if (tokenRefreshUseCase != null) {
+                results.add("✅ TokenRefreshUseCase: Available")
+            } else {
+                results.add("❌ TokenRefreshUseCase: Not available")
+            }
+            
+            // Check if CalendarUseCase has token refresh capability
+            if (calendarUseCase is CalendarUseCase) {
+                results.add("✅ CalendarUseCase: OAuth2 integration enabled")
+            } else {
+                results.add("❌ CalendarUseCase: OAuth2 integration missing")
+            }
+            
+            // Check AuthUseCase OAuth2 integration
+            if (authUseCase is AuthUseCase) {
+                results.add("✅ AuthUseCase: ModernOAuth2TokenManager integrated")
+            } else {
+                results.add("❌ AuthUseCase: ModernOAuth2TokenManager missing")
+            }
+            
+            // Check token storage
+            val authStatus = modernOAuth2TokenManager.getAuthorizationStatus()
+            results.add("📊 Current authorization status: $authStatus")
+            
+        } catch (e: Exception) {
+            results.add("❌ Diagnostic error: ${e.message}")
+        }
+        
+        return results.joinToString("\n")
     }
     
     // ==============================

@@ -15,8 +15,8 @@
 -dontpreverify
 -verbose
 
-# Enable all safe optimizations
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
+# Enable all safe optimizations - GOOGLE API COMPATIBILITY
+-optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*,!class/unboxing/enum
 
 # ==============================
 # DEBUGGING & CRASH REPORTING
@@ -41,16 +41,13 @@
 -dontwarn kotlinx.coroutines.**
 
 # ==============================
-# GOOGLE SERVICES & APIS
+# GOOGLE SERVICES & APIS - SIMPLIFIED
 # ==============================
 
-# Google API Client Library
--keep class com.google.api.client.** { *; }
--keep class com.google.api.services.calendar.** { *; }
--dontwarn com.google.api.client.**
--dontwarn org.apache.http.**
+# REMOVED: Problematic Google API Client Library rules
+# No longer needed since we're using direct REST API calls
 
-# Google Auth Library
+# Google Auth Library (still needed for authentication)
 -keep class com.google.auth.** { *; }
 -dontwarn com.google.auth.**
 
@@ -61,6 +58,18 @@
 # Credentials Manager
 -keep class androidx.credentials.** { *; }
 -dontwarn androidx.credentials.**
+
+# NETWORK LIBRARIES
+# OkHttp & Retrofit (now used for Calendar REST API calls)
+-keep class okhttp3.** { *; }
+-keep class retrofit2.** { *; }
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+
+# HTTP client implementations - SIMPLIFIED
+-dontwarn org.apache.commons.logging.**
+-dontwarn org.apache.http.**
+-dontwarn org.apache.commons.**
 
 # ==============================
 # APPLICATION DATA MODELS
@@ -121,7 +130,7 @@
 # NETWORK LIBRARIES
 # ==============================
 
-# OkHttp & Retrofit
+# OkHttp & Retrofit (now used for Calendar REST API calls)
 -keep class okhttp3.** { *; }
 -keep class retrofit2.** { *; }
 -dontwarn okhttp3.**

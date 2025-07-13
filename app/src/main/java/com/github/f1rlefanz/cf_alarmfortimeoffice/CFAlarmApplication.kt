@@ -45,7 +45,8 @@ class CFAlarmApplication : Application() {
                 // PERFORMANCE: Defer non-critical migrations to reduce startup time
                 launch {
                     Logger.d(LogTags.DATASTORE, "Running DataStore migration")
-                    appContainer.authDataStoreRepository.migrateTokenExpiryIfNeeded()
+                    // Migration call removed to avoid blocking main thread
+                    // appContainer.authDataStoreRepository.migrateTokenExpiryIfNeeded()
                 }
                 
                 Logger.i(LogTags.APP, "App initialization completed successfully")

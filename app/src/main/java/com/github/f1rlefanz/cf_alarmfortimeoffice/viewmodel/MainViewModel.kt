@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -26,18 +28,21 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
  * ✅ Folgt Clean Architecture Principles
  * ✅ Zentrale Koordination ohne Mixed Responsibilities
  * ✅ FIXED: hasSelectedCalendars wird jetzt korrekt überwacht
+ * ✅ CRITICAL FIX: Auto-triggers calendar loading after authentication
  */
 class MainViewModel(
     private val authUseCase: IAuthUseCase,
     private val shiftUseCase: IShiftUseCase,
     private val alarmUseCase: IAlarmUseCase,
     private val calendarSelectionRepository: ICalendarSelectionRepository,
-    private val calendarViewModel: CalendarViewModel? = null
+    private val calendarViewModel: CalendarViewModel? = null,
+    private val authViewModel: AuthViewModel? = null
 ) : ViewModel() {
 
     data class MainUiState(
         val isAuthenticated: Boolean = false,
         val hasSelectedCalendars: Boolean = false,
+        val hasAvailableCalendars: Boolean = false, // NEW: Track available calendars separately
         val hasShiftConfig: Boolean = false,
         val isProcessingShifts: Boolean = false,
         val hasUpcomingShift: Boolean = false,
@@ -49,6 +54,18 @@ class MainViewModel(
 
     init {
         observeAppState()
+        setupAuthCalendarTrigger()
+    }
+    
+    /**
+     * CRITICAL FIX: Sets up automatic calendar loading after authentication
+     * This connects AuthViewModel to CalendarViewModel for seamless user experience
+     */
+    private fun setupAuthCalendarTrigger() {
+        authViewModel?.setCalendarReloadTrigger {
+            Logger.business(LogTags.NAVIGATION, "🔄 MAIN-COORDINATOR: Triggering calendar reload after authentication")
+            calendarViewModel?.loadAvailableCalendars(resetPagination = true)
+        }
     }
 
     private fun observeAppState() {
@@ -58,11 +75,13 @@ class MainViewModel(
                 alarmUseCase.activeAlarms,
                 calendarSelectionRepository.selectedCalendarIds
                     .debounce(100) // PERFORMANCE: Batch calendar selection changes
-                    .distinctUntilChanged() // PERFORMANCE: Only emit on actual changes
-            ) { authData, activeAlarms, selectedCalendarIds ->
+                    .distinctUntilChanged(), // PERFORMANCE: Only emit on actual changes
+                                calendarViewModel?.uiState?.map { it.availableCalendars.isNotEmpty() } ?: flowOf(false)
+            ) { authData, activeAlarms, selectedCalendarIds, hasAvailableCalendars ->
                 MainUiState(
                     isAuthenticated = authData.isLoggedIn,
                     hasSelectedCalendars = selectedCalendarIds.isNotEmpty(),
+                    hasAvailableCalendars = hasAvailableCalendars, // NEW: Track available calendars
                     hasActiveAlarms = activeAlarms.isNotEmpty()
                 )
             }.distinctUntilChanged() // PERFORMANCE: Only emit when main state actually changes
@@ -71,7 +90,7 @@ class MainViewModel(
                 _uiState.value = state
                 
                 // Debug-Log für Diagnose
-                Logger.d(LogTags.NAVIGATION, "Main state updated - authenticated=${state.isAuthenticated}, hasCalendars=${state.hasSelectedCalendars}")
+                Logger.d(LogTags.NAVIGATION, "Main state updated - authenticated=${state.isAuthenticated}, hasCalendars=${state.hasAvailableCalendars}, hasSelected=${state.hasSelectedCalendars}")
             }
         }
     }

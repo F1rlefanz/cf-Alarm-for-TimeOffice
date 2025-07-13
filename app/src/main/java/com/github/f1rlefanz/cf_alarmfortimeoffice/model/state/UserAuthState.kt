@@ -31,13 +31,13 @@ data class UserAuthState(
         fun authenticated(
             email: String,
             displayName: String,
-            accessToken: String
+            accessToken: String?
         ) = UserAuthState(
             isSignedIn = true,
             userEmail = email,
             displayName = displayName,
             accessToken = accessToken,
-            hasValidToken = true
+            hasValidToken = accessToken?.isNotEmpty() == true
         )
     }
 }

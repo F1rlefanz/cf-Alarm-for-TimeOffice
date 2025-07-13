@@ -23,8 +23,8 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSetupM
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSuccessCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ViewModelFactory
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
 
 /**
  * Enhanced Hue Tab Content with modern UX
@@ -92,22 +92,26 @@ fun HueTabContent(
             // Success Celebration Card ODER Connected Status ODER Discovery
             when {
                 // 1. Success Card (temporär für 5 Sekunden)
-                showSuccessCard && uiState.bridgeConnectionInfo != null -> {
-                    BridgeSuccessCard(
-                        connectionInfo = uiState.bridgeConnectionInfo!!,
-                        isVisible = showSuccessCard,
-                        onDismiss = { showSuccessCard = false }
-                    )
+                showSuccessCard -> {
+                    uiState.bridgeConnectionInfo?.let { connectionInfo ->
+                        BridgeSuccessCard(
+                            connectionInfo = connectionInfo,
+                            isVisible = showSuccessCard,
+                            onDismiss = { showSuccessCard = false }
+                        )
+                    }
                 }
                 
                 // 2. Connected Status Card (permanent wenn connected)
                 uiState.bridgeConnectionInfo?.isConnected == true && !showSuccessCard -> {
-                    ConnectedStatusCard(
-                        connectionInfo = uiState.bridgeConnectionInfo!!,
-                        onDisconnect = { 
-                            hueViewModel.clearDiscoveredBridges()
-                        }
-                    )
+                    uiState.bridgeConnectionInfo?.let { connectionInfo ->
+                        ConnectedStatusCard(
+                            connectionInfo = connectionInfo,
+                            onDisconnect = { 
+                                hueViewModel.clearDiscoveredBridges()
+                            }
+                        )
+                    }
                 }
                 
                 // 3. Discovery Card (nur wenn NICHT connected und NICHT discovering)

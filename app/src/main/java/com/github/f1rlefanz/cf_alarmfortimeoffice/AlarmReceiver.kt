@@ -15,7 +15,7 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
+// UIConstants import removed - using direct constants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueRepositoryFactory
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
@@ -26,6 +26,9 @@ class AlarmReceiver : BroadcastReceiver() {
         private const val ALARM_CHANNEL_ID = "CF_ALARM_CHANNEL"
         private const val ALARM_CHANNEL_NAME = "CF-Alarm Wecker"
         private const val ALARM_NOTIFICATION_ID = 1001
+        
+        // VIBRATION PATTERN: Pattern for alarm vibration (on, off, on, off, ...)
+        private val ALARM_VIBRATION_PATTERN = longArrayOf(0, 1000, 500, 1000, 500, 1000)
         
         // Static references für Alarm-Medien (um sie stoppen zu können)
         private var mediaPlayer: MediaPlayer? = null
@@ -122,7 +125,7 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
         
-        Logger.i(LogTags.HUE_INTEGRATION, "🎨 Starting Hue integration for shift: $shiftPattern")
+        Logger.i(LogTags.HUE_INTEGRATION, "🎨 Starting Hue integration for shift: $shiftPattern at $alarmTime")
         
         // Async Hue-Operation um AlarmReceiver nicht zu blockieren
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
@@ -169,7 +172,7 @@ class AlarmReceiver : BroadcastReceiver() {
      * @param shiftPattern Schichtmuster
      * @param shiftStartTime Schichtbeginn (kann null sein)
      * @param shiftEndTime Schichtende (kann null sein)
-     * @param alarmTime Alarm-Zeit
+     * @param alarmTime Alarm-Zeit (für Logging und Debugging)
      * @return ShiftMatch für Rule-Evaluation
      */
     private fun createShiftMatchFromAlarm(
@@ -179,6 +182,7 @@ class AlarmReceiver : BroadcastReceiver() {
         alarmTime: String
     ): ShiftMatch {
         return try {
+            Logger.d(LogTags.HUE_INTEGRATION, "Creating ShiftMatch for pattern: $shiftPattern at $alarmTime")
             // Parse Zeitstempel falls verfügbar
             val startTime = shiftStartTime?.let { 
                 java.time.LocalDateTime.parse(it) 
@@ -245,7 +249,7 @@ class AlarmReceiver : BroadcastReceiver() {
     
     private fun startVibration(context: Context) {
         try {
-            val vibrationPattern = UIConstants.ALARM_VIBRATION_PATTERN
+            val vibrationPattern = ALARM_VIBRATION_PATTERN
             
             when {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {

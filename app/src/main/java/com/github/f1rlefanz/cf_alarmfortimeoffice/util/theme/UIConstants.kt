@@ -172,3 +172,24 @@ object GraphicsConstants {
     /** Extra large corner radius for special cases */
     const val EXTRA_LARGE_CORNER_RADIUS = 20f
 }
+
+// ============================
+// ALARM & VIBRATION CONSTANTS
+// ============================
+object UIConstants {
+    /** Animation duration for UI transitions */
+    const val ANIMATION_DURATION_SHORT = 250
+    const val ANIMATION_DURATION_MEDIUM = 500
+    const val ANIMATION_DURATION_LONG = 1000
+    
+    /** Vibration pattern for alarms: [delay, vibrate, pause, vibrate, pause, vibrate] */
+    val ALARM_VIBRATION_PATTERN = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+    
+    /** Standard animation delays */
+    const val STANDARD_DELAY = 16L // 60fps
+    const val LONG_DELAY = 33L     // 30fps
+    
+    /** Progress indicator sizes */
+    const val PROGRESS_INDICATOR_SIZE = 40
+    const val LARGE_PROGRESS_INDICATOR_SIZE = 60
+}

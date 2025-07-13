@@ -21,9 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.UIConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.AlphaValues
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.AlphaValues
 
 /**
  * Enhanced animated discovery card with visual progress indicators

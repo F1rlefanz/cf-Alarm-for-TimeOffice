@@ -94,7 +94,7 @@ class AlarmViewModel(
                     shiftName = shift.shiftType.displayName,
                     triggerTime = alarmTime,
                     formattedTime = java.time.format.DateTimeFormatter
-                        .ofPattern(com.github.f1rlefanz.cf_alarmfortimeoffice.util.DateTimeFormats.STANDARD_DATETIME)
+                        .ofPattern(com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats.STANDARD_DATETIME)
                         .format(java.time.LocalDateTime.ofInstant(
                             java.time.Instant.ofEpochMilli(alarmTime), 
                             java.time.ZoneId.systemDefault()

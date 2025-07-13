@@ -66,7 +66,8 @@ class CalendarViewModel(
     private val calendarUseCase: ICalendarUseCase,
     private val calendarSelectionRepository: ICalendarSelectionRepository,
     private val errorHandler: ErrorHandler,
-    private val shiftUseCase: com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IShiftUseCase
+    private val shiftUseCase: com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IShiftUseCase,
+    private val alarmUseCase: com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmUseCase
 ) : ViewModel() {
 
     private val _localUiState = MutableStateFlow(CalendarUiState())
@@ -317,6 +318,18 @@ class CalendarViewModel(
                     
                     Logger.i(LogTags.CALENDAR, "Progressive calendar loading completed - page ${calendarPage.page}: ${calendarPage.calendars.size} calendars, total: ${calendarPage.totalCalendars}")
                     
+                    // DIAGNOSTIC: Log special case when no calendars are found
+                    if (resetPagination && calendarPage.totalCalendars == 0) {
+                        Logger.w(LogTags.CALENDAR, "🔍 CALENDAR-DIAGNOSIS: Google account has no calendars accessible via Calendar API")
+                        Logger.i(LogTags.CALENDAR, "🔍 CALENDAR-DIAGNOSIS: This could mean:")
+                        Logger.i(LogTags.CALENDAR, "   - User's Google account has no calendars created")
+                        Logger.i(LogTags.CALENDAR, "   - Calendar access is restricted by organization policy")  
+                        Logger.i(LogTags.CALENDAR, "   - API permissions are insufficient")
+                        Logger.i(LogTags.CALENDAR, "💡 CALENDAR-DIAGNOSIS: User should create a calendar in Google Calendar first")
+                    } else if (resetPagination && calendarPage.totalCalendars > 0) {
+                        Logger.i(LogTags.CALENDAR, "✅ CALENDAR-DIAGNOSIS: Successfully found ${calendarPage.totalCalendars} calendars - user can proceed with calendar selection")
+                    }
+                    
                 }.onFailure { error ->
                     updateLocalStateImmediate { 
                         it.copy(
@@ -387,25 +400,6 @@ class CalendarViewModel(
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * SINGLE SOURCE OF TRUTH: Speichert Selection im Repository statt lokalem State
-     * ATOMIC UPDATE: Kompletter Austausch der ausgewählten IDs
-     */
-    fun selectCalendars(calendarIds: Set<String>) {
-        viewModelScope.launch {
-            calendarSelectionRepository.saveSelectedCalendarIds(calendarIds)
-                .onSuccess {
-                    Logger.i(LogTags.CALENDAR, "Calendar selection saved: ${calendarIds.size} calendars")
-                    // Events werden automatisch über observeCalendarSelection() geladen
-                }
-                .onFailure { error ->
-                    updateLocalState { 
-                        it.copy(error = errorHandler.getErrorMessage(error))
-                    }
-                }
         }
     }
 
@@ -517,7 +511,7 @@ class CalendarViewModel(
                     }
                 }
                 
-                // FINAL UPDATE: Complete loading state
+                // FINAL UPDATE: Complete loading state and CREATE ALARMS
                 val finalSortedEvents = allEvents.sortedBy { it.startTime }
                 val finalHasMore = if (loadAll) {
                     false
@@ -534,6 +528,11 @@ class CalendarViewModel(
                         totalEvents = if (loadAll) finalSortedEvents.size else totalEventCount,
                         hasMoreEvents = finalHasMore
                     )
+                }
+                
+                // 🚨 CRITICAL FIX: Automatically create alarms from recognized shifts!
+                if (finalSortedEvents.isNotEmpty()) {
+                    createAlarmsFromLoadedEvents(finalSortedEvents)
                 }
                 
                 if (forceRefresh) {
@@ -567,34 +566,6 @@ class CalendarViewModel(
             } else {
                 calendarSelectionRepository.addCalendarId(calendarId)
             }
-        }
-    }
-
-    fun testConnection() {
-        viewModelScope.launch {
-            updateLocalState { it.copy(isLoading = true, error = null) }
-            
-            calendarUseCase.testCalendarConnection()
-                .onSuccess { isConnected: Boolean ->
-                    if (isConnected) {
-                        loadAvailableCalendars()
-                    } else {
-                        updateLocalState { 
-                            it.copy(
-                                isLoading = false,
-                                error = "Kalender-Verbindung fehlgeschlagen"
-                            )
-                        }
-                    }
-                }
-                .onFailure { error: Throwable ->
-                    updateLocalState { 
-                        it.copy(
-                            isLoading = false,
-                            error = errorHandler.getErrorMessage(error)
-                        )
-                    }
-                }
         }
     }
 
@@ -768,11 +739,55 @@ class CalendarViewModel(
     }
 
     /**
-     * CONVENIENCE: Clear selection über Repository
+     * 🚨 CRITICAL FIX: Automatically create alarms from loaded events
+     * This was the missing link causing alarms to never be created!
      */
-    fun clearCalendarSelection() {
+    private fun createAlarmsFromLoadedEvents(events: List<CalendarEvent>) {
         viewModelScope.launch {
-            calendarSelectionRepository.clearSelection()
+            try {
+                // Get current shift configuration
+                val shiftConfig = shiftUseCase.getCurrentShiftConfig().getOrNull()
+                
+                if (shiftConfig?.autoAlarmEnabled == true) {
+                    Logger.business(LogTags.ALARM, "🚨 AUTO-ALARM: Creating alarms from ${events.size} loaded events")
+                    
+                    // CRITICAL: Clear existing alarms first to prevent duplicates
+                    alarmUseCase.deleteAllAlarms()
+                        .onSuccess {
+                            Logger.business(LogTags.ALARM, "🧹 AUTO-ALARM: Cleared existing alarms")
+                        }
+                        .onFailure { error ->
+                            Logger.w(LogTags.ALARM, "⚠️ AUTO-ALARM: Failed to clear existing alarms", error)
+                        }
+                    
+                    // Small delay to ensure alarm cleanup is complete
+                    kotlinx.coroutines.delay(100)
+                    
+                    // Create alarms from events using AlarmUseCase
+                    alarmUseCase.createAlarmsFromEvents(events, shiftConfig)
+                        .onSuccess { createdAlarms ->
+                            Logger.business(LogTags.ALARM, "✅ AUTO-ALARM: Successfully created ${createdAlarms.size} alarms")
+                            
+                            // Schedule system alarms for each created alarm
+                            createdAlarms.forEach { alarmInfo ->
+                                alarmUseCase.scheduleSystemAlarm(alarmInfo)
+                                    .onSuccess {
+                                        Logger.business(LogTags.ALARM, "✅ SYSTEM-ALARM: Scheduled alarm for ${alarmInfo.shiftName} at ${alarmInfo.formattedTime}")
+                                    }
+                                    .onFailure { error ->
+                                        Logger.e(LogTags.ALARM, "❌ SYSTEM-ALARM: Failed to schedule alarm for ${alarmInfo.shiftName}", error)
+                                    }
+                            }
+                        }
+                        .onFailure { error ->
+                            Logger.e(LogTags.ALARM, "❌ AUTO-ALARM: Failed to create alarms from events", error)
+                        }
+                } else {
+                    Logger.d(LogTags.ALARM, "AUTO-ALARM disabled - skipping alarm creation")
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "❌ AUTO-ALARM: Exception during alarm creation", e)
+            }
         }
     }
     

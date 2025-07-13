@@ -35,7 +35,8 @@ class ViewModelFactory(
             calendarUseCase = appContainer.calendarUseCase,
             calendarSelectionRepository = appContainer.calendarSelectionRepository,
             errorHandler = appContainer.errorHandler,
-            shiftUseCase = appContainer.shiftUseCase
+            shiftUseCase = appContainer.shiftUseCase,
+            alarmUseCase = appContainer.alarmUseCase // 🚨 CRITICAL FIX: Add missing AlarmUseCase dependency
         ).also { _calendarViewModel = it }
     }
     
@@ -53,8 +54,9 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(AuthViewModel::class.java) -> {
                 AuthViewModel(
                     authDataStoreRepository = appContainer.authDataStoreRepository,
-                    oauth2TokenManager = appContainer.oauth2TokenManager,
-                    errorHandler = appContainer.errorHandler
+                    credentialAuthManager = appContainer.credentialAuthManager,
+                    errorHandler = appContainer.errorHandler,
+                    authUseCase = appContainer.authUseCase // MODERN: Add AuthUseCase for Calendar authorization
                 ) as T
             }
             modelClass.isAssignableFrom(CalendarViewModel::class.java) -> {

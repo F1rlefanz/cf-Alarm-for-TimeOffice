@@ -41,6 +41,7 @@ object LogTags {
     const val ALARM = "CFAlarm.Alarm"
     const val ALARM_MANAGER = "CFAlarm.Alarm.Manager"
     const val ALARM_RECEIVER = "CFAlarm.Alarm.Receiver"
+    const val ALARM_TESTING = "CFAlarm.Alarm.Testing" // 🚨 DEBUG: For alarm testing
     
     // === USER INTERFACE ===
     const val UI = "CFAlarm.UI"
@@ -50,6 +51,7 @@ object LogTags {
     // === DATA PERSISTENCE ===
     const val DATASTORE = "CFAlarm.DataStore"
     const val REPOSITORY = "CFAlarm.Repository"
+    const val DI = "CFAlarm.DI"
     
     // === SYSTEM & LIFECYCLE ===
     const val APP = "CFAlarm.App"

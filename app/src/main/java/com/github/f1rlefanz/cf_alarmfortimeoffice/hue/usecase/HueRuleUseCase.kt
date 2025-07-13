@@ -212,17 +212,22 @@ class HueRuleUseCase(
                     val batchResult = lightUseCase.executeBatchLightActions(actions)
                     
                     if (batchResult.isSuccess) {
-                        val result = batchResult.getOrNull()!!
-                        successfulActions += result.successfulActions
-                        
-                        // Add any failed actions to errors
-                        result.failedActions.forEach { failedAction ->
-                            failedAction.error?.let { error ->
-                                errors.add("Action failed for ${failedAction.targetId}: $error")
+                        batchResult.getOrNull()?.let { result ->
+                            successfulActions += result.successfulActions
+                            
+                            // Add any failed actions to errors
+                            result.failedActions.forEach { failedAction ->
+                                failedAction.error?.let { error ->
+                                    errors.add("Action failed for ${failedAction.targetId}: $error")
+                                }
                             }
+                            
+                            Logger.i(LogTags.HUE_USECASE, "Rule ${rule.name} executed: ${result.successfulActions}/${result.totalActions} actions successful")
+                        } ?: run {
+                            val error = "Batch execution succeeded but no result returned for rule ${rule.name}"
+                            Logger.w(LogTags.HUE_USECASE, error)
+                            errors.add(error)
                         }
-                        
-                        Logger.i(LogTags.HUE_USECASE, "Rule ${rule.name} executed: ${result.successfulActions}/${result.totalActions} actions successful")
                         
                     } else {
                         val error = "Failed to execute actions for rule ${rule.name}: ${batchResult.exceptionOrNull()?.message}"
