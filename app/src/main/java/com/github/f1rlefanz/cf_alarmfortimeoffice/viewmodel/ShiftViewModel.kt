@@ -83,14 +83,31 @@ class ShiftViewModel(
 
     private fun loadShiftConfig() {
         viewModelScope.launch {
+            // TIMING FIX: Ensure ShiftConfig is always available
+            Logger.d(LogTags.SHIFT_CONFIG, "🔄 TIMING-FIX: Loading ShiftConfig...")
+            
             shiftUseCase.getCurrentShiftConfig()
                 .onSuccess { config ->
                     _uiState.value = _uiState.value.copy(currentShiftConfig = config)
+                    Logger.business(LogTags.SHIFT_CONFIG, "✅ TIMING-FIX: ShiftConfig loaded successfully - autoAlarm=${config.autoAlarmEnabled}, definitions=${config.definitions.size}")
                 }
                 .onFailure { error ->
-                    _uiState.value = _uiState.value.copy(
-                        error = errorHandler.getErrorMessage(error)
-                    )
+                    Logger.w(LogTags.SHIFT_CONFIG, "⚠️ TIMING-FIX: Failed to load ShiftConfig, creating default", error)
+                    
+                    // FALLBACK: Create default configuration if loading fails
+                    val defaultConfig = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig.getDefaultConfig()
+                    
+                    shiftUseCase.saveShiftConfig(defaultConfig)
+                        .onSuccess {
+                            _uiState.value = _uiState.value.copy(currentShiftConfig = defaultConfig)
+                            Logger.business(LogTags.SHIFT_CONFIG, "✅ TIMING-FIX: Default ShiftConfig created and loaded - autoAlarm=${defaultConfig.autoAlarmEnabled}")
+                        }
+                        .onFailure { saveError ->
+                            _uiState.value = _uiState.value.copy(
+                                error = errorHandler.getErrorMessage(saveError)
+                            )
+                            Logger.e(LogTags.SHIFT_CONFIG, "❌ TIMING-FIX: Failed to save default ShiftConfig", saveError)
+                        }
                 }
         }
     }
@@ -111,6 +128,10 @@ class ShiftViewModel(
                         if (currentEvents.isNotEmpty()) {
                             Logger.d(LogTags.SHIFT_RECOGNITION, "Shift config updated, re-processing ${currentEvents.size} calendar events with new definitions")
                             processCalendarEvents(currentEvents)
+                            
+                            // 🚨 CRITICAL FIX: Trigger automatic alarm creation after shift config update!
+                            Logger.business(LogTags.ALARM, "🔄 CONFIG-UPDATE: Triggering alarm creation after shift config change")
+                            triggerAlarmCreationFromConfigUpdate(currentEvents, config)
                         }
                     }
                 }
@@ -176,6 +197,28 @@ class ShiftViewModel(
         }
     }
 
+    /**
+     * 🚨 CRITICAL FIX: Triggers alarm creation after shift config updates
+     * This ensures that when new shift definitions are added, alarms are automatically created
+     */
+    private fun triggerAlarmCreationFromConfigUpdate(events: List<CalendarEvent>, config: ShiftConfig) {
+        calendarViewModel?.let { calendarVM ->
+            Logger.business(LogTags.ALARM, "🔄 CONFIG-UPDATE: Triggering alarm creation for newly recognized shifts")
+            
+            viewModelScope.launch {
+                // Small delay to ensure shift recognition is complete
+                kotlinx.coroutines.delay(100)
+                
+                // Trigger alarm creation from current events
+                calendarVM.createAlarmsFromCurrentEvents()
+                
+                Logger.business(LogTags.ALARM, "✅ CONFIG-UPDATE: Alarm creation triggered successfully")
+            }
+        } ?: run {
+            Logger.w(LogTags.ALARM, "⚠️ CONFIG-UPDATE: CalendarViewModel not available for alarm creation")
+        }
+    }
+    
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

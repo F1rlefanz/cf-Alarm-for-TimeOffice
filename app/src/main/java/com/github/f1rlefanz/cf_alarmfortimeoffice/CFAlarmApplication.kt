@@ -42,6 +42,31 @@ class CFAlarmApplication : Application() {
                 Logger.d(LogTags.AUTH, "Initializing OAuth2 token storage")
                 appContainer.initializeTokenStorage()
                 
+                // TIMING FIX: Initialize ShiftConfig early to prevent race conditions
+                Logger.d(LogTags.SHIFT_CONFIG, "🔄 STARTUP: Initializing ShiftConfig early to prevent timing issues")
+                launch {
+                    try {
+                        val shiftUseCase = appContainer.shiftUseCase
+                        val currentConfig = shiftUseCase.getCurrentShiftConfig().getOrNull()
+                        
+                        if (currentConfig != null) {
+                            Logger.business(LogTags.SHIFT_CONFIG, "✅ STARTUP: ShiftConfig loaded successfully - autoAlarm=${currentConfig.autoAlarmEnabled}")
+                        } else {
+                            Logger.i(LogTags.SHIFT_CONFIG, "🔧 STARTUP: No ShiftConfig found, creating default")
+                            val defaultConfig = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig.getDefaultConfig()
+                            shiftUseCase.saveShiftConfig(defaultConfig)
+                                .onSuccess {
+                                    Logger.business(LogTags.SHIFT_CONFIG, "✅ STARTUP: Default ShiftConfig created - autoAlarm=${defaultConfig.autoAlarmEnabled}")
+                                }
+                                .onFailure { error ->
+                                    Logger.e(LogTags.SHIFT_CONFIG, "❌ STARTUP: Failed to save default ShiftConfig", error)
+                                }
+                        }
+                    } catch (e: Exception) {
+                        Logger.e(LogTags.SHIFT_CONFIG, "❌ STARTUP: Exception during ShiftConfig initialization", e)
+                    }
+                }
+                
                 // PERFORMANCE: Defer non-critical migrations to reduce startup time
                 launch {
                     Logger.d(LogTags.DATASTORE, "Running DataStore migration")

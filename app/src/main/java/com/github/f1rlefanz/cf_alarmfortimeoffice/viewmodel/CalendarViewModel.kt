@@ -532,6 +532,8 @@ class CalendarViewModel(
                 
                 // 🚨 CRITICAL FIX: Automatically create alarms from recognized shifts!
                 if (finalSortedEvents.isNotEmpty()) {
+                    // DEBUGGING: Log current state before alarm creation
+                    logCurrentStateForDebugging(finalSortedEvents)
                     createAlarmsFromLoadedEvents(finalSortedEvents)
                 }
                 
@@ -740,16 +742,38 @@ class CalendarViewModel(
 
     /**
      * 🚨 CRITICAL FIX: Automatically create alarms from loaded events
-     * This was the missing link causing alarms to never be created!
+     * TIMING FIX: Waits for ShiftConfig to be available before creating alarms
+     * RETRY LOGIC: Attempts multiple times to handle race conditions
      */
     private fun createAlarmsFromLoadedEvents(events: List<CalendarEvent>) {
         viewModelScope.launch {
             try {
-                // Get current shift configuration
-                val shiftConfig = shiftUseCase.getCurrentShiftConfig().getOrNull()
+                Logger.business(LogTags.ALARM, "🚨 TIMING-FIX: Starting alarm creation for ${events.size} loaded events")
+                
+                // TIMING FIX: Wait for ShiftConfig with retry logic
+                var shiftConfig: com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig? = null
+                var attempts = 0
+                val maxAttempts = 10 // Try for up to 5 seconds (10 * 500ms)
+                
+                while (shiftConfig == null && attempts < maxAttempts) {
+                    shiftConfig = shiftUseCase.getCurrentShiftConfig().getOrNull()
+                    
+                    if (shiftConfig == null) {
+                        attempts++
+                        Logger.d(LogTags.ALARM, "⏳ TIMING-FIX: ShiftConfig not ready yet, attempt $attempts/$maxAttempts")
+                        kotlinx.coroutines.delay(500) // Wait 500ms before next attempt
+                    }
+                }
+                
+                if (shiftConfig == null) {
+                    Logger.w(LogTags.ALARM, "⚠️ TIMING-FIX: ShiftConfig still not available after $maxAttempts attempts - checking for default config")
+                    
+                    // FALLBACK: Try to load or create a default ShiftConfig
+                    shiftConfig = createDefaultShiftConfigIfNeeded()
+                }
                 
                 if (shiftConfig?.autoAlarmEnabled == true) {
-                    Logger.business(LogTags.ALARM, "🚨 AUTO-ALARM: Creating alarms from ${events.size} loaded events")
+                    Logger.business(LogTags.ALARM, "✅ TIMING-FIX: ShiftConfig available, autoAlarm=${shiftConfig.autoAlarmEnabled}, creating alarms...")
                     
                     // CRITICAL: Clear existing alarms first to prevent duplicates
                     alarmUseCase.deleteAllAlarms()
@@ -783,11 +807,114 @@ class CalendarViewModel(
                             Logger.e(LogTags.ALARM, "❌ AUTO-ALARM: Failed to create alarms from events", error)
                         }
                 } else {
-                    Logger.d(LogTags.ALARM, "AUTO-ALARM disabled - skipping alarm creation")
+                    val configStatus = if (shiftConfig == null) "ShiftConfig is null" else "autoAlarmEnabled=${shiftConfig.autoAlarmEnabled}"
+                    Logger.w(LogTags.ALARM, "⚠️ TIMING-FIX: Cannot create alarms - $configStatus")
                 }
             } catch (e: Exception) {
                 Logger.e(LogTags.ALARM, "❌ AUTO-ALARM: Exception during alarm creation", e)
             }
+        }
+    }
+
+    /**
+     * FALLBACK: Creates a default ShiftConfig if none exists
+     * This ensures alarm creation can proceed even if ShiftConfig loading fails
+     */
+    private suspend fun createDefaultShiftConfigIfNeeded(): com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig? {
+        return try {
+            Logger.i(LogTags.ALARM, "🔧 FALLBACK: Attempting to create default ShiftConfig")
+            
+            // Use the existing default configuration from ShiftConfig companion object
+            val defaultConfig = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig.getDefaultConfig()
+            
+            // Save the default config
+            shiftUseCase.saveShiftConfig(defaultConfig)
+                .onSuccess {
+                    Logger.business(LogTags.ALARM, "✅ FALLBACK: Default ShiftConfig created and saved successfully")
+                }
+                .onFailure { error ->
+                    Logger.e(LogTags.ALARM, "❌ FALLBACK: Failed to save default ShiftConfig", error)
+                }
+            
+            defaultConfig
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ FALLBACK: Exception creating default ShiftConfig", e)
+            null
+        }
+    }
+
+    /**
+     * Creates default shift definitions for common work patterns
+     * NOTE: Not used anymore, using ShiftConfig.getDefaultConfig() instead
+     */
+    @Deprecated("Use ShiftConfig.getDefaultConfig() instead")
+    private fun createDefaultShiftDefinitions(): List<com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition> {
+        return listOf(
+            com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+                id = "early",
+                name = "Frühdienst",
+                keywords = listOf("früh", "early", "morning", "06:00", "07:00", "08:00"),
+                alarmTime = java.time.LocalTime.of(5, 30), // 30 minutes before typical early shift
+                isEnabled = true
+            ),
+            com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+                id = "late", 
+                name = "Spätdienst",
+                keywords = listOf("spät", "late", "evening", "14:00", "15:00", "16:00"),
+                alarmTime = java.time.LocalTime.of(13, 30), // 30 minutes before typical late shift
+                isEnabled = true
+            ),
+            com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
+                id = "night",
+                name = "Nachtdienst", 
+                keywords = listOf("nacht", "night", "22:00", "23:00", "00:00"),
+                alarmTime = java.time.LocalTime.of(21, 30), // 30 minutes before typical night shift
+                isEnabled = true
+            )
+        )
+    }
+
+    /**
+     * 🚨 PUBLIC API: Triggers alarm creation from current events
+     * Used by ShiftViewModel when shift config changes
+     */
+    fun createAlarmsFromCurrentEvents() {
+        val currentEvents = _localUiState.value.events
+        if (currentEvents.isNotEmpty()) {
+            Logger.business(LogTags.ALARM, "🔄 PUBLIC-API: Creating alarms from ${currentEvents.size} current events")
+            
+            viewModelScope.launch {
+                logCurrentStateForDebugging(currentEvents)
+                createAlarmsFromLoadedEvents(currentEvents)
+            }
+        } else {
+            Logger.w(LogTags.ALARM, "⚠️ PUBLIC-API: No current events available for alarm creation")
+        }
+    }
+
+    /**
+     * DEBUGGING: Logs current state to help diagnose timing issues
+     */
+    private suspend fun logCurrentStateForDebugging(events: List<CalendarEvent>) {
+        try {
+            Logger.business(LogTags.ALARM, "🔍 DEBUG-STATE: Starting alarm creation process")
+            Logger.business(LogTags.ALARM, "🔍 DEBUG-STATE: Events loaded: ${events.size}")
+            
+            events.take(3).forEach { event ->
+                Logger.d(LogTags.ALARM, "🔍 DEBUG-STATE: Event: '${event.title}' at ${event.startTime}")
+            }
+            
+            val shiftConfig = shiftUseCase.getCurrentShiftConfig().getOrNull()
+            if (shiftConfig != null) {
+                Logger.business(LogTags.ALARM, "🔍 DEBUG-STATE: ShiftConfig available - autoAlarm=${shiftConfig.autoAlarmEnabled}, definitions=${shiftConfig.definitions.size}")
+                shiftConfig.definitions.forEach { def ->
+                    Logger.d(LogTags.ALARM, "🔍 DEBUG-STATE: ShiftDef: '${def.name}' enabled=${def.isEnabled}, keywords=${def.keywords}")
+                }
+            } else {
+                Logger.w(LogTags.ALARM, "🔍 DEBUG-STATE: ⚠️ ShiftConfig is NULL - this is the problem!")
+            }
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "🔍 DEBUG-STATE: Exception during debugging", e)
         }
     }
     
