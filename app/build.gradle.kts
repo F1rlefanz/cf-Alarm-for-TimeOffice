@@ -22,7 +22,6 @@ android {
         }
 
         // BuildConfig constants for Google OAuth
-        // TODO: Replace with actual Google Web Client ID from Google Cloud Console
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"931091152160-8s3nd7os2p61ac6ecm799gjhekkf0b4i.apps.googleusercontent.com\"")
     }
 

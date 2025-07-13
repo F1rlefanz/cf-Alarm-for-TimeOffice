@@ -102,11 +102,5 @@ class AlarmRepository(
             Result.failure(e)
         }
     }
-    
-    /**
-     * Legacy method für Kompatibilität mit bestehendem Code
-     * @deprecated Verwende getAllAlarms() stattdessen
-     */
-    @Deprecated("Use getAllAlarms() instead", ReplaceWith("getAllAlarms()"))
-    fun getActiveAlarmCount(): Int = _activeAlarms.value.size
+
 }
