@@ -1,9 +1,9 @@
 [versions]
-agp = "8.11.0"
+agp = "8.11.1"
 googleAuthLibraryOauth2Http = "1.31.0"
 gson = "2.13.1"
-kotlin = "2.1.0"
-coreKtx = "1.16.0"
+kotlin = "2.2.0"
+coreKtx = "1.17.0-beta01"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
