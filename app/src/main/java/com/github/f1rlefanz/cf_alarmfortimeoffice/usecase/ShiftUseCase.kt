@@ -35,7 +35,12 @@ class ShiftUseCase(
     override val shiftConfig: Flow<ShiftConfig> = shiftConfigRepository.shiftConfig
     
     override suspend fun saveShiftConfig(config: ShiftConfig): Result<Unit> = 
-        shiftConfigRepository.saveShiftConfig(config)
+        shiftConfigRepository.saveShiftConfig(config).also { result ->
+            if (result.isSuccess) {
+                // CRITICAL FIX: Clear recognition cache when shift config changes
+                shiftRecognitionEngine.clearRecognitionCache()
+            }
+        }
     
     override suspend fun getCurrentShiftConfig(): Result<ShiftConfig> = 
         shiftConfigRepository.getCurrentShiftConfig()
@@ -47,6 +52,9 @@ class ShiftUseCase(
             val updatedConfig = currentConfig.copy(definitions = updatedDefinitions)
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
+            
+            // CRITICAL FIX: Clear recognition cache when shift definitions change
+            shiftRecognitionEngine.clearRecognitionCache()
         }
     
     override suspend fun updateShiftDefinition(definition: ShiftDefinition): Result<Unit> = 
@@ -58,6 +66,9 @@ class ShiftUseCase(
             val updatedConfig = currentConfig.copy(definitions = updatedDefinitions)
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
+            
+            // CRITICAL FIX: Clear recognition cache when shift definitions change
+            shiftRecognitionEngine.clearRecognitionCache()
         }
     
     override suspend fun deleteShiftDefinition(definitionId: String): Result<Unit> = 
@@ -67,6 +78,9 @@ class ShiftUseCase(
             val updatedConfig = currentConfig.copy(definitions = updatedDefinitions)
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
+            
+            // CRITICAL FIX: Clear recognition cache when shift definitions change
+            shiftRecognitionEngine.clearRecognitionCache()
         }
     
     override suspend fun recognizeShiftsInEvents(events: List<CalendarEvent>): Result<List<ShiftMatch>> = 
@@ -77,7 +91,12 @@ class ShiftUseCase(
         }
     
     override suspend fun resetToDefaults(): Result<Unit> = 
-        shiftConfigRepository.resetToDefaults()
+        shiftConfigRepository.resetToDefaults().also { result ->
+            if (result.isSuccess) {
+                // CRITICAL FIX: Clear recognition cache when resetting to defaults
+                shiftRecognitionEngine.clearRecognitionCache()
+            }
+        }
     
     override suspend fun hasValidConfig(): Result<Boolean> = 
         shiftConfigRepository.hasValidConfig()
@@ -92,6 +111,9 @@ class ShiftUseCase(
     suspend fun updateShiftConfig(config: ShiftConfig): Result<Unit> = withContext(Dispatchers.IO) {
         SafeExecutor.safeExecute("ShiftUseCase.updateShiftConfig") {
             shiftConfigRepository.saveShiftConfig(config).getOrThrow()
+            
+            // CRITICAL FIX: Clear recognition cache when shift config changes
+            shiftRecognitionEngine.clearRecognitionCache()
         }
     }
     

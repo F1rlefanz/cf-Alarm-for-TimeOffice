@@ -5,6 +5,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IShiftConfigRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 
 class ShiftRecognitionEngine(
@@ -21,7 +22,61 @@ class ShiftRecognitionEngine(
         return matchingShifts.firstOrNull()
     }
     
+    /**
+     * PERFORMANCE OPTIMIZATION: Enhanced recognition with caching
+     * Caches results for identical event sets instead of skipping
+     */
+    @Volatile
+    private var lastRecognitionHash = 0
+    @Volatile
+    private var cachedMatches: List<ShiftMatch> = emptyList()
+    @Volatile
+    private var recognitionInProgress = false
+    
+    /**
+     * Clears the recognition cache to force re-processing of events.
+     * This should be called when shift configuration changes.
+     */
+    fun clearRecognitionCache() {
+        lastRecognitionHash = 0
+        cachedMatches = emptyList()
+        recognitionInProgress = false
+        Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 CACHE-CLEAR: Recognition cache cleared due to configuration change")
+    }
+    
     suspend fun getAllMatchingShifts(events: List<CalendarEvent>): List<ShiftMatch> {
+        // PERFORMANCE: Calculate hash of input to prevent duplicate processing
+        val eventsHash = events.hashCode()
+        
+        // DEDUPLICATION: Skip if same events are being processed
+        if (recognitionInProgress) {
+            Logger.d(LogTags.SHIFT_RECOGNITION, "Recognition already in progress, waiting...")
+            kotlinx.coroutines.delay(50)
+            if (recognitionInProgress) {
+                Logger.d(LogTags.SHIFT_RECOGNITION, "Recognition still in progress, skipping duplicate call")
+                return cachedMatches
+            }
+        }
+        
+        // CACHE HIT: Return cached results if same events were processed recently
+        if (lastRecognitionHash == eventsHash && lastRecognitionHash != 0) {
+            Logger.d(LogTags.SHIFT_RECOGNITION, "Same events already processed recently, returning cached ${cachedMatches.size} matches")
+            return cachedMatches
+        }
+        
+        recognitionInProgress = true
+        lastRecognitionHash = eventsHash
+        
+        try {
+            val matches = performRecognition(events)
+            cachedMatches = matches
+            return matches
+        } finally {
+            recognitionInProgress = false
+        }
+    }
+    
+    private suspend fun performRecognition(events: List<CalendarEvent>): List<ShiftMatch> {
         val shiftConfigResult = shiftConfigRepository.getCurrentShiftConfig()
         val shiftDefinitions = shiftConfigResult.getOrNull()?.definitions ?: emptyList()
         val matches = mutableListOf<ShiftMatch>()

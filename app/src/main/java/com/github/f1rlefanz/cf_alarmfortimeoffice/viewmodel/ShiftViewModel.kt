@@ -116,6 +116,20 @@ class ShiftViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
+            // CRITICAL FIX: Clear recognition cache BEFORE saving config
+            try {
+                // Access the ShiftRecognitionEngine through the UseCase and clear its cache
+                Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 CACHE-CLEAR: Clearing recognition cache before config update")
+                
+                // Force clear the recognition cache by calling recognizeShiftsInEvents with empty list
+                // This will reset the internal cache state
+                shiftUseCase.recognizeShiftsInEvents(emptyList())
+                
+                Logger.d(LogTags.SHIFT_RECOGNITION, "✅ CACHE-CLEAR: Recognition cache cleared successfully")
+            } catch (e: Exception) {
+                Logger.w(LogTags.SHIFT_RECOGNITION, "⚠️ CACHE-CLEAR: Failed to clear cache", e)
+            }
+            
             shiftUseCase.saveShiftConfig(config)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
@@ -127,6 +141,10 @@ class ShiftViewModel(
                     calendarViewModel?.uiState?.value?.events?.let { currentEvents ->
                         if (currentEvents.isNotEmpty()) {
                             Logger.d(LogTags.SHIFT_RECOGNITION, "Shift config updated, re-processing ${currentEvents.size} calendar events with new definitions")
+                            
+                            // Small delay to ensure config is fully persisted
+                            kotlinx.coroutines.delay(200)
+                            
                             processCalendarEvents(currentEvents)
                             
                             // 🚨 CRITICAL FIX: Trigger automatic alarm creation after shift config update!

@@ -198,15 +198,36 @@ class ModernOAuth2TokenManager(
     }
     
     /**
-     * Helper to get user email from Android Accounts system.
+     * Helper to get user email from SharedPreferences (consistent with AuthViewModel).
+     * CRITICAL FIX: Use same storage as AuthViewModel instead of Android Accounts system
      */
     private fun getUserEmailFromAccounts(): String? {
         return try {
+            // CRITICAL FIX: Read from SharedPreferences where AuthViewModel stores it
+            val prefs = context.getSharedPreferences("cf_alarm_auth", Context.MODE_PRIVATE)
+            val email = prefs.getString("current_user_email", null)
+            
+            if (email != null) {
+                Logger.d(LogTags.AUTH, "User email retrieved from SharedPreferences: $email")
+                return email
+            }
+            
+            // FALLBACK: Try Android Accounts system if SharedPreferences is empty
             val accountManager = context.getSystemService(Context.ACCOUNT_SERVICE) as android.accounts.AccountManager
             val accounts = accountManager.getAccountsByType("com.google")
-            accounts.firstOrNull()?.name // Returns email
+            val fallbackEmail = accounts.firstOrNull()?.name
+            
+            if (fallbackEmail != null) {
+                Logger.d(LogTags.AUTH, "User email retrieved from Android Accounts as fallback: $fallbackEmail")
+                // Save to SharedPreferences for future use
+                prefs.edit().putString("current_user_email", fallbackEmail).apply()
+            } else {
+                Logger.w(LogTags.AUTH, "No user email found in SharedPreferences or Android Accounts")
+            }
+            
+            fallbackEmail
         } catch (e: Exception) {
-            Logger.e(LogTags.AUTH, "Error getting user email from accounts", e)
+            Logger.e(LogTags.AUTH, "Error getting user email", e)
             null
         }
     }

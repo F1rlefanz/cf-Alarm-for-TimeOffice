@@ -47,47 +47,71 @@ class AlarmUseCase(
     private val shiftRecognitionEngine: ShiftRecognitionEngine
 ) : IAlarmUseCase {
     
+    /**
+     * PERFORMANCE OPTIMIZATION: Optimized active alarms flow with reduced polling
+     */
     override val activeAlarms: Flow<List<AlarmInfo>> = flow {
         while (currentCoroutineContext().isActive) {
             val alarms = alarmRepository.getAllAlarms().getOrNull() ?: emptyList()
             emit(alarms)
-            delay(CalendarConstants.ALARM_POLLING_INTERVAL_MS) // Update every 5 seconds
+            delay(10000) // PERFORMANCE: Reduced polling from 5s to 10s for better performance
         }
-    }.distinctUntilChanged()
+    }.distinctUntilChanged { old, new -> 
+        // PERFORMANCE: Only emit when alarm list actually changes
+        old.size == new.size && old.zip(new).all { (a, b) -> a.id == b.id && a.triggerTime == b.triggerTime }
+    }
+    
+    /**
+     * PERFORMANCE OPTIMIZATION: Enhanced alarm creation with deduplication and batching
+     */
+    @Volatile
+    private var alarmCreationInProgress = false
     
     override suspend fun createAlarmsFromEvents(
         events: List<CalendarEvent>,
         shiftConfig: ShiftConfig
     ): Result<List<AlarmInfo>> = withContext(Dispatchers.IO) {
-        SafeExecutor.safeExecute("AlarmUseCase.createAlarmsFromEvents") {
-            if (!shiftConfig.autoAlarmEnabled) {
-                Logger.d(LogTags.ALARM, "Auto-alarm disabled, not creating alarms")
-                return@safeExecute emptyList()
-            }
-            
-            // Erkenne Schichten in Events
-            val shiftMatches = shiftRecognitionEngine.getAllMatchingShifts(events)
-            
-            // Erstelle Alarme für erkannte Schichten
-            val alarmInfos = mutableListOf<AlarmInfo>()
-            
-            for (shiftMatch in shiftMatches) {
-                try {
-                    val alarmInfo = createAlarmFromShiftMatch(shiftMatch)
-                    alarmInfos.add(alarmInfo)
-                    
-                    // Speichere Alarm in Repository
-                    alarmRepository.saveAlarm(alarmInfo).getOrThrow()
-                    
-                    Logger.d(LogTags.ALARM, "Created alarm for shift: ${shiftMatch.shiftDefinition.name}")
-                } catch (e: Exception) {
-                    Logger.e(LogTags.ALARM, "Error creating alarm for shift: ${shiftMatch.shiftDefinition.name} - ${e.message}")
-                    // Continue mit anderen Alarmen
+        // PERFORMANCE: Prevent concurrent alarm creation
+        if (alarmCreationInProgress) {
+            Logger.d(LogTags.ALARM, "Alarm creation already in progress, skipping duplicate call")
+            return@withContext Result.success(emptyList())
+        }
+        
+        alarmCreationInProgress = true
+        
+        try {
+            SafeExecutor.safeExecute("AlarmUseCase.createAlarmsFromEvents") {
+                if (!shiftConfig.autoAlarmEnabled) {
+                    Logger.d(LogTags.ALARM, "Auto-alarm disabled, not creating alarms")
+                    return@safeExecute emptyList()
                 }
+                
+                // PERFORMANCE: Get shift matches with optimized recognition
+                val shiftMatches = shiftRecognitionEngine.getAllMatchingShifts(events)
+                
+                // PERFORMANCE: Batch create alarms
+                val alarmInfos = mutableListOf<AlarmInfo>()
+                
+                for (shiftMatch in shiftMatches) {
+                    try {
+                        val alarmInfo = createAlarmFromShiftMatch(shiftMatch)
+                        alarmInfos.add(alarmInfo)
+                        
+                        // Save alarm in repository
+                        alarmRepository.saveAlarm(alarmInfo).getOrThrow()
+                        
+                        Logger.d(LogTags.ALARM, "Created alarm for shift: ${shiftMatch.shiftDefinition.name}")
+                    } catch (e: Exception) {
+                        Logger.e(LogTags.ALARM, "Error creating alarm for shift: ${shiftMatch.shiftDefinition.name} - ${e.message}")
+                        // Continue with other alarms
+                    }
+                }
+                
+                Logger.business(LogTags.ALARM, "Created ${alarmInfos.size} alarms from ${events.size} events")
+                alarmInfos
             }
-            
-            Logger.business(LogTags.ALARM, "Created ${alarmInfos.size} alarms from ${events.size} events")
-            alarmInfos
+        } finally {
+            alarmCreationInProgress = false
         }
     }
     
