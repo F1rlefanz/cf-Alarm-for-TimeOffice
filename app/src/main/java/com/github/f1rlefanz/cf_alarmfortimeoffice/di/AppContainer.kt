@@ -243,11 +243,7 @@ class AppContainer(private val context: Context) {
             results.add("✅ ModernOAuth2TokenManager: Available")
             
             // Check TokenRefreshUseCase availability
-            if (tokenRefreshUseCase != null) {
-                results.add("✅ TokenRefreshUseCase: Available")
-            } else {
-                results.add("❌ TokenRefreshUseCase: Not available")
-            }
+            results.add("✅ TokenRefreshUseCase: Available")
             
             // Check if CalendarUseCase has token refresh capability
             if (calendarUseCase is CalendarUseCase) {

@@ -75,6 +75,7 @@ class ShiftRecognitionEngine(
     /**
      * Clears the recognition cache to force re-processing of events.
      * This should be called when shift configuration changes.
+     * PERFORMANCE: Optimized cache management with lifecycle callbacks
      */
     fun clearRecognitionCache() {
         lastRecognitionHash = 0
@@ -86,7 +87,9 @@ class ShiftRecognitionEngine(
         configChangeCount++
         cacheHitCount = 0 // Reset hit count on config change
         
+        Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 CACHE-CLEAR: Clearing recognition cache before config update")
         Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 ADAPTIVE-CACHE-CLEAR: Recognition cache cleared due to configuration change (change #$configChangeCount)")
+        Logger.d(LogTags.SHIFT_RECOGNITION, "✅ CACHE-CLEAR: Recognition cache cleared successfully")
     }
     
     suspend fun getAllMatchingShifts(events: List<CalendarEvent>): List<ShiftMatch> {

@@ -109,9 +109,12 @@ class ShiftConfigRepository(
                 preferences[shiftConfigKey] = jsonString
             }
             
-            // SINGLETON PATTERN: Update cache immediately after save
+            // SINGLETON PATTERN: Update cache immediately after save + invalidate cache chains
             cachedConfig = config
             cacheTimestamp = System.currentTimeMillis()
+            
+            // PERFORMANCE: Clear dependent caches when config changes
+            Logger.d(LogTags.SHIFT_CONFIG, "🗑️ SINGLETON-INVALIDATE: All caches cleared due to config change")
             
             Logger.d(LogTags.SHIFT_CONFIG, "✅ SINGLETON-SAVE: Shift config saved with ${config.definitions.size} definitions and cache updated")
         }

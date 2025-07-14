@@ -11,23 +11,37 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 /**
  * UseCase for automatic token refresh and validation.
  * 
- * MODERNIZED: Uses ModernOAuth2TokenManager for 2024/2025 Google APIs approach.
+ * MODERNIZED + OPTIMIZED: Uses ModernOAuth2TokenManager for 2024/2025 Google APIs approach.
  * - Thread-safe implementation with proper cancellation support
  * - Uses structured concurrency
  * - Compatible with Credential Manager authentication
  * - Prevents Race Conditions through proper scope management
  * - Cancellation-aware for lifecycle safety
+ * - PERFORMANCE: Smart caching to reduce redundant token validations
  */
 class TokenRefreshUseCase(
     private val modernOAuth2TokenManager: ModernOAuth2TokenManager,
     private val tokenStorage: TokenStorageRepository
 ) {
     
+    // PERFORMANCE: Smart token validation caching
+    @Volatile
+    private var lastTokenValidation: String? = null
+    @Volatile
+    private var lastValidationTime: Long = 0L
+    @Volatile
+    private var validationInProgress: Boolean = false
+    
+    private companion object {
+        const val TOKEN_VALIDATION_CACHE_MS = 30000L // 30 seconds cache for token validation
+        const val MAX_VALIDATION_WAIT_MS = 200L      // Max wait for concurrent validations
+    }
+    
     /**
      * Ensures a valid access token is available for API calls.
      * Automatically refreshes if needed.
      * 
-     * MODERNIZED: Uses ModernOAuth2TokenManager with cancellation-aware implementation
+     * MODERNIZED + OPTIMIZED: Uses ModernOAuth2TokenManager with smart caching
      * HYBRID-SUPPORT: Handles both legacy tokens and modern Credential Manager tokens
      */
     suspend fun ensureValidToken(): Result<String> = withContext(Dispatchers.IO) {
@@ -35,24 +49,65 @@ class TokenRefreshUseCase(
             // Check for cancellation before proceeding
             ensureActive()
             
-            Logger.d(LogTags.TOKEN, "Ensuring valid token")
-            
-            // Use modern token manager directly
-            val result = modernOAuth2TokenManager.getValidCalendarToken()
-            
-            // HYBRID-SUPPORT: Special handling for Credential Manager authentication
-            result.onSuccess { token ->
-                if (token == "credential_manager_auth_pending") {
-                    Logger.d(LogTags.TOKEN, "MODERN-AUTH: Using Credential Manager authentication flow")
-                    // This is valid - the token will trigger hybrid authentication in CalendarRepository
-                } else {
-                    Logger.dThrottled(LogTags.TOKEN, "Using valid Calendar access token")
+            // PERFORMANCE: Check validation cache first
+            val currentTime = System.currentTimeMillis()
+            lastTokenValidation?.let { cachedToken ->
+                val cacheAge = currentTime - lastValidationTime
+                if (cacheAge < TOKEN_VALIDATION_CACHE_MS) {
+                    Logger.d(LogTags.TOKEN, "✅ TOKEN-DIAGNOSTIC: Using valid Calendar access token (${(TOKEN_VALIDATION_CACHE_MS - cacheAge) / 1000}min remaining)")
+                    return@withContext Result.success(cachedToken)
                 }
-            }.onFailure { error ->
-                Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
             }
             
-            result
+            // PERFORMANCE: Handle concurrent validation attempts
+            if (validationInProgress) {
+                Logger.d(LogTags.TOKEN, "🔄 TOKEN-WAIT: Validation in progress, waiting smartly...")
+                
+                val startWait = System.currentTimeMillis()
+                while (validationInProgress && (System.currentTimeMillis() - startWait) < MAX_VALIDATION_WAIT_MS) {
+                    delay(25)
+                }
+                
+                // Check if concurrent validation completed successfully
+                lastTokenValidation?.let { freshToken ->
+                    val cacheAge = System.currentTimeMillis() - lastValidationTime
+                    if (cacheAge < TOKEN_VALIDATION_CACHE_MS) {
+                        Logger.d(LogTags.TOKEN, "✅ TOKEN-CONCURRENT-SUCCESS: Using fresh token from concurrent validation")
+                        return@withContext Result.success(freshToken)
+                    }
+                }
+            }
+            
+            validationInProgress = true
+            
+            try {
+                Logger.d(LogTags.TOKEN, "Ensuring valid token")
+                
+                // Use modern token manager directly
+                val result = modernOAuth2TokenManager.getValidCalendarToken()
+                
+                // PERFORMANCE: Cache successful token validation
+                result.onSuccess { token ->
+                    lastTokenValidation = token
+                    lastValidationTime = currentTime
+                    
+                    if (token == "credential_manager_auth_pending") {
+                        Logger.d(LogTags.TOKEN, "MODERN-AUTH: Using Credential Manager authentication flow")
+                        // This is valid - the token will trigger hybrid authentication in CalendarRepository
+                    } else {
+                        Logger.d(LogTags.TOKEN, "Using valid Calendar access token")
+                    }
+                }.onFailure { error ->
+                    // Clear cache on failure
+                    lastTokenValidation = null
+                    lastValidationTime = 0L
+                    Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
+                }
+                
+                result
+            } finally {
+                validationInProgress = false
+            }
             
         } catch (e: CancellationException) {
             Logger.d(LogTags.TOKEN, "Operation cancelled")

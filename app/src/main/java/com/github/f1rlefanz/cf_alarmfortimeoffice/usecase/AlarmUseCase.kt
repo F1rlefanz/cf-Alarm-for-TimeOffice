@@ -88,8 +88,8 @@ class AlarmUseCase(
                 
                 Logger.d(LogTags.ALARM, "🔄 BATCH-CREATE: Starting batch alarm creation for ${events.size} events")
                 
-                // ATOMIC CLEARING: Clear existing alarms first (single operation)
-                deleteAllAlarms().getOrThrow()
+                // PERFORMANCE: Single atomic clear - directly call internal clear to avoid nested SafeExecutor calls
+                clearInternalAlarms()
                 
                 // PERFORMANCE: Get shift matches with optimized recognition
                 val shiftMatches = shiftRecognitionEngine.getAllMatchingShifts(events)
@@ -122,6 +122,34 @@ class AlarmUseCase(
     
     override suspend fun saveAlarm(alarmInfo: AlarmInfo): Result<Unit> = 
         alarmRepository.saveAlarm(alarmInfo)
+    
+    
+    /**
+     * PERFORMANCE: Internal clearing method to avoid nested SafeExecutor calls and duplicate clearing
+     * Used internally to prevent the redundant clearing operations seen in the log
+     */
+    private suspend fun clearInternalAlarms() {
+        if (clearingInProgress) {
+            Logger.d(LogTags.ALARM, "🔒 INTERNAL-CLEAR: Clearing already in progress, using optimized internal path")
+            return
+        }
+        
+        clearingInProgress = true
+        
+        try {
+            Logger.d(LogTags.ALARM, "🧹 INTERNAL-CLEAR: Fast internal clearing (system + repository)")
+            
+            // Step 1: Cancel system alarms
+            alarmManagerService.cancelSystemAlarm()
+            
+            // Step 2: Clear repository
+            alarmRepository.deleteAllAlarms().getOrThrow()
+            
+            Logger.d(LogTags.ALARM, "✅ INTERNAL-CLEAR: Fast clearing completed")
+        } finally {
+            clearingInProgress = false
+        }
+    }
     
     override suspend fun deleteAlarm(alarmId: Int): Result<Unit> = 
         SafeExecutor.safeExecute("AlarmUseCase.deleteAlarm") {
@@ -251,9 +279,9 @@ class AlarmUseCase(
                 return@safeExecute
             }
             
-            // ATOMIC CLEARING: Use atomic clearing method (single call, no redundancy)
-            Logger.d(LogTags.ALARM, "🔄 LEGACY-SHIFT: Clearing existing alarms before setting new one")
-            deleteAllAlarms().getOrThrow()
+            // PERFORMANCE: Use internal clearing to avoid redundant SafeExecutor wrapping
+            Logger.d(LogTags.ALARM, "🔄 LEGACY-SHIFT: Using optimized clearing for single shift")
+            clearInternalAlarms()
             
             // Create alarm info from shift
             val alarmTime = shift.alarmTime

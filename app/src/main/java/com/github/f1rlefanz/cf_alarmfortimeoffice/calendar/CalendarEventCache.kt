@@ -167,7 +167,7 @@ class CalendarEventCache {
     
     /**
      * OFFLINE SUPPORT: Speichert Ereignisse im Cache mit Priorität
-     * PERFORMANCE: Optimierte Cache-Größenverwaltung
+     * PERFORMANCE: Optimierte Cache-Größenverwaltung + String-Interning
      */
     suspend fun put(
         calendarId: String, 
@@ -190,9 +190,21 @@ class CalendarEventCache {
             Logger.d(LogTags.CALENDAR_CACHE, "Removed ${entriesToRemove.size} cache entries to make space")
         }
         
+        // PERFORMANCE: Memory-optimierte Event-Speicherung mit String-Interning
+        val optimizedEvents = events.map { event ->
+            val optimizedBuilder = com.github.f1rlefanz.cf_alarmfortimeoffice.util.MemoryOptimizedCalendarEventBuilder()
+            optimizedBuilder
+                .setId(event.id)
+                .setTitle(event.title)
+                .setCalendarId(event.calendarId)
+                .setStartTime(event.startTime)
+                .setEndTime(event.endTime)
+                .build()
+        }
+        
         val key = CacheKey.create(calendarId, daysAhead)
         val entry = CacheEntry(
-            events = events,
+            events = optimizedEvents,
             timestamp = LocalDateTime.now(),
             etag = etag,
             priority = priority
@@ -200,6 +212,11 @@ class CalendarEventCache {
         
         cache[key] = entry
         Logger.cache(LogTags.CALENDAR_CACHE, "STORED", "${events.size} events (TTL: 15 min, Priority: $priority)")
+        
+        // PERFORMANCE: Log memory optimization impact
+        if (events.isNotEmpty()) {
+            Logger.d(LogTags.PERFORMANCE, "💾 Cache STRING-INTERNED: \"${calendarId.take(20)}...\" (usage: ${events.size})")
+        }
     }
     
     /**
