@@ -62,7 +62,7 @@ class AlarmUseCase(
     }
     
     /**
-     * PERFORMANCE OPTIMIZATION: Enhanced alarm creation with deduplication and batching
+     * PERFORMANCE OPTIMIZATION: Enhanced alarm creation with atomic clearing and batching
      */
     @Volatile
     private var alarmCreationInProgress = false
@@ -73,7 +73,7 @@ class AlarmUseCase(
     ): Result<List<AlarmInfo>> = withContext(Dispatchers.IO) {
         // PERFORMANCE: Prevent concurrent alarm creation
         if (alarmCreationInProgress) {
-            Logger.d(LogTags.ALARM, "Alarm creation already in progress, skipping duplicate call")
+            Logger.d(LogTags.ALARM, "🔒 BATCH-CREATE: Alarm creation already in progress, skipping duplicate call")
             return@withContext Result.success(emptyList())
         }
         
@@ -85,6 +85,11 @@ class AlarmUseCase(
                     Logger.d(LogTags.ALARM, "Auto-alarm disabled, not creating alarms")
                     return@safeExecute emptyList()
                 }
+                
+                Logger.d(LogTags.ALARM, "🔄 BATCH-CREATE: Starting batch alarm creation for ${events.size} events")
+                
+                // ATOMIC CLEARING: Clear existing alarms first (single operation)
+                deleteAllAlarms().getOrThrow()
                 
                 // PERFORMANCE: Get shift matches with optimized recognition
                 val shiftMatches = shiftRecognitionEngine.getAllMatchingShifts(events)
@@ -100,14 +105,14 @@ class AlarmUseCase(
                         // Save alarm in repository
                         alarmRepository.saveAlarm(alarmInfo).getOrThrow()
                         
-                        Logger.d(LogTags.ALARM, "Created alarm for shift: ${shiftMatch.shiftDefinition.name}")
+                        Logger.d(LogTags.ALARM, "✅ BATCH-CREATE: Created alarm for shift: ${shiftMatch.shiftDefinition.name}")
                     } catch (e: Exception) {
-                        Logger.e(LogTags.ALARM, "Error creating alarm for shift: ${shiftMatch.shiftDefinition.name} - ${e.message}")
+                        Logger.e(LogTags.ALARM, "❌ BATCH-CREATE: Error creating alarm for shift: ${shiftMatch.shiftDefinition.name} - ${e.message}")
                         // Continue with other alarms
                     }
                 }
                 
-                Logger.business(LogTags.ALARM, "Created ${alarmInfos.size} alarms from ${events.size} events")
+                Logger.business(LogTags.ALARM, "✅ BATCH-CREATE: Created ${alarmInfos.size} alarms from ${events.size} events")
                 alarmInfos
             }
         } finally {
@@ -120,20 +125,47 @@ class AlarmUseCase(
     
     override suspend fun deleteAlarm(alarmId: Int): Result<Unit> = 
         SafeExecutor.safeExecute("AlarmUseCase.deleteAlarm") {
-            // Cancel system alarm first
-            cancelSystemAlarm(alarmId).getOrThrow()
+            Logger.d(LogTags.ALARM, "🧹 ATOMIC-SINGLE: Deleting single alarm ID=$alarmId")
             
-            // Delete from repository
+            // ATOMIC SINGLE: Cancel system alarm first, then repository
+            cancelSystemAlarm(alarmId).getOrThrow()
             alarmRepository.deleteAlarm(alarmId).getOrThrow()
+            
+            Logger.d(LogTags.ALARM, "✅ ATOMIC-SINGLE: Alarm $alarmId deleted successfully")
         }
+    
+    /**
+     * ATOMIC OPERATION: Single-point alarm clearing to prevent redundant operations
+     * Coordinates both system alarm cancellation and repository clearing
+     */
+    @Volatile
+    private var clearingInProgress = false
     
     override suspend fun deleteAllAlarms(): Result<Unit> = 
         SafeExecutor.safeExecute("AlarmUseCase.deleteAllAlarms") {
-            // Cancel all system alarms
-            alarmManagerService.cancelSystemAlarm()
+            // ATOMIC CLEARING: Prevent concurrent clearing operations
+            if (clearingInProgress) {
+                Logger.d(LogTags.ALARM, "🔒 ATOMIC-CLEAR: Clearing already in progress, skipping duplicate call")
+                return@safeExecute
+            }
             
-            // Clear repository
-            alarmRepository.deleteAllAlarms().getOrThrow()
+            clearingInProgress = true
+            
+            try {
+                Logger.d(LogTags.ALARM, "🧹 ATOMIC-CLEAR: Starting atomic alarm clearing operation")
+                
+                // ATOMIC STEP 1: Cancel system alarms first (prevents ghost alarms)
+                Logger.d(LogTags.ALARM, "🧹 ATOMIC-CLEAR: Cancelling system alarms...")
+                alarmManagerService.cancelSystemAlarm()
+                
+                // ATOMIC STEP 2: Clear repository (local storage)
+                Logger.d(LogTags.ALARM, "🧹 ATOMIC-CLEAR: Clearing alarm repository...")
+                alarmRepository.deleteAllAlarms().getOrThrow()
+                
+                Logger.business(LogTags.ALARM, "✅ ATOMIC-CLEAR: All alarms cleared successfully (system + repository)")
+            } finally {
+                clearingInProgress = false
+            }
         }
     
     override suspend fun scheduleSystemAlarm(alarmInfo: AlarmInfo): Result<Unit> = 
@@ -219,7 +251,8 @@ class AlarmUseCase(
                 return@safeExecute
             }
             
-            // Cancel existing alarms
+            // ATOMIC CLEARING: Use atomic clearing method (single call, no redundancy)
+            Logger.d(LogTags.ALARM, "🔄 LEGACY-SHIFT: Clearing existing alarms before setting new one")
             deleteAllAlarms().getOrThrow()
             
             // Create alarm info from shift
@@ -247,11 +280,11 @@ class AlarmUseCase(
     suspend fun cancelAlarm(alarmId: Int): Result<Unit> = withContext(Dispatchers.IO) {
         SafeExecutor.safeExecute("AlarmUseCase.cancelAlarm") {
             deleteAlarm(alarmId).getOrThrow()
-            Logger.business(LogTags.ALARM, "Alarm $alarmId cancelled")
+            Logger.business(LogTags.ALARM, "✅ LEGACY-CANCEL: Alarm $alarmId cancelled")
         }
     }
     
-    suspend fun cancelAllAlarms(): Result<Unit> = deleteAllAlarms()
+    suspend fun cancelAllAlarms(): Result<Unit> = deleteAllAlarms() // ATOMIC: Direct delegation to atomic method
     
     fun getActiveAlarmsFlow(): Flow<List<AlarmInfo>> = activeAlarms
 }

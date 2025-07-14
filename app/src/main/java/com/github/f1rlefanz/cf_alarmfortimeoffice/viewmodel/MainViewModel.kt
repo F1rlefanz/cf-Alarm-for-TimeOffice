@@ -71,12 +71,17 @@ class MainViewModel(
     private fun observeAppState() {
         viewModelScope.launch {
             combine(
-                authUseCase.authData,
-                alarmUseCase.activeAlarms,
+                authUseCase.authData
+                    .distinctUntilChanged(), // PERFORMANCE: Auth changes are expensive
+                alarmUseCase.activeAlarms
+                    .debounce(200) // PERFORMANCE: Batch alarm changes (less critical)
+                    .distinctUntilChanged(),
                 calendarSelectionRepository.selectedCalendarIds
-                    .debounce(100) // PERFORMANCE: Batch calendar selection changes
+                    .debounce(150) // PERFORMANCE: Batch calendar selection changes
                     .distinctUntilChanged(), // PERFORMANCE: Only emit on actual changes
-                                calendarViewModel?.uiState?.map { it.availableCalendars.isNotEmpty() } ?: flowOf(false)
+                calendarViewModel?.uiState?.map { it.availableCalendars.isNotEmpty() }
+                    ?.debounce(100) // PERFORMANCE: Batch availability checks
+                    ?.distinctUntilChanged() ?: flowOf(false)
             ) { authData, activeAlarms, selectedCalendarIds, hasAvailableCalendars ->
                 MainUiState(
                     isAuthenticated = authData.isLoggedIn,
@@ -85,12 +90,12 @@ class MainViewModel(
                     hasActiveAlarms = activeAlarms.isNotEmpty()
                 )
             }.distinctUntilChanged() // PERFORMANCE: Only emit when main state actually changes
-            .debounce(50) // PERFORMANCE: Batch main state updates
+            .debounce(75) // PERFORMANCE: Batch main state updates with shorter delay for UI responsiveness
             .collect { state ->
                 _uiState.value = state
                 
                 // Debug-Log für Diagnose
-                Logger.d(LogTags.NAVIGATION, "Main state updated - authenticated=${state.isAuthenticated}, hasCalendars=${state.hasAvailableCalendars}, hasSelected=${state.hasSelectedCalendars}")
+                Logger.d(LogTags.NAVIGATION, "🔄 UI-DEBOUNCE: Main state updated - authenticated=${state.isAuthenticated}, hasCalendars=${state.hasAvailableCalendars}, hasSelected=${state.hasSelectedCalendars}")
             }
         }
     }

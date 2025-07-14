@@ -20,12 +20,13 @@ import java.time.LocalDateTime
 /**
  * UseCase für alle Shift-bezogenen Operationen - implementiert IShiftUseCase
  * 
- * REFACTORED:
+ * REFACTORED + OPTIMIZED:
  * ✅ Implementiert IShiftUseCase Interface für bessere Testbarkeit
  * ✅ Verwendet Repository-Interfaces statt konkrete Implementierungen
  * ✅ Erweiterte Business Logic für Shift-Management
  * ✅ Result-basierte API für konsistente Fehlerbehandlung
  * ✅ Integration mit ShiftRecognitionEngine für intelligente Shift-Erkennung
+ * ✅ SINGLETON PATTERN: Cache-Invalidierung für optimale Performance
  */
 class ShiftUseCase(
     private val shiftConfigRepository: IShiftConfigRepository,
@@ -34,11 +35,24 @@ class ShiftUseCase(
     
     override val shiftConfig: Flow<ShiftConfig> = shiftConfigRepository.shiftConfig
     
+    /**
+     * SINGLETON OPTIMIZATION: Invalidates both recognition cache and config cache
+     */
+    private fun invalidateAllCaches() {
+        // Clear recognition cache
+        shiftRecognitionEngine.clearRecognitionCache()
+        
+        // Clear config cache if repository supports it
+        (shiftConfigRepository as? com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository)?.invalidateCache()
+        
+        Logger.d(LogTags.SHIFT_CONFIG, "🗑️ SINGLETON-INVALIDATE: All caches cleared due to config change")
+    }
+    
     override suspend fun saveShiftConfig(config: ShiftConfig): Result<Unit> = 
         shiftConfigRepository.saveShiftConfig(config).also { result ->
             if (result.isSuccess) {
-                // CRITICAL FIX: Clear recognition cache when shift config changes
-                shiftRecognitionEngine.clearRecognitionCache()
+                // SINGLETON OPTIMIZATION: Clear all caches when config changes
+                invalidateAllCaches()
             }
         }
     
@@ -53,8 +67,8 @@ class ShiftUseCase(
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
             
-            // CRITICAL FIX: Clear recognition cache when shift definitions change
-            shiftRecognitionEngine.clearRecognitionCache()
+            // SINGLETON OPTIMIZATION: Clear all caches when definitions change
+            invalidateAllCaches()
         }
     
     override suspend fun updateShiftDefinition(definition: ShiftDefinition): Result<Unit> = 
@@ -67,8 +81,8 @@ class ShiftUseCase(
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
             
-            // CRITICAL FIX: Clear recognition cache when shift definitions change
-            shiftRecognitionEngine.clearRecognitionCache()
+            // SINGLETON OPTIMIZATION: Clear all caches when definitions change
+            invalidateAllCaches()
         }
     
     override suspend fun deleteShiftDefinition(definitionId: String): Result<Unit> = 
@@ -79,8 +93,8 @@ class ShiftUseCase(
             
             shiftConfigRepository.saveShiftConfig(updatedConfig).getOrThrow()
             
-            // CRITICAL FIX: Clear recognition cache when shift definitions change
-            shiftRecognitionEngine.clearRecognitionCache()
+            // SINGLETON OPTIMIZATION: Clear all caches when definitions change
+            invalidateAllCaches()
         }
     
     override suspend fun recognizeShiftsInEvents(events: List<CalendarEvent>): Result<List<ShiftMatch>> = 
@@ -93,8 +107,8 @@ class ShiftUseCase(
     override suspend fun resetToDefaults(): Result<Unit> = 
         shiftConfigRepository.resetToDefaults().also { result ->
             if (result.isSuccess) {
-                // CRITICAL FIX: Clear recognition cache when resetting to defaults
-                shiftRecognitionEngine.clearRecognitionCache()
+                // SINGLETON OPTIMIZATION: Clear all caches when resetting to defaults
+                invalidateAllCaches()
             }
         }
     
@@ -112,8 +126,8 @@ class ShiftUseCase(
         SafeExecutor.safeExecute("ShiftUseCase.updateShiftConfig") {
             shiftConfigRepository.saveShiftConfig(config).getOrThrow()
             
-            // CRITICAL FIX: Clear recognition cache when shift config changes
-            shiftRecognitionEngine.clearRecognitionCache()
+            // SINGLETON OPTIMIZATION: Clear all caches when config changes
+            invalidateAllCaches()
         }
     }
     

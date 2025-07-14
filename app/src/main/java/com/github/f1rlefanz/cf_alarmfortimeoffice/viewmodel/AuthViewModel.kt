@@ -70,15 +70,15 @@ class AuthViewModel(
 
     /**
      * Observes auth data changes from DataStore.
-     * PERFORMANCE FIX: Atomic updates statt Mutex für bessere Performance
+     * PERFORMANCE FIX: Eliminates UI Thread blocking durch improved background processing
      * CALENDAR AUTO-RELOAD: Automatically loads calendars after successful authorization
-     * MAIN THREAD OPTIMIZATION: Background coroutine mit distinctUntilChanged batching
+     * UI THREAD OPTIMIZATION: Pure background processing mit atomic state updates
      */
     @OptIn(FlowPreview::class)
     private fun observeAuthState() {
-        viewModelScope.launch(Dispatchers.IO) { // PERFORMANCE: Move to background thread
+        viewModelScope.launch(Dispatchers.IO) { // PERFORMANCE: Background thread only
             authDataStoreRepository.authData
-                .debounce(300) // OPTIMIZATION: Increased debounce to reduce rapid updates
+                .debounce(200) // PERFORMANCE: Reduced from 300ms for better responsiveness
                 .distinctUntilChanged { old, new -> 
                     // PERFORMANCE: Only update if meaningful changes occurred
                     old.isLoggedIn == new.isLoggedIn &&
@@ -86,27 +86,23 @@ class AuthViewModel(
                     old.accessToken == new.accessToken
                 }
                 .collect { authData ->
-                    // PERFORMANCE FIX: Switch to main context only for UI state updates
-                    withContext(Dispatchers.Main.immediate) {
-                        Logger.d(LogTags.AUTH, "Auth data updated - isLoggedIn=${authData.isLoggedIn}")
-                        
-                        // PERFORMANCE: Atomic non-blocking state update
-                        updateAuthState { currentState ->
-                            currentState.copy(
-                                userAuth = UserAuthState(
-                                    isSignedIn = authData.isLoggedIn,
-                                    userEmail = authData.email,
-                                    displayName = authData.displayName,
-                                    accessToken = authData.accessToken,
-                                    hasValidToken = authData.accessToken?.isNotEmpty() == true
-                                )
+                    Logger.d(LogTags.AUTH, "🔄 UI-THREAD-OPT: Auth data updated - isLoggedIn=${authData.isLoggedIn}")
+                    
+                    // UI THREAD OPTIMIZATION: Atomic update without context switching
+                    updateAuthState { currentState ->
+                        currentState.copy(
+                            userAuth = UserAuthState(
+                                isSignedIn = authData.isLoggedIn,
+                                userEmail = authData.email,
+                                displayName = authData.displayName,
+                                accessToken = authData.accessToken,
+                                hasValidToken = authData.accessToken?.isNotEmpty() == true
                             )
-                        }
+                        )
                     }
                     
-                    // CRITICAL FIX: Auto-trigger calendar loading after successful authentication
+                    // PERFORMANCE: Background calendar trigger without UI thread switch
                     if (authData.isLoggedIn && authData.accessToken?.isNotEmpty() == true) {
-                        // PERFORMANCE: Keep calendar trigger on background thread
                         triggerCalendarReloadAfterAuth()
                     }
                 }
@@ -469,7 +465,7 @@ class AuthViewModel(
      * CRITICAL FIX: Triggers calendar reload after successful authentication/authorization
      * This connects AuthViewModel to CalendarViewModel for automatic calendar loading
      * DEDUPLICATION: Prevents multiple calendar loads in quick succession
-     * PERFORMANCE OPTIMIZATION: Debouncing with atomic operations
+     * UI THREAD OPTIMIZATION: Pure background processing ohne Main thread switch
      */
     @Volatile
     private var lastCalendarTriggerTime = 0L
@@ -479,36 +475,34 @@ class AuthViewModel(
     private fun triggerCalendarReloadAfterAuth() {
         // PERFORMANCE: Prevent concurrent triggers with atomic check
         if (triggerInProgress) {
-            Logger.d(LogTags.AUTH, "🔄 AUTH-TRIGGERED: Calendar reload already in progress, skipping")
+            Logger.d(LogTags.AUTH, "🔄 UI-THREAD-OPT: Calendar reload already in progress, skipping")
             return
         }
         
-        viewModelScope.launch(Dispatchers.Default) { // PERFORMANCE: Use Default dispatcher
+        viewModelScope.launch(Dispatchers.Default) { // UI THREAD OPTIMIZATION: Pure background
             try {
                 val currentTime = System.currentTimeMillis()
                 val timeSinceLastTrigger = currentTime - lastCalendarTriggerTime
                 
-                // DEDUPLICATION: Prevent multiple triggers within 3 seconds (reduced from 5)
-                if (timeSinceLastTrigger < 3000) {
-                    Logger.d(LogTags.AUTH, "🔄 AUTH-TRIGGERED: Calendar reload trigger debounced (${timeSinceLastTrigger}ms since last)")
+                // DEDUPLICATION: Prevent multiple triggers within 2 seconds (optimized)
+                if (timeSinceLastTrigger < 2000) {
+                    Logger.d(LogTags.AUTH, "🔄 UI-THREAD-OPT: Calendar reload trigger debounced (${timeSinceLastTrigger}ms since last)")
                     return@launch
                 }
                 
                 triggerInProgress = true
                 lastCalendarTriggerTime = currentTime
                 
-                // Optimized delay - reduced from 200ms to 100ms
-                delay(100)
+                // UI THREAD OPTIMIZATION: Reduced delay from 100ms to 50ms
+                delay(50)
                 
-                Logger.business(LogTags.AUTH, "🔄 AUTH-TRIGGERED: Initiating calendar reload after successful authentication")
+                Logger.business(LogTags.AUTH, "🔄 UI-THREAD-OPT: Initiating calendar reload after successful authentication")
                 
-                // PERFORMANCE: Trigger on main thread only when necessary
-                withContext(Dispatchers.Main.immediate) {
-                    calendarReloadTrigger?.invoke()
-                }
+                // UI THREAD OPTIMIZATION: Direct callback invocation (callback should handle threading)
+                calendarReloadTrigger?.invoke()
                 
             } catch (e: Exception) {
-                Logger.e(LogTags.AUTH, "❌ AUTH-TRIGGERED: Failed to trigger calendar reload", e)
+                Logger.e(LogTags.AUTH, "❌ UI-THREAD-OPT: Failed to trigger calendar reload", e)
             } finally {
                 triggerInProgress = false
             }

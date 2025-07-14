@@ -51,7 +51,7 @@ class ShiftViewModel(
     
     /**
      * REACTIVE PATTERN: Observiert Calendar Events automatisch
-     * PERFORMANCE: Mit debouncing und distinctUntilChanged für Effizienz  
+     * PERFORMANCE: Enhanced debouncing strategy für different scenarios
      * LOOSE COUPLING: Optional dependency für Entkopplung
      * MEMORY SAFE: Proper cleanup über viewModelScope
      */
@@ -61,10 +61,10 @@ class ShiftViewModel(
                 calendarVM.uiState
                     .map { it.events } // Nur Events extrahieren
                     .distinctUntilChanged() // Performance: Nur bei echten Änderungen
-                    .debounce(300) // Performance: Batch Updates (300ms für UI-Responsiveness)
+                    .debounce(400) // ENHANCED: Längeres Debouncing für teure Shift-Recognition (400ms)
                     .collect { events: List<CalendarEvent> ->
                         if (events.isNotEmpty()) {
-                            Logger.d(LogTags.SHIFT_RECOGNITION, "Calendar events changed, triggering shift recognition for ${events.size} events")
+                            Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 UI-DEBOUNCE: Calendar events changed, triggering shift recognition for ${events.size} events")
                             processCalendarEvents(events)
                         } else {
                             // Clear recognized shifts wenn keine Events vorhanden
@@ -72,7 +72,7 @@ class ShiftViewModel(
                                 recognizedShifts = emptyList(),
                                 upcomingShift = null
                             )
-                            Logger.d(LogTags.SHIFT_RECOGNITION, "No calendar events, clearing recognized shifts")
+                            Logger.d(LogTags.SHIFT_RECOGNITION, "🔄 UI-DEBOUNCE: No calendar events, clearing recognized shifts")
                         }
                     }
             }
@@ -83,16 +83,16 @@ class ShiftViewModel(
 
     private fun loadShiftConfig() {
         viewModelScope.launch {
-            // TIMING FIX: Ensure ShiftConfig is always available
-            Logger.d(LogTags.SHIFT_CONFIG, "🔄 TIMING-FIX: Loading ShiftConfig...")
+            // SINGLETON OPTIMIZATION: Enhanced startup with cache awareness
+            Logger.d(LogTags.SHIFT_CONFIG, "🔄 SINGLETON-STARTUP: Loading ShiftConfig with singleton pattern...")
             
             shiftUseCase.getCurrentShiftConfig()
                 .onSuccess { config ->
                     _uiState.value = _uiState.value.copy(currentShiftConfig = config)
-                    Logger.business(LogTags.SHIFT_CONFIG, "✅ TIMING-FIX: ShiftConfig loaded successfully - autoAlarm=${config.autoAlarmEnabled}, definitions=${config.definitions.size}")
+                    Logger.business(LogTags.SHIFT_CONFIG, "✅ SINGLETON-STARTUP: ShiftConfig loaded successfully - autoAlarm=${config.autoAlarmEnabled}, definitions=${config.definitions.size}")
                 }
                 .onFailure { error ->
-                    Logger.w(LogTags.SHIFT_CONFIG, "⚠️ TIMING-FIX: Failed to load ShiftConfig, creating default", error)
+                    Logger.w(LogTags.SHIFT_CONFIG, "⚠️ SINGLETON-STARTUP: Failed to load ShiftConfig, creating default", error)
                     
                     // FALLBACK: Create default configuration if loading fails
                     val defaultConfig = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig.getDefaultConfig()
@@ -100,13 +100,13 @@ class ShiftViewModel(
                     shiftUseCase.saveShiftConfig(defaultConfig)
                         .onSuccess {
                             _uiState.value = _uiState.value.copy(currentShiftConfig = defaultConfig)
-                            Logger.business(LogTags.SHIFT_CONFIG, "✅ TIMING-FIX: Default ShiftConfig created and loaded - autoAlarm=${defaultConfig.autoAlarmEnabled}")
+                            Logger.business(LogTags.SHIFT_CONFIG, "✅ SINGLETON-STARTUP: Default ShiftConfig created and loaded - autoAlarm=${defaultConfig.autoAlarmEnabled}")
                         }
                         .onFailure { saveError ->
                             _uiState.value = _uiState.value.copy(
                                 error = errorHandler.getErrorMessage(saveError)
                             )
-                            Logger.e(LogTags.SHIFT_CONFIG, "❌ TIMING-FIX: Failed to save default ShiftConfig", saveError)
+                            Logger.e(LogTags.SHIFT_CONFIG, "❌ SINGLETON-STARTUP: Failed to save default ShiftConfig", saveError)
                         }
                 }
         }
