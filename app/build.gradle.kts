@@ -46,7 +46,7 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             isDebuggable = true
-            applicationIdSuffix = ".debug"
+            // applicationIdSuffix = ".debug"  // TEMP: Disabled for Google Auth compatibility
             versionNameSuffix = "-DEBUG"
         }
     }
