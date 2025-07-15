@@ -1,31 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!-- 
-        Network Security Configuration for Philips Hue Bridge Integration
+        SECURITY-HARDENED Network Security Configuration
         
-        PROBLEM: Android blocks HTTP connections to local IP addresses by default
-        SOLUTION: Explicitly allow cleartext traffic for local network ranges
-        
+        PRINCIPLE: Minimal cleartext permissions only for Philips Hue Bridge
         SECURITY IMPACT:
-        - Only affects local network communication (192.168.x.x, 10.x.x.x, etc.)
-        - External HTTPS traffic remains fully protected
+        - Cleartext ONLY for local network ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        - ALL external traffic forced to HTTPS
         - Philips Hue bridges only support HTTP for local API access
         - Physical button press still required for initial authentication
     -->
     
     <!-- Debug configuration: Allow user certificates for development -->
-    <debug-overrides cleartextTrafficPermitted="true">
+    <debug-overrides cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system"/>
             <certificates src="user"/>
         </trust-anchors>
+        <!-- Allow cleartext only for local development -->
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="false">localhost</domain>
+            <domain includeSubdomains="false">127.0.0.1</domain>
+            <domain includeSubdomains="false">10.0.2.2</domain>
+        </domain-config>
     </debug-overrides>
     
     <!-- 
-        Production fallback: Allow cleartext for private IP ranges
-        This is the critical configuration for Hue Bridge communication
+        PRODUCTION: Strict security with minimal cleartext exceptions
+        Only allow HTTP for private IP ranges (RFC 1918)
     -->
-    <base-config cleartextTrafficPermitted="true">
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Class A private network -->
+        <domain includeSubdomains="true">10.0.0.0/8</domain>
+        <!-- Class B private network -->
+        <domain includeSubdomains="true">172.16.0.0/12</domain>
+        <!-- Class C private network -->
+        <domain includeSubdomains="true">192.168.0.0/16</domain>
+        <!-- Link-local addresses -->
+        <domain includeSubdomains="true">169.254.0.0/16</domain>
+    </domain-config>
+    
+    <!-- 
+        BASE CONFIG: HTTPS enforced for all external traffic
+        This is the critical security improvement
+    -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system"/>
         </trust-anchors>

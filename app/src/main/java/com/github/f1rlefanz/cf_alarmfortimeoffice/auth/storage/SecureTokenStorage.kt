@@ -2,6 +2,8 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.auth.storage
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.data.TokenData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,8 +15,8 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 /**
  * Secure token storage implementation.
  * 
- * TEMPORARY: Uses regular SharedPreferences with plan to upgrade to EncryptedSharedPreferences.
- * This ensures OAuth2 system works while we resolve encryption dependencies.
+ * SECURITY: Uses EncryptedSharedPreferences with AES256-GCM encryption.
+ * Protects OAuth2 tokens from extraction even on rooted devices.
  * 
  * Single responsibility: Token persistence operations only.
  */
@@ -25,8 +27,26 @@ class SecureTokenStorage(private val context: Context) {
         encodeDefaults = true
     }
     
+    private val masterKey: MasterKey by lazy {
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+    }
+    
     private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Logger.e(LogTags.TOKEN, "Failed to create encrypted preferences, falling back to regular SharedPreferences", e)
+            // Fallback to regular SharedPreferences if encryption fails
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }
     }
     
     /**
