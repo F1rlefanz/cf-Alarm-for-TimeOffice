@@ -69,6 +69,10 @@ object LogTags {
     const val ERROR = "CFAlarm.Error"
     const val RECOVERY = "CFAlarm.Recovery"
     const val OFFLINE = "CFAlarm.Offline"
+    const val VALIDATION = "CFAlarm.Validation"
+    const val SYSTEM = "CFAlarm.System"
+    const val FILE_SYSTEM = "CFAlarm.FileSystem"
+    const val PREFERENCES = "CFAlarm.Preferences"
 }
 
 /**

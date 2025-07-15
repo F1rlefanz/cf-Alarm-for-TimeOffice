@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.error.ErrorHandler
 
 /**
  * ViewModelFactory für Clean Architecture Dependency Injection
@@ -34,7 +35,7 @@ class ViewModelFactory(
         return _calendarViewModel ?: CalendarViewModel(
             calendarUseCase = appContainer.calendarUseCase,
             calendarSelectionRepository = appContainer.calendarSelectionRepository,
-            errorHandler = appContainer.errorHandler,
+            errorHandler = ErrorHandler,
             shiftUseCase = appContainer.shiftUseCase,
             alarmUseCase = appContainer.alarmUseCase // 🚨 CRITICAL FIX: Add missing AlarmUseCase dependency
         ).also { _calendarViewModel = it }
@@ -55,7 +56,7 @@ class ViewModelFactory(
                 AuthViewModel(
                     authDataStoreRepository = appContainer.authDataStoreRepository,
                     credentialAuthManager = appContainer.credentialAuthManager,
-                    errorHandler = appContainer.errorHandler,
+                    errorHandler = ErrorHandler,
                     authUseCase = appContainer.authUseCase // MODERN: Add AuthUseCase for Calendar authorization
                 ) as T
             }
@@ -66,14 +67,14 @@ class ViewModelFactory(
                 // REACTIVE ARCHITECTURE: ShiftViewModel observiert CalendarViewModel
                 (_shiftViewModel ?: ShiftViewModel(
                     shiftUseCase = appContainer.shiftUseCase,
-                    errorHandler = appContainer.errorHandler,
+                    errorHandler = ErrorHandler,
                     calendarViewModel = getOrCreateCalendarViewModel() // REACTIVE: Für automatische Schichterkennung
                 ).also { _shiftViewModel = it }) as T
             }
             modelClass.isAssignableFrom(AlarmViewModel::class.java) -> {
                 AlarmViewModel(
                     alarmUseCase = appContainer.alarmUseCase, // Interface-Abhängigkeit
-                    errorHandler = appContainer.errorHandler
+                    errorHandler = ErrorHandler
                 ) as T
             }
             modelClass.isAssignableFrom(MainViewModel::class.java) -> {

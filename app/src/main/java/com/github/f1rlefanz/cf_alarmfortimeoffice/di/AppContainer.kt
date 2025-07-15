@@ -8,7 +8,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.storage.TokenStorageRepos
 import com.github.f1rlefanz.cf_alarmfortimeoffice.auth.usecase.TokenRefreshUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
-import com.github.f1rlefanz.cf_alarmfortimeoffice.error.ErrorHandler
+// ErrorHandler ist jetzt ein Singleton-Object - kein Import nötig
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.AlarmRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAlarmRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAuthDataStoreRepository
@@ -148,9 +148,8 @@ class AppContainer(private val context: Context) {
         ShiftRecognitionEngine(shiftConfigRepository)
     }
     
-    val errorHandler: ErrorHandler by lazy {
-        ErrorHandler()
-    }
+    // ErrorHandler ist jetzt ein Singleton-Object und benötigt keine Instanziierung
+    // Direkter Zugriff über ErrorHandler.methodName()
     
     // ==============================
     // USE CASE INTERFACES & IMPLEMENTATIONS (Domain Layer)

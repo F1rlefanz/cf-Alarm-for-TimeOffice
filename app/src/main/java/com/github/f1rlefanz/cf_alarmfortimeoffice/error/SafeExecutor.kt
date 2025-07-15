@@ -14,9 +14,7 @@ import kotlinx.coroutines.flow.flowOf
  */
 object SafeExecutor {
     
-    // PERFORMANCE: Cached ErrorHandler to avoid repeated instantiation
-    @PublishedApi
-    internal val errorHandler = ErrorHandler()
+    // PERFORMANCE: ErrorHandler ist jetzt ein Singleton-Object - kein Caching nötig
     
     /**
      * Execute a suspend function safely with error handling
@@ -27,7 +25,7 @@ object SafeExecutor {
     ): Result<T> = try {
         Result.success(block())
     } catch (e: Exception) {
-        val appError = errorHandler.handleError(e, context)
+        val appError = ErrorHandler.handleError(e, context)
         Result.failure(appError)
     }
     
@@ -40,7 +38,7 @@ object SafeExecutor {
     ): T? = try {
         block()
     } catch (e: Exception) {
-        errorHandler.handleError(e, context)
+        ErrorHandler.handleError(e, context)
         null
     }
     
@@ -54,7 +52,7 @@ object SafeExecutor {
     ): T = try {
         block()
     } catch (e: Exception) {
-        errorHandler.handleError(e, context)
+        ErrorHandler.handleError(e, context)
         default
     }
     
@@ -67,7 +65,7 @@ object SafeExecutor {
     ): Result<T> = try {
         Result.success(block())
     } catch (e: Exception) {
-        val appError = errorHandler.handleError(e, context)
+        val appError = ErrorHandler.handleError(e, context)
         Result.failure(appError)
     }
     
@@ -75,11 +73,11 @@ object SafeExecutor {
      * PERFORMANCE: Helper methods to avoid ErrorHandler creation in extension functions
      */
     internal fun createAppError(throwable: Throwable, context: String): AppError {
-        return errorHandler.handleError(throwable, context)
+        return ErrorHandler.handleError(throwable, context)
     }
     
     internal fun logError(throwable: Throwable, context: String) {
-        errorHandler.handleError(throwable, context)
+        ErrorHandler.handleError(throwable, context)
     }
 }
 
