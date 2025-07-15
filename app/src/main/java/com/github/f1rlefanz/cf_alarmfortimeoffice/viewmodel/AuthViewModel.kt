@@ -153,7 +153,7 @@ class AuthViewModel(
             
             try {
                 Logger.business(LogTags.AUTH, "Starting modern credential sign-in")
-                val signInResult = credentialAuthManager.signIn()
+                val signInResult = credentialAuthManager.signIn(context)
                 
                 if (signInResult.success && signInResult.credentialResponse != null) {
                     // Extract user info from credential

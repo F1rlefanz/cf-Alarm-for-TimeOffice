@@ -27,7 +27,7 @@ class CredentialAuthManager(private val context: Context) {
     // Use BuildConfig for Web Client ID
     private val googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
 
-    suspend fun signIn(): SignInResult {
+    suspend fun signIn(activityContext: Context): SignInResult {
         if (googleWebClientId.isBlank()) {
             Logger.e(LogTags.AUTH, "Web Client ID is empty!")
             return SignInResult(success = false, error = "Web Client ID nicht konfiguriert")
@@ -35,6 +35,7 @@ class CredentialAuthManager(private val context: Context) {
 
         Logger.d(LogTags.AUTH, "Using Web Client ID: ${googleWebClientId.take(20)}...")
         Logger.d(LogTags.AUTH, "Package name: ${context.packageName}")
+        Logger.d(LogTags.AUTH, "Activity context: ${activityContext.javaClass.simpleName}")
         Logger.d(LogTags.AUTH, "Debug SHA-1 should be: 98:1F:ED:CF:28:31:A0:10:7C:03:1B:A2:F2:4F:7C:88:06:99:20:D9")
 
         val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
@@ -49,7 +50,8 @@ class CredentialAuthManager(private val context: Context) {
 
         Logger.d(LogTags.AUTH, "Requesting credentials...")
         return try {
-            val result = credentialManager.getCredential(context = context, request = request)
+            // CRITICAL FIX: Use activityContext instead of stored application context
+            val result = credentialManager.getCredential(context = activityContext, request = request)
             Logger.business(LogTags.AUTH, "Credential successfully obtained", result.credential.type)
             SignInResult(success = true, credentialResponse = result)
 
