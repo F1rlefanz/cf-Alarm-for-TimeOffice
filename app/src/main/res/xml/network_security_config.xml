@@ -22,6 +22,11 @@
     <!-- 
         PRODUCTION: Strict security with minimal cleartext exceptions
         Only allow HTTP for private IP ranges (RFC 1918)
+        
+        NOTE: Certificate Pinning for Google APIs deliberately EXCLUDED
+        Google officially discourages pinning for googleapis.com domains
+        due to high risk of breakage during CA migrations.
+        See: https://developers.google.com/maps/root-ca-faq
     -->
     <domain-config cleartextTrafficPermitted="true">
         <!-- Class A private network -->

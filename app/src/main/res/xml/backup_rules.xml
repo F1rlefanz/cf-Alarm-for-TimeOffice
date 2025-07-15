@@ -1,13 +1,44 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   SECURITY-HARDENED Full Backup Rules (Android 6.0-11 compatibility)
+   
+   PRINCIPLE: Exclude ALL sensitive data from legacy backup systems
+   SECURITY IMPACT: Prevents token leakage through older backup mechanisms
+   
+   Note: This file is used for Android 6.0 to 11 (API 23-30)
+   For Android 12+ (API 31+), see data_extraction_rules.xml
+   
    See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- CRITICAL: Exclude ALL authentication and sensitive data -->
+    <exclude domain="sharedpref" path="cf_alarm_tokens.xml"/>
+    <exclude domain="sharedpref" path="encrypted_token_storage.xml"/>
+    <exclude domain="sharedpref" path="oauth2_tokens.xml"/>
+    <exclude domain="sharedpref" path="google_auth_tokens.xml"/>
+    
+    <!-- Exclude sensitive Hue configuration -->
+    <exclude domain="sharedpref" path="hue_bridge_config.xml"/>
+    <exclude domain="sharedpref" path="hue_authentication.xml"/>
+    
+    <!-- Exclude any authentication-related SharedPreferences -->
+    <exclude domain="sharedpref" path="cf_alarm_auth.xml"/>
+    
+    <!-- Exclude any potential sensitive files -->
+    <exclude domain="file" path=".*\.key"/>
+    <exclude domain="file" path=".*\.token"/>
+    <exclude domain="file" path=".*\.pem"/>
+    <exclude domain="file" path=".*\.p12"/>
+    <exclude domain="file" path=".*\.keystore"/>
+    
+    <!-- Include only non-sensitive app configuration -->
+    <include domain="sharedpref" path="shift_config.xml"/>
+    <include domain="sharedpref" path="alarm_settings.xml"/>
+    <include domain="sharedpref" path="ui_preferences.xml"/>
+    <include domain="sharedpref" path="app_preferences.xml"/>
+    
+    <!-- Include harmless app data -->
+    <include domain="file" path="logs/"/>
+    <include domain="file" path="cache/"/>
+    <include domain="database" path="app_database.db"/>
 </full-backup-content>

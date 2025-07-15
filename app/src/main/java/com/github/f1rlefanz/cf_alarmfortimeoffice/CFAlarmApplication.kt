@@ -2,6 +2,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice
 
 import android.app.Application
 import com.github.f1rlefanz.cf_alarmfortimeoffice.di.AppContainer
+import com.github.f1rlefanz.cf_alarmfortimeoffice.security.SecurityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,12 +20,18 @@ class CFAlarmApplication : Application() {
     // Dependency container
     lateinit var appContainer: AppContainer
         private set
+        
+    // PHASE 2: Security Manager for enhanced security validation
+    private lateinit var securityManager: SecurityManager
     
     override fun onCreate() {
         super.onCreate()
         
         // Initialize dependency container
         appContainer = AppContainer(this)
+        
+        // PHASE 2: Initialize Security Manager
+        securityManager = SecurityManager(this)
         
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -41,6 +48,16 @@ class CFAlarmApplication : Application() {
                 // PERFORMANCE: Initialize critical components first
                 Logger.d(LogTags.AUTH, "Initializing OAuth2 token storage")
                 appContainer.initializeTokenStorage()
+                
+                // PHASE 2: Perform comprehensive security assessment
+                Logger.business(LogTags.SECURITY, "🔒 PHASE-2: Performing comprehensive security assessment...")
+                val securityAssessment = securityManager.performSecurityAssessment()
+                
+                // Log security assessment summary
+                Logger.business(LogTags.SECURITY, "📋 SECURITY-SUMMARY: Overall Level = ${securityAssessment.overallSecurityLevel}")
+                if (securityAssessment.rootDetection.isRooted) {
+                    Logger.w(LogTags.SECURITY, "⚠️  USER-NOTICE: Device root detected - using enhanced security measures")
+                }
                 
                 // TIMING FIX: Initialize ShiftConfig early to prevent race conditions
                 Logger.d(LogTags.SHIFT_CONFIG, "🔄 STARTUP: Initializing ShiftConfig early to prevent timing issues")

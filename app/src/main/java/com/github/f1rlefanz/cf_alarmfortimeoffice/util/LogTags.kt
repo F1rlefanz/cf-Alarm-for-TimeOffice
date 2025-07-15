@@ -65,6 +65,13 @@ object LogTags {
     const val HUE_NETWORK = "CFAlarm.Hue.Network"
     const val BACKGROUND_SYNC = "CFAlarm.Background.Sync"
     
+    // === PHASE 2: SECURITY & VALIDATION ===
+    const val SECURITY = "CFAlarm.Security"
+    const val ROOT_DETECTION = "CFAlarm.Security.Root"
+    const val ENCRYPTION = "CFAlarm.Security.Encryption"
+    const val INTEGRITY = "CFAlarm.Security.Integrity"
+    const val NETWORK_SECURITY = "CFAlarm.Security.Network"
+    
     // === ERROR & RECOVERY ===
     const val ERROR = "CFAlarm.Error"
     const val RECOVERY = "CFAlarm.Recovery"
