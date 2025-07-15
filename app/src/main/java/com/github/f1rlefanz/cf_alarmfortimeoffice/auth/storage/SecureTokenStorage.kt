@@ -27,14 +27,13 @@ class SecureTokenStorage(private val context: Context) {
         encodeDefaults = true
     }
     
-    private val masterKey: MasterKey by lazy {
-        MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-    }
-    
     private val prefs: SharedPreferences by lazy {
         try {
+            // Create MasterKey for encryption
+            val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            
             EncryptedSharedPreferences.create(
                 context,
                 PREFS_NAME,
