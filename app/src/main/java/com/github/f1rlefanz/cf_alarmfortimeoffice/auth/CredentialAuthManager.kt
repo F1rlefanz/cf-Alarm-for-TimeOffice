@@ -34,10 +34,14 @@ class CredentialAuthManager(private val context: Context) {
         }
 
         Logger.d(LogTags.AUTH, "Using Web Client ID: ${googleWebClientId.take(20)}...")
+        Logger.d(LogTags.AUTH, "Package name: ${context.packageName}")
+        Logger.d(LogTags.AUTH, "Debug SHA-1 should be: 98:1F:ED:CF:28:31:A0:10:7C:03:1B:A2:F2:4F:7C:88:06:99:20:D9")
 
         val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
+            .setFilterByAuthorizedAccounts(false)  // WICHTIG: Alle Konten anzeigen
             .setServerClientId(googleWebClientId)
+            .setAutoSelectEnabled(false)  // Benutzer soll wählen können
+            .setRequestNonce(null)  // Kein Nonce für Debug
             .build()
 
         val request: GetCredentialRequest = GetCredentialRequest.Builder()
