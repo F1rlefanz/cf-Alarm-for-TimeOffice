@@ -12,17 +12,11 @@
     -->
     
     <!-- Debug configuration: Allow user certificates for development -->
-    <debug-overrides cleartextTrafficPermitted="false">
+    <debug-overrides cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>
             <certificates src="user"/>
         </trust-anchors>
-        <!-- Allow cleartext only for local development -->
-        <domain-config cleartextTrafficPermitted="true">
-            <domain includeSubdomains="false">localhost</domain>
-            <domain includeSubdomains="false">127.0.0.1</domain>
-            <domain includeSubdomains="false">10.0.2.2</domain>
-        </domain-config>
     </debug-overrides>
     
     <!-- 
@@ -38,6 +32,10 @@
         <domain includeSubdomains="true">192.168.0.0/16</domain>
         <!-- Link-local addresses -->
         <domain includeSubdomains="true">169.254.0.0/16</domain>
+        <!-- Development localhost -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
     
     <!-- 
