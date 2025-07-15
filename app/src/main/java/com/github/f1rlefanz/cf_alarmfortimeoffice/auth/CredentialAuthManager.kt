@@ -41,7 +41,6 @@ class CredentialAuthManager(private val context: Context) {
             .setFilterByAuthorizedAccounts(false)  // WICHTIG: Alle Konten anzeigen
             .setServerClientId(googleWebClientId)
             .setAutoSelectEnabled(false)  // Benutzer soll wählen können
-            .setRequestNonce(null)  // Kein Nonce für Debug
             .build()
 
         val request: GetCredentialRequest = GetCredentialRequest.Builder()
