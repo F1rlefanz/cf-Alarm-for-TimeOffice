@@ -12,6 +12,10 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import timber.log.Timber
 
+// Firebase Imports
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+
 class CFAlarmApplication : Application() {
     
     // Application scope for long-running operations
@@ -27,6 +31,9 @@ class CFAlarmApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // Initialize Firebase first
+        initializeFirebase()
+        
         // Initialize dependency container
         appContainer = AppContainer(this)
         
@@ -40,6 +47,32 @@ class CFAlarmApplication : Application() {
         
         // Initialize OAuth2 token system and perform migrations
         initializeApp()
+    }
+    
+    /**
+     * Firebase Setup mit Professional Best Practices (2025)
+     */
+    private fun initializeFirebase() {
+        try {
+            // Firebase initialisieren 
+            FirebaseApp.initializeApp(this)
+            
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            
+            // App-spezifische Context Keys setzen
+            crashlytics.setCustomKey("app_package", packageName)
+            crashlytics.setCustomKey("build_type", if (BuildConfig.DEBUG) "debug" else "release")
+            crashlytics.setCustomKey("version_code", BuildConfig.VERSION_CODE)
+            crashlytics.setCustomKey("version_name", BuildConfig.VERSION_NAME)
+            
+            // Initial Breadcrumb
+            crashlytics.log("CFAlarmApplication: Firebase initialized successfully")
+            
+            Logger.i(LogTags.APP, "🔥 Firebase Crashlytics initialized with app context")
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.APP, "❌ Failed to initialize Firebase", e)
+        }
     }
     
     private fun initializeApp() {

@@ -23,6 +23,10 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeT
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig
+
+// Firebase Crashlytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class MainActivity : ComponentActivity() {
 
@@ -91,6 +95,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Firebase Crashlytics Setup
+        setupFirebaseCrashlytics()
+
         // Dependency Container abrufen
         appContainer = (application as CFAlarmApplication).appContainer
         
@@ -158,6 +165,46 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Firebase Crashlytics Setup mit Professional Best Practices
+     */
+    private fun setupFirebaseCrashlytics() {
+        try {
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            
+            // User ID setzen (anonymisiert) 
+            val userId = android.provider.Settings.Secure.getString(
+                contentResolver, 
+                android.provider.Settings.Secure.ANDROID_ID
+            ).take(8) // Nur ersten 8 Zeichen für Datenschutz
+            crashlytics.setUserId("user_$userId")
+            
+            // Custom Keys für App Context
+            crashlytics.setCustomKey("app_version", packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown")
+            crashlytics.setCustomKey("build_type", if (BuildConfig.DEBUG) "debug" else "release")
+            crashlytics.setCustomKey("target_sdk", applicationInfo.targetSdkVersion)
+            
+            // Breadcrumb-Log
+            crashlytics.log("MainActivity: Firebase Crashlytics initialized")
+            
+            Logger.business("Crashlytics", "Firebase Crashlytics setup completed with user context")
+            
+        } catch (e: Exception) {
+            Logger.e("Crashlytics", "Failed to setup Crashlytics", e)
+        }
+    }
+
+    /**
+     * Test-Crash für Firebase Crashlytics Verifikation
+     * NUR für Development/Testing verwenden!
+     */
+    fun triggerTestCrash() {
+        if (BuildConfig.DEBUG) {
+            FirebaseCrashlytics.getInstance().log("Test crash triggered by user")
+            throw RuntimeException("Firebase Crashlytics Test Crash - This is intentional for testing!")
         }
     }
 

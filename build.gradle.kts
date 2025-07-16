@@ -2,4 +2,8 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     kotlin("android") version "2.2.0" apply false
+    
+    // Firebase plugins (2025 Standards)
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
 }
