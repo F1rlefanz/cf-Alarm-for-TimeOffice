@@ -83,8 +83,9 @@ class HueNUpnpDiscoveryService {
             val bridges = discoveryResponses.map { response ->
                 HueBridge(
                     id = response.id,
-                    internalipaddress = response.internalipaddress,
-                    name = "Philips Hue Bridge"
+                    ipAddress = response.internalipaddress,
+                    name = "Philips Hue Bridge",
+                    discoveryMethod = com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryMethod.N_UPNP
                 )
             }
             

@@ -75,7 +75,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
                                     val bridge = createHueBridgeFromService(service)
                                     bridge?.let {
                                         discoveredBridges.add(it)
-                                        Logger.i(LogTags.HUE_DISCOVERY, "Hue bridge discovered: ${it.internalipaddress}")
+                                        Logger.i(LogTags.HUE_DISCOVERY, "Hue bridge discovered: ${it.ipAddress}")
                                     }
                                 }
                             }
@@ -152,8 +152,9 @@ class HueMdnsDiscoveryService(private val context: Context) {
                 
                 HueBridge(
                     id = bridgeId,
-                    internalipaddress = hostAddress,
-                    name = serviceInfo.serviceName
+                    ipAddress = hostAddress,
+                    name = serviceInfo.serviceName,
+                    discoveryMethod = com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryMethod.MDNS
                 )
             } else {
                 Logger.w(LogTags.HUE_DISCOVERY, "Service has no IP address: ${serviceInfo.serviceName}")
