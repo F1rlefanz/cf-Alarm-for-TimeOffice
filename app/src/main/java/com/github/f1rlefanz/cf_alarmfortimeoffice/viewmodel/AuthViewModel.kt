@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -34,12 +33,14 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
  * ✅ Debounced flows prevent rapid UI updates
  * ✅ Single Source of Truth für Authentication
  * ✅ Memory leak prevention
+ * ✅ REACTIVE CALENDAR SELECTION: Auto-syncs hasSelectedCalendars flag
  */
 class AuthViewModel(
     private val authDataStoreRepository: IAuthDataStoreRepository,
     private val credentialAuthManager: CredentialAuthManager,
     private val errorHandler: ErrorHandler,
-    private val authUseCase: com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAuthUseCase? = null
+    private val authUseCase: com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAuthUseCase? = null,
+    private val calendarSelectionRepository: com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalendarSelectionRepository? = null
 ) : ViewModel() {
 
     // CONSOLIDATED STATE: Ein einziger State statt AuthState + AuthUiState
@@ -64,8 +65,10 @@ class AuthViewModel(
     }
 
     init {
+        Logger.d(LogTags.AUTH, "🚀 REACTIVE-CALENDAR: AuthViewModel initialized with CalendarSelectionRepository=${calendarSelectionRepository != null}")
         observeAuthState()
         checkInitialAuthState()
+        observeCalendarSelection() // REACTIVE CALENDAR: Observer für Calendar-Selection-Änderungen
     }
 
     /**
@@ -130,12 +133,79 @@ class AuthViewModel(
                     }
                     
                     Logger.d(LogTags.AUTH, "Initial auth state - authenticated=${authData.isLoggedIn}, user=${authData.email}")
+                    
+                    // REACTIVE CALENDAR: Check initial calendar selection status
+                    checkInitialCalendarSelection()
+                    
                     // Only collect once for initial state, then return
                     return@collect
                 }
             } catch (e: Exception) {
                 Logger.e(LogTags.AUTH, "Error checking initial auth state", e)
             }
+        }
+    }
+
+    /**
+     * REACTIVE CALENDAR: Checks initial calendar selection status on startup
+     * Ensures hasSelectedCalendars flag is correctly set on app startup
+     */
+    private fun checkInitialCalendarSelection() {
+        calendarSelectionRepository?.let { repository ->
+            viewModelScope.launch {
+                try {
+                    val selectedIds = repository.getCurrentSelectedCalendarIds().getOrElse { emptySet() }
+                    val hasSelectedCalendars = selectedIds.isNotEmpty()
+                    
+                    Logger.d(LogTags.AUTH, "🔍 INITIAL-CALENDAR: Found ${selectedIds.size} selected calendars on startup, hasSelected=$hasSelectedCalendars")
+                    
+                    updateAuthState { currentState ->
+                        currentState.copy(
+                            calendarOps = currentState.calendarOps.copy(
+                                hasSelectedCalendars = hasSelectedCalendars
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    Logger.e(LogTags.AUTH, "Error checking initial calendar selection", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * REACTIVE CALENDAR SELECTION: Observes calendar selection changes
+     * 
+     * BUG FIX: Automatically synchronizes hasSelectedCalendars flag with CalendarSelectionRepository
+     * Solves the issue where Calendar-Berechtigung card appears after restart even when calendars are selected
+     */
+    @OptIn(FlowPreview::class)
+    private fun observeCalendarSelection() {
+        calendarSelectionRepository?.let { repository ->
+            viewModelScope.launch(Dispatchers.IO) { // PERFORMANCE: Background thread only
+                repository.selectedCalendarIds
+                    .debounce(150) // PERFORMANCE: Debounce to prevent excessive updates
+                    .distinctUntilChanged { old, new -> 
+                        // PERFORMANCE: Only update if selection actually changed
+                        old.size == new.size && old == new
+                    }
+                    .collect { selectedIds ->
+                        val hasSelectedCalendars = selectedIds.isNotEmpty()
+                        
+                        Logger.d(LogTags.AUTH, "🔄 REACTIVE-CALENDAR: Calendar selection changed - ${selectedIds.size} calendars selected, hasSelected=$hasSelectedCalendars")
+                        
+                        // UI THREAD OPTIMIZATION: Atomic update without context switching
+                        updateAuthState { currentState ->
+                            currentState.copy(
+                                calendarOps = currentState.calendarOps.copy(
+                                    hasSelectedCalendars = hasSelectedCalendars
+                                )
+                            )
+                        }
+                    }
+            }
+        } ?: run {
+            Logger.w(LogTags.AUTH, "⚠️ REACTIVE-CALENDAR: CalendarSelectionRepository not injected - calendar selection sync disabled")
         }
     }
 
@@ -519,6 +589,17 @@ class AuthViewModel(
     fun setCalendarReloadTrigger(trigger: () -> Unit) {
         calendarReloadTrigger = trigger
         Logger.d(LogTags.AUTH, "Calendar reload trigger registered")
+    }
+
+    /**
+     * REACTIVE CALENDAR: Manually refresh calendar selection status
+     * Call this if calendar selection state seems out of sync
+     */
+    fun refreshCalendarSelectionStatus() {
+        viewModelScope.launch {
+            checkInitialCalendarSelection()
+            Logger.d(LogTags.AUTH, "🔄 MANUAL-REFRESH: Calendar selection status refreshed")
+        }
     }
 
     // PERMISSION MANAGEMENT: Methods for managing calendar permissions

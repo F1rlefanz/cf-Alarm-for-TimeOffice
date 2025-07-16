@@ -57,7 +57,8 @@ class ViewModelFactory(
                     authDataStoreRepository = appContainer.authDataStoreRepository,
                     credentialAuthManager = appContainer.credentialAuthManager,
                     errorHandler = ErrorHandler,
-                    authUseCase = appContainer.authUseCase // MODERN: Add AuthUseCase for Calendar authorization
+                    authUseCase = appContainer.authUseCase, // MODERN: Add AuthUseCase for Calendar authorization
+                    calendarSelectionRepository = appContainer.calendarSelectionRepository // REACTIVE: Add CalendarSelectionRepository for hasSelectedCalendars sync
                 ) as T
             }
             modelClass.isAssignableFrom(CalendarViewModel::class.java) -> {
