@@ -1,55 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration für CFAlarm App
+    
+    Diese Konfiguration erlaubt HTTP-Verbindungen nur für lokale IoT-Geräte
+    gemäß Android Security Best Practices 2025 und GDPR-Compliance.
+    
+    Unterstützte Szenarien:
+    - Philips Hue Bridges (HTTPS bevorzugt, HTTP Fallback)
+    - Andere lokale IoT-Geräte im privaten Netzwerk
+    - Keine externe HTTP-Verbindungen (nur HTTPS)
+    
+    RFC 1918 Private Network Support wird über dynamische Code-Validierung
+    implementiert, nicht über statische XML-Domain-Listen.
+-->
 <network-security-config>
     <!-- 
-        SECURITY-HARDENED Network Security Configuration
-        
-        PRINCIPLE: Minimal cleartext permissions only for Philips Hue Bridge
-        SECURITY IMPACT:
-        - Cleartext ONLY for local network ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-        - ALL external traffic forced to HTTPS
-        - Philips Hue bridges only support HTTP for local API access
-        - Physical button press still required for initial authentication
-    -->
-    
-    <!-- Debug configuration: Allow user certificates for development -->
-    <debug-overrides cleartextTrafficPermitted="true">
-        <trust-anchors>
-            <certificates src="system"/>
-            <certificates src="user"/>
-        </trust-anchors>
-    </debug-overrides>
-    
-    <!-- 
-        PRODUCTION: Strict security with minimal cleartext exceptions
-        Only allow HTTP for private IP ranges (RFC 1918)
-        
-        NOTE: Certificate Pinning for Google APIs deliberately EXCLUDED
-        Google officially discourages pinning for googleapis.com domains
-        due to high risk of breakage during CA migrations.
-        See: https://developers.google.com/maps/root-ca-faq
-    -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Class A private network -->
-        <domain includeSubdomains="true">10.0.0.0/8</domain>
-        <!-- Class B private network -->
-        <domain includeSubdomains="true">172.16.0.0/12</domain>
-        <!-- Class C private network -->
-        <domain includeSubdomains="true">192.168.0.0/16</domain>
-        <!-- Link-local addresses -->
-        <domain includeSubdomains="true">169.254.0.0/16</domain>
-        <!-- Development localhost -->
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
-    
-    <!-- 
-        BASE CONFIG: HTTPS enforced for all external traffic
-        This is the critical security improvement
+        Base Configuration: Nur HTTPS für alle externen Verbindungen
+        Android 9+ Standard: cleartext disabled by default
     -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
+            <!-- System-Standard CAs für HTTPS-Verbindungen -->
             <certificates src="system"/>
         </trust-anchors>
     </base-config>
+    
+    <!-- 
+        Lokale IoT-Geräte: HTTP erlaubt für private IP-Bereiche
+        WICHTIG: Diese Config wird durch Code-Validierung ergänzt
+        
+        Die spezifischen IPs werden zur Laufzeit durch NetworkSecurityPolicy
+        validiert, um nur RFC 1918 private networks zu erlauben:
+        - 192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+        - 10.0.0.0/8 (10.0.0.0 - 10.255.255.255)  
+        - 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+        - 169.254.0.0/16 (Link-Local)
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 
+            Placeholder Domains - Echte Validation erfolgt in HueBridgeSecurityValidator
+            Diese Einträge decken häufige lokale Router-IP-Bereiche ab
+        -->
+        
+        <!-- Standard lokale Router IPs -->
+        <domain includeSubdomains="false">192.168.1.1</domain>
+        <domain includeSubdomains="false">192.168.0.1</domain>
+        <domain includeSubdomains="false">192.168.178.1</domain>
+        <domain includeSubdomains="false">10.0.0.1</domain>
+        <domain includeSubdomains="false">172.16.0.1</domain>
+        
+        <!-- Beispiel für entdeckte Hue Bridge -->
+        <domain includeSubdomains="false">192.168.178.24</domain>
+        
+        <!-- Trust Anchors: System CAs für HTTPS-Verbindungen -->
+        <trust-anchors>
+            <!-- Standard System CAs für HTTPS-Verbindungen zu modernen Bridges -->
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- 
+        Debug-Only Overrides für Development
+        Nur aktiv wenn android:debuggable="true"
+    -->
+    <debug-overrides>
+        <trust-anchors>
+            <!-- Debug CAs falls benötigt für lokale Development -->
+            <certificates src="system"/>
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config>

@@ -72,6 +72,11 @@ object LogTags {
     const val INTEGRITY = "CFAlarm.Security.Integrity"
     const val NETWORK_SECURITY = "CFAlarm.Security.Network"
     
+    // === HTTPS-FIRST HUE INTEGRATION ===
+    const val HUE_SECURITY = "CFAlarm.Hue.Security"
+    const val HUE_HTTPS = "CFAlarm.Hue.HTTPS"
+    const val HUE_PROTOCOL = "CFAlarm.Hue.Protocol"
+    
     // === ERROR & RECOVERY ===
     const val ERROR = "CFAlarm.Error"
     const val RECOVERY = "CFAlarm.Recovery"
