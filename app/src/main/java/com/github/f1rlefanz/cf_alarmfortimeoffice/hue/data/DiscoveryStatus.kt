@@ -20,13 +20,16 @@ data class DiscoveryStatus(
 )
 
 /**
- * Discovery method being used
+ * Discovery method being used (Enhanced 2025 Edition)
  */
 enum class DiscoveryMethod {
     ONLINE_DISCOVERY, // Using Philips cloud service (N-UPnP)
+    N_UPNP,          // Alias for ONLINE_DISCOVERY - modern name
     MDNS,            // Using mDNS discovery (_hue._tcp.local)
     LOCAL_NETWORK,   // Deprecated: Legacy local network scanning
-    IP_TEST          // Deprecated: Testing specific IP addresses
+    IP_TEST,         // Deprecated: Testing specific IP addresses
+    MANUAL,          // Manually entered IP
+    CACHE            // From cached discovery
 }
 
 /**

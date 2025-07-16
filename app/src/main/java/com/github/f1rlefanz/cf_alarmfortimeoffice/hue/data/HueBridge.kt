@@ -59,16 +59,6 @@ data class BridgeCapabilities(
 )
 
 /**
- * Discovery Method Enum
- */
-enum class DiscoveryMethod {
-    N_UPNP,        // https://discovery.meethue.com
-    MDNS,          // mDNS/_hue._tcp.local
-    MANUAL,        // Manually entered IP
-    CACHE          // From cached discovery
-}
-
-/**
  * Bridge configuration response
  */
 @Immutable

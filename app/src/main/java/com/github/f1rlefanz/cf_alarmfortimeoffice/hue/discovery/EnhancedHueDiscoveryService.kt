@@ -3,7 +3,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery
 import android.content.Context
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.api.HueApiClientV2
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryMethod
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.security.HueBridgeSecurityValidator
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
@@ -45,9 +45,9 @@ class EnhancedHueDiscoveryService(private val context: Context) {
     private val mdnsService = HueMdnsDiscoveryService(context)
     
     // Discovery status flow
-    private val _discoveryStatus = MutableSharedFlow<DiscoveryStatus>(replay = 1)
+    private val _discoveryStatus = MutableSharedFlow<DiscoveryStage>(replay = 1)
     
-    fun getDiscoveryStatus(): Flow<DiscoveryStatus> = _discoveryStatus.asSharedFlow()
+    fun getDiscoveryStatus(): Flow<DiscoveryStage> = _discoveryStatus.asSharedFlow()
     
     /**
      * Enhanced Bridge Discovery mit HTTPS-First Protocol Detection
@@ -63,14 +63,14 @@ class EnhancedHueDiscoveryService(private val context: Context) {
         Logger.business(LogTags.HUE_DISCOVERY, "🚀 Starting ENHANCED bridge discovery with HTTPS-first protocol detection")
         
         try {
-            _discoveryStatus.emit(DiscoveryStatus.STARTING)
+            _discoveryStatus.emit(DiscoveryStage.STARTING)
             
             val discoveredBridges = mutableListOf<HueBridge>()
             val processedIPs = mutableSetOf<String>()
             
             // === PHASE 1: N-UPnP Discovery (HTTPS) ===
             Logger.i(LogTags.HUE_DISCOVERY, "📡 PHASE 1: N-UPnP discovery via HTTPS")
-            _discoveryStatus.emit(DiscoveryStatus.N_UPNP_SEARCH)
+            _discoveryStatus.emit(DiscoveryStage.N_UPNP_SEARCH)
             
             val nUpnpResult = withTimeoutOrNull(NUPNP_TIMEOUT_MS) {
                 async { runNUpnpDiscovery() }
@@ -88,7 +88,7 @@ class EnhancedHueDiscoveryService(private val context: Context) {
             
             // === PHASE 2: mDNS Discovery (Local Network) ===
             Logger.i(LogTags.HUE_DISCOVERY, "📡 PHASE 2: mDNS discovery for local network")
-            _discoveryStatus.emit(DiscoveryStatus.MDNS_SEARCH)
+            _discoveryStatus.emit(DiscoveryStage.MDNS_SEARCH)
             
             val mdnsResult = withTimeoutOrNull(MDNS_TIMEOUT_MS) {
                 async { runMdnsDiscovery() }
@@ -109,11 +109,11 @@ class EnhancedHueDiscoveryService(private val context: Context) {
             
             // === PHASE 3: Enhanced Protocol Detection & Validation ===
             Logger.business(LogTags.HUE_DISCOVERY, "🔍 PHASE 3: Running enhanced validation and protocol detection")
-            _discoveryStatus.emit(DiscoveryStatus.VALIDATING)
+            _discoveryStatus.emit(DiscoveryStage.VALIDATING)
             
             val enhancedBridges = enhanceBridgesWithProtocolDetection(discoveredBridges)
             
-            _discoveryStatus.emit(DiscoveryStatus.COMPLETED)
+            _discoveryStatus.emit(DiscoveryStage.COMPLETED)
             
             Logger.business(LogTags.HUE_DISCOVERY, "🎯 ENHANCED discovery completed: ${enhancedBridges.size} verified bridges")
             enhancedBridges.forEach { bridge ->
@@ -124,7 +124,7 @@ class EnhancedHueDiscoveryService(private val context: Context) {
             
         } catch (e: Exception) {
             Logger.e(LogTags.HUE_DISCOVERY, "❌ Enhanced bridge discovery failed", e)
-            _discoveryStatus.emit(DiscoveryStatus.ERROR)
+            _discoveryStatus.emit(DiscoveryStage.FAILED)
             return@withContext Result.failure(e)
         }
     }
