@@ -26,14 +26,14 @@ data class ShiftConfig(
                 ShiftDefinition(
                     id = "early_shift",
                     name = "Frühschicht",
-                    keywords = listOf("Früh", "FD", "FS", "Frühschicht"),
+                    keywords = listOf("Früh", "FD", "FS", "Frühschicht", "F"),
                     alarmTime = LocalTime.of(5, 30),
                     isEnabled = true
                 ),
                 ShiftDefinition(
                     id = "late_shift", 
                     name = "Spätschicht",
-                    keywords = listOf("Spät", "SD", "SS", "Spätschicht"),
+                    keywords = listOf("Spät", "SD", "SS", "Spätschicht", "S2"),
                     alarmTime = LocalTime.of(13, 0),
                     isEnabled = true
                 ),

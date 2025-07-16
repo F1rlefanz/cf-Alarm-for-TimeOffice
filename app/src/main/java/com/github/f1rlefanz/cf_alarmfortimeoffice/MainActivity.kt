@@ -23,6 +23,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeT
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.*
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DebugLogInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig
 
 // Firebase Crashlytics
@@ -116,6 +117,12 @@ class MainActivity : ComponentActivity() {
 
         // Prüfe Notification-Berechtigung
         checkNotificationPermission()
+        
+        // Debug: Test File-Logging (nur im Debug-Build)
+        if (BuildConfig.DEBUG) {
+            DebugLogInfo.addTestLogEntries()
+            DebugLogInfo.logFileInfo(this)
+        }
 
         setContent {
             CFAlarmForTimeOfficeTheme {

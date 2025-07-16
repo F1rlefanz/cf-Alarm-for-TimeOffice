@@ -10,7 +10,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.SimpleFileTree
 import timber.log.Timber
+import java.io.File
 
 // Firebase Imports
 import com.google.firebase.FirebaseApp
@@ -42,7 +44,13 @@ class CFAlarmApplication : Application() {
         
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
-            Logger.d(LogTags.APP, "Timber initialized in DEBUG mode")
+            
+            // File-Logging für 3-Tage-Analyse
+            val logFile = File(getExternalFilesDir(null), "debug_logs.txt")
+            Timber.plant(SimpleFileTree(logFile))
+            
+            Logger.d(LogTags.APP, "Timber initialized in DEBUG mode with file logging")
+            Logger.i(LogTags.APP, "🗂️ Debug logs will be saved to: ${logFile.absolutePath}")
         }
         
         // Initialize OAuth2 token system and perform migrations
