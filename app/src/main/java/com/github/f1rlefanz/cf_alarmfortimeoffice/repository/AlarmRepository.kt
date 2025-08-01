@@ -27,10 +27,18 @@ class AlarmRepository(
     
     // In-memory storage für aktive Alarme
     private val _activeAlarms = MutableStateFlow<List<AlarmInfo>>(emptyList())
-    val activeAlarms: Flow<List<AlarmInfo>> = _activeAlarms.asStateFlow()
+    
+    override val activeAlarms: Flow<List<AlarmInfo>> = _activeAlarms.asStateFlow()
     
     override suspend fun saveAlarm(alarmInfo: AlarmInfo): Result<Unit> {
         return try {
+            // VALIDATION: Check if alarm is in the future
+            val currentTime = System.currentTimeMillis()
+            if (alarmInfo.triggerTime <= currentTime) {
+                Logger.w(LogTags.ALARM, "Rejecting past alarm: ${alarmInfo.formattedTime} (current: ${java.time.LocalDateTime.now()})")
+                return Result.failure(IllegalArgumentException("Alarm time is in the past: ${alarmInfo.formattedTime}"))
+            }
+            
             val currentAlarms = _activeAlarms.value.toMutableList()
             val existingIndex = currentAlarms.indexOfFirst { it.id == alarmInfo.id }
             
@@ -45,6 +53,10 @@ class AlarmRepository(
             }
             
             _activeAlarms.value = currentAlarms
+            
+            // CLEANUP: Trigger cleanup after save
+            cleanupExpiredAlarms()
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM, "Error saving alarm: ${alarmInfo.id}", e)
@@ -99,6 +111,46 @@ class AlarmRepository(
             Result.success(exists)
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM, "Error checking if alarm exists: $alarmId", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * CLEANUP: Remove expired alarms automatically
+     */
+    private suspend fun cleanupExpiredAlarms() {
+        try {
+            val currentTime = System.currentTimeMillis()
+            val validAlarms = _activeAlarms.value.filter { it.triggerTime > currentTime }
+            val expiredCount = _activeAlarms.value.size - validAlarms.size
+            
+            if (expiredCount > 0) {
+                _activeAlarms.value = validAlarms
+                Logger.w(LogTags.ALARM, "Cleaned up $expiredCount expired alarms")
+            }
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "Error during alarm cleanup", e)
+        }
+    }
+    
+    /**
+     * PUBLIC: Manual cleanup for startup or manual triggers
+     */
+    suspend fun cleanupExpiredAlarmsManually(): Result<Int> {
+        return try {
+            val currentTime = System.currentTimeMillis()
+            val originalCount = _activeAlarms.value.size
+            val validAlarms = _activeAlarms.value.filter { it.triggerTime > currentTime }
+            val expiredCount = originalCount - validAlarms.size
+            
+            if (expiredCount > 0) {
+                _activeAlarms.value = validAlarms
+                Logger.w(LogTags.ALARM, "Manual cleanup: removed $expiredCount expired alarms")
+            }
+            
+            Result.success(expiredCount)
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "Error during manual alarm cleanup", e)
             Result.failure(e)
         }
     }

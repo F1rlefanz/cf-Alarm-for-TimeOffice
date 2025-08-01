@@ -1,6 +1,7 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces
 
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AlarmInfo
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Interface für Alarm Repository Operations
@@ -9,8 +10,17 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AlarmInfo
  * - Dependency Inversion: Abstraktion statt konkrete Implementierung
  * - Testbarkeit: UseCase/ViewModel kann mit Mock-Repository getestet werden
  * - Flexibilität: Implementierung austauschbar (Database/SharedPrefs/InMemory)
+ * 
+ * REACTIVE ENHANCEMENT: Added activeAlarms Flow for immediate UI updates
  */
 interface IAlarmRepository {
+    
+    /**
+     * REACTIVE: Flow of active alarms for immediate UI updates
+     * 
+     * @return Flow that emits current alarm list whenever it changes
+     */
+    val activeAlarms: Flow<List<AlarmInfo>>
     
     /**
      * Speichert oder aktualisiert eine Alarm-Information

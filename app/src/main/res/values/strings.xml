@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CF-Alarm for TimeOffice</string>
+    <string name="fallback_service_description">Hybrid Alarm Fallback Service - Ensures alarms trigger even when the system alarm manager fails</string>
 </resources>

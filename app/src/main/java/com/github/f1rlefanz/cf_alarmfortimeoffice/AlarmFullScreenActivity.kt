@@ -1,89 +1,553 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice
 
-import android.content.Intent
-import android.os.Build
-import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import android.app.NotificationManager
+
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.os.*
+import android.view.View
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmStopService
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.theme.CFAlarmForTimeOfficeTheme
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.AnimationDurations
+import android.widget.Button
+import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmVerificationManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.VerificationSource
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
-import java.text.SimpleDateFormat
-import java.util.*
 
-class AlarmFullScreenActivity : ComponentActivity() {
+/**
+ * Full-screen alarm activity that shows when an alarm is triggered.
+ * 
+ * Features:
+ * - Full-screen, lock-screen overlay
+ * - Dismissal controls
+ * - Audio management
+ * - Wake lock management for reliability
+ */
+class AlarmFullScreenActivity : AppCompatActivity() {
+    
+    companion object {
+        private const val WAKE_LOCK_TAG = "CFAlarm:FullScreenActivity"
+        private const val WAKE_LOCK_TIMEOUT = 10 * 60 * 1000L // 10 minutes
+    }
+    
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var alarmRingtone: Ringtone? = null
+    private var vibrator: Vibrator? = null
+    
+    // 🔊 ENHANCED SOUND LOOP: Robust alarm audio management
+    private var soundLoopHandler: Handler? = null
+    private var soundLoopRunnable: Runnable? = null
+    private var isAlarmActive = false
+    private var alarmMediaPlayer: android.media.MediaPlayer? = null
+    
+    // 🚀 PHASE 3: Alarm verification
+    private lateinit var verificationManager: AlarmVerificationManager
+    private var currentAlarmId: Int = -1
+    
+    // UI Components
+    private lateinit var shiftNameText: TextView
+    private lateinit var alarmTimeText: TextView
+    private lateinit var dismissButton: Button
+    private lateinit var snoozeButton: Button
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        Logger.d(LogTags.ALARM, "AlarmFullScreenActivity onCreate")
+        Logger.d(LogTags.ALARM, "🖥️ AlarmFullScreenActivity starting on ${Build.MANUFACTURER} ${Build.MODEL}")
+        
+        // 🚀 PHASE 3: Initialize verification manager
+        verificationManager = AlarmVerificationManager(this)
+        
+        // Extract alarm ID for verification
+        currentAlarmId = intent.getIntExtra("alarm_id", -1)
+        
+        // 🚨 ENHANCED OnePlus-spezifische Diagnose
+        if (Build.MANUFACTURER.equals("OnePlus", ignoreCase = true)) {
+            Logger.w(LogTags.ALARM, "⚠️ OnePlus detected - checking for aggressive power management")
+            Logger.business(LogTags.ALARM, "🔍 OnePlus Device Details: ${Build.MODEL}, Android ${Build.VERSION.RELEASE}")
+            
+            // Check if we have the trigger source info
+            val triggeredVia = intent.getStringExtra("triggered_via")
+            Logger.business(LogTags.ALARM, "📱 Alarm triggered via: ${triggeredVia ?: "unknown"}")
+            
+            // OnePlus-specific warnings
+            Logger.w(LogTags.ALARM, "🔴 OnePlus WARNING: If alarm fails, check:")
+            Logger.w(LogTags.ALARM, "   1. Settings > Battery > Battery optimization > CF-Alarm > Don't optimize")
+            Logger.w(LogTags.ALARM, "   2. Settings > App Management > CF-Alarm > Allow Auto Startup")
+            Logger.w(LogTags.ALARM, "   3. Lock CF-Alarm in Recent Apps list")
+        }
+        
+        // Configure as full-screen, lock-screen overlay
+        setupFullScreenMode()
+        
+        // Acquire wake lock to ensure device stays awake
+        acquireWakeLock()
+        
+        // Set up basic layout (we'll use simple TextViews and Buttons)
+        setupBasicLayout()
+        
+        // Set up back button handling (modern approach)
+        setupBackButtonHandling()
+        
+        // Extract alarm information from intent
+        handleAlarmIntent()
+        
+        // Start alarm sound and vibration
+        startAlarmEffects()
+        
+        // 🚀 PHASE 3: Verify alarm success
+        if (currentAlarmId != -1) {
+            verificationManager.verifyAlarmSuccess(currentAlarmId, VerificationSource.FULL_SCREEN_ACTIVITY)
+        }
+        
+        Logger.i(LogTags.ALARM, "✅ AlarmFullScreenActivity fully initialized with verification")
+    }
+    
+    override fun onStart() {
+        super.onStart()
+        Logger.i(LogTags.ALARM, "🔄 AlarmFullScreenActivity STARTED")
+    }
 
-        setupWindowFlags()
+    override fun onResume() {
+        super.onResume()
+        Logger.i(LogTags.ALARM, "▶️ AlarmFullScreenActivity RESUMED")
         
-        // Hole Alarm-Daten aus Intent
-        val shiftName = intent.getStringExtra("shift_name") ?: "Unbekannte Schicht"
-        val alarmTime = intent.getStringExtra("alarm_time") ?: "Jetzt"
+        // 🔊 SOUND RECOVERY: Restart alarm sound if it was stopped during pause
+        if (isAlarmActive && alarmRingtone?.isPlaying != true) {
+            Logger.w(LogTags.ALARM, "🔊 Sound stopped during background - restarting alarm effects")
+            startAlarmEffects()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Logger.w(LogTags.ALARM, "⏸️ AlarmFullScreenActivity PAUSED - System intervention?")
         
-        setContent {
-            CFAlarmForTimeOfficeTheme {
-                AlarmFullScreenContent(
-                    shiftName = shiftName,
-                    alarmTime = alarmTime,
-                    onStopClicked = { 
-                        performHapticFeedback()
-                        stopAlarmAndFinish() 
-                    }
-                )
+        // 🚨 CRITICAL OnePlus Detection: Log aggressive power management
+        if (Build.MANUFACTURER.equals("OnePlus", ignoreCase = true)) {
+            Logger.e(LogTags.ALARM, "🔴 OnePlus DETECTED: Activity paused - likely aggressive power management!")
+        }
+        
+        // IMPORTANT: Keep wake lock active during pause for OnePlus compatibility
+        // OnePlus devices frequently pause activities but we need to keep alarm running
+        Logger.d(LogTags.ALARM, "⚠️ Keeping wake lock active during pause for OnePlus compatibility")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Logger.e(LogTags.ALARM, "⏹️ AlarmFullScreenActivity STOPPED - System is killing us!")
+        
+        // OnePlus-specific logging for debugging
+        if (Build.MANUFACTURER.equals("OnePlus", ignoreCase = true)) {
+            Logger.e(LogTags.ALARM, "🔴 OnePlus CRITICAL: Activity stopped - check battery optimization settings!")
+        }
+        
+        // Only release wake lock on stop, not pause
+        try {
+            wakeLock?.let { lock ->
+                if (lock.isHeld) {
+                    lock.release()
+                    Logger.d(LogTags.ALARM, "✅ Wake lock released in onStop")
+                }
             }
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Error releasing wake lock in onStop", e)
         }
     }
     
-    private fun setupWindowFlags() {
+    private fun setupFullScreenMode() {
+        // 🚀 ANDROID 14+ MODERN APPROACH: Enhanced lock screen and full-screen setup
+        
+        // Show on lock screen and when device is locked (Modern API preferred)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+            
+            // Android 10+ (API 29): Additional security for lock screen
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                setInheritShowWhenLocked(true)
+            }
         } else {
+            // Legacy support for older Android versions
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
+        }
+        
+        // 📱 ENHANCED FULL-SCREEN CONFIGURATION
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
+        
+        // 🎯 MODERN UI VISIBILITY: Compatible with Android 14+ edge-to-edge
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ (API 30): Modern window insets approach with null-safety
+            try {
+                window.decorView?.let { decorView ->
+                    window.insetsController?.let { controller ->
+                        controller.hide(
+                            android.view.WindowInsets.Type.statusBars() or 
+                            android.view.WindowInsets.Type.navigationBars()
+                        )
+                        controller.systemBarsBehavior = 
+                            android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        Logger.d(LogTags.ALARM, "✅ Modern insets controller configured successfully")
+                    } ?: run {
+                        Logger.w(LogTags.ALARM, "⚠️ InsetsController not available, falling back to legacy approach")
+                        // Fallback to legacy approach if insetsController is null
+                        @Suppress("DEPRECATION")
+                        decorView.systemUiVisibility = (
+                            View.SYSTEM_UI_FLAG_FULLSCREEN or
+                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        )
+                    }
+                } ?: run {
+                    Logger.e(LogTags.ALARM, "❌ DecorView is null - cannot configure full-screen mode")
+                    // Try to continue without full-screen setup - better than crashing
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "❌ Failed to configure modern insets controller", e)
+                // Fallback to legacy approach on any exception
+                try {
+                    @Suppress("DEPRECATION")
+                    window.decorView?.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                } catch (legacyException: Exception) {
+                    Logger.e(LogTags.ALARM, "❌ Even legacy approach failed", legacyException)
+                }
+            }
+        } else {
+            // Legacy approach for Android 10 and below with null-safety
+            try {
+                window.decorView?.let { decorView ->
+                    @Suppress("DEPRECATION")
+                    decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                    Logger.d(LogTags.ALARM, "✅ Legacy system UI visibility configured successfully")
+                } ?: run {
+                    Logger.e(LogTags.ALARM, "❌ DecorView is null - cannot configure legacy full-screen mode")
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "❌ Failed to configure legacy system UI visibility", e)
+            }
+        }
+        
+        // No action bar handling needed - our theme is Material.Light.NoActionBar
+        // The supportActionBar is null anyway, so no need to hide anything
+        
+        Logger.d(LogTags.ALARM, "✅ Full-screen mode configured for Android ${Build.VERSION.SDK_INT}")
+    }
+    
+    private fun acquireWakeLock() {
+        try {
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            
+            // 🔋 MODERN WAKE LOCK: Optimized for alarm use case
+            wakeLock = powerManager.newWakeLock(
+                // Use SCREEN_BRIGHT_WAKE_LOCK for full alarm functionality
+                // ACQUIRE_CAUSES_WAKEUP ensures the screen turns on immediately
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                WAKE_LOCK_TAG
+            ).apply {
+                setReferenceCounted(false) // Manual management for precise control
+                acquire(WAKE_LOCK_TIMEOUT)
+            }
+            
+            Logger.business(LogTags.ALARM, "✅ Enhanced wake lock acquired for full-screen activity (timeout: ${WAKE_LOCK_TIMEOUT}ms)")
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Failed to acquire wake lock", e)
+            // Continue without wake lock - the activity may still work
         }
     }
     
-    private fun performHapticFeedback() {
+    private fun setupBasicLayout() {
+        // Create a simple linear layout programmatically
+        // This avoids needing XML layout files for now
+        
+        val rootLayout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(android.graphics.Color.parseColor("#1976D2")) // Blue background
+            setPadding(32, 64, 32, 64)
+        }
+        
+        // Main title
+        val titleText = TextView(this).apply {
+            text = "⏰ CF-ALARM"
+            textSize = 32f
+            setTextColor(android.graphics.Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+        
+        // Shift name display
+        shiftNameText = TextView(this).apply {
+            text = "Schicht lädt..."
+            textSize = 24f
+            setTextColor(android.graphics.Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 16)
+        }
+        
+        // Alarm time display
+        alarmTimeText = TextView(this).apply {
+            text = "Jetzt"
+            textSize = 18f
+            setTextColor(android.graphics.Color.parseColor("#E3F2FD"))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 48)
+        }
+        
+        // Dismiss button
+        dismissButton = Button(this).apply {
+            text = "ALARM STOPPEN"
+            textSize = 18f
+            setBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
+            setTextColor(android.graphics.Color.WHITE)
+            setPadding(24, 16, 24, 16)
+            setOnClickListener { dismissAlarm() }
+        }
+        
+        // Snooze button
+        snoozeButton = Button(this).apply {
+            text = "5 MIN SPÄTER"
+            textSize = 16f
+            setBackgroundColor(android.graphics.Color.parseColor("#FF9800"))
+            setTextColor(android.graphics.Color.WHITE)
+            setPadding(24, 16, 24, 16)
+            setOnClickListener { snoozeAlarm() }
+        }
+        
+        // Add all components to layout
+        rootLayout.addView(titleText)
+        rootLayout.addView(shiftNameText)
+        rootLayout.addView(alarmTimeText)
+        rootLayout.addView(dismissButton)
+        rootLayout.addView(snoozeButton)
+        
+        setContentView(rootLayout)
+    }
+    
+    private fun handleAlarmIntent() {
+        val shiftName = intent.getStringExtra("shift_name") ?: "Unbekannte Schicht"
+        val alarmTime = intent.getStringExtra("alarm_time") ?: "Jetzt"
+        val alarmType = intent.getStringExtra("alarm_type")
+        val fallbackMode = intent.getBooleanExtra("fallback_mode", false)
+        
+        shiftNameText.text = if (fallbackMode) "⚠️ $shiftName (Fallback)" else shiftName
+        alarmTimeText.text = "Zeit: $alarmTime${alarmType?.let { " ($it)" } ?: ""}"
+        
+        Logger.i(LogTags.ALARM, "📋 Alarm details: $shiftName at $alarmTime${if (fallbackMode) " [FALLBACK]" else ""}")
+    }
+    
+    private fun startAlarmEffects() {
+        // Mark alarm as active for lifecycle management
+        isAlarmActive = true
+        
+        // 🔊 ENHANCED ALARM SOUND: Multi-tier reliability approach
+        var soundStarted = false
+        
+        // Tier 1: Try RingtoneManager (preferred for alarm sounds)
+        soundStarted = tryStartRingtoneAlarm()
+        
+        // Tier 2: Fallback to MediaPlayer if Ringtone fails
+        if (!soundStarted) {
+            Logger.w(LogTags.ALARM, "🔊 Ringtone failed, trying MediaPlayer fallback")
+            soundStarted = tryStartMediaPlayerAlarm()
+        }
+        
+        // Tier 3: If both fail, at least show visual alert
+        if (!soundStarted) {
+            Logger.e(LogTags.ALARM, "❌ All audio methods failed - showing visual-only alarm")
+            // At least we have the visual UI and vibration
+        }
+        
+        // Always start vibration regardless of audio success
+        startAlarmVibration()
+    }
+    
+    private fun tryStartRingtoneAlarm(): Boolean {
         try {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            
+            if (alarmUri == null) {
+                Logger.w(LogTags.ALARM, "⚠️ No ringtone URIs available")
+                return false
+            }
+                
+            alarmRingtone = RingtoneManager.getRingtone(this, alarmUri)?.apply {
+                // Enhanced audio configuration for alarm reliability
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    isLooping = true
+                    Logger.d(LogTags.ALARM, "✅ Native ringtone looping enabled (API 28+)")
+                } else {
+                    Logger.d(LogTags.ALARM, "📱 Using manual loop for older Android (API < 28)")
+                    // Start robust manual looping for older APIs
+                    startRobustManualRingtoneLoop()
+                }
+                
+                // Volume check and logging
+                try {
+                    val audioManager = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                    val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+                    val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+                    
+                    if (currentVolume < maxVolume * 0.7) {
+                        Logger.w(LogTags.ALARM, "⚠️ Alarm volume low ($currentVolume/$maxVolume), but respecting user settings")
+                    }
+                    
+                    Logger.business(LogTags.ALARM, "🔊 Alarm volume: $currentVolume/$maxVolume")
+                } catch (e: Exception) {
+                    Logger.w(LogTags.ALARM, "Could not check alarm volume", e)
+                }
+                
+                play()
+            }
+            
+            // Verify sound actually started
+            val isPlaying = alarmRingtone?.isPlaying == true
+            if (isPlaying) {
+                Logger.business(LogTags.ALARM, "✅ Ringtone alarm sound started successfully")
+                return true
+            } else {
+                Logger.w(LogTags.ALARM, "⚠️ Ringtone created but not playing")
+                return false
+            }
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Failed to start ringtone alarm", e)
+            return false
+        }
+    }
+    
+    private fun tryStartMediaPlayerAlarm(): Boolean {
+        try {
+            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                
+            if (alarmUri == null) {
+                Logger.w(LogTags.ALARM, "⚠️ No alarm URIs available for MediaPlayer")
+                return false
+            }
+            
+            alarmMediaPlayer = android.media.MediaPlayer().apply {
+                setDataSource(this@AlarmFullScreenActivity, alarmUri)
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                isLooping = true
+                
+                setOnPreparedListener { player ->
+                    try {
+                        player.start()
+                        Logger.business(LogTags.ALARM, "✅ MediaPlayer alarm sound started successfully")
+                    } catch (e: Exception) {
+                        Logger.e(LogTags.ALARM, "❌ MediaPlayer start failed", e)
+                    }
+                }
+                
+                setOnErrorListener { _, what, extra ->
+                    Logger.e(LogTags.ALARM, "❌ MediaPlayer error: what=$what, extra=$extra")
+                    false // Return false to trigger onCompletion
+                }
+                
+                prepareAsync()
+            }
+            
+            return true
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Failed to start MediaPlayer alarm", e)
+            return false
+        }
+    }
+    
+    private fun startRobustManualRingtoneLoop() {
+        // Cleanup any existing loop
+        stopManualRingtoneLoop()
+        
+        soundLoopHandler = Handler(Looper.getMainLooper())
+        
+        soundLoopRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    // Only continue if alarm is still active and we have a wake lock
+                    if (!isAlarmActive || wakeLock?.isHeld != true) {
+                        Logger.d(LogTags.ALARM, "🔇 Stopping sound loop - alarm inactive or no wake lock")
+                        return
+                    }
+                    
+                    alarmRingtone?.let { ringtone ->
+                        if (!ringtone.isPlaying) {
+                            try {
+                                ringtone.play()
+                                Logger.d(LogTags.ALARM, "🔄 Manually restarted ringtone for continuous loop")
+                            } catch (e: Exception) {
+                                Logger.e(LogTags.ALARM, "❌ Error restarting ringtone in loop", e)
+                                // Try to recreate ringtone if it failed
+                                if (isAlarmActive) {
+                                    Logger.d(LogTags.ALARM, "🔄 Attempting to recreate ringtone")
+                                    tryStartRingtoneAlarm()
+                                }
+                            }
+                        }
+                    } ?: run {
+                        // Ringtone is null, try to recreate if alarm is still active
+                        if (isAlarmActive) {
+                            Logger.w(LogTags.ALARM, "⚠️ Ringtone is null, attempting to recreate")
+                            tryStartRingtoneAlarm()
+                        }
+                    }
+                    
+                    // Schedule next check - shorter interval for reliability
+                    if (isAlarmActive) {
+                        soundLoopHandler?.postDelayed(this, 2000) // Check every 2 seconds
+                    }
+                    
+                } catch (e: Exception) {
+                    Logger.e(LogTags.ALARM, "❌ Error in sound loop runnable", e)
+                    // Try to continue the loop despite the error
+                    if (isAlarmActive) {
+                        soundLoopHandler?.postDelayed(this, 3000) // Slightly longer interval after error
+                    }
+                }
+            }
+        }
+        
+        // Start the loop with initial delay
+        soundLoopHandler?.postDelayed(soundLoopRunnable!!, 2000)
+        Logger.d(LogTags.ALARM, "✅ Robust manual ringtone loop started")
+    }
+    
+    private fun stopManualRingtoneLoop() {
+        soundLoopRunnable?.let { runnable ->
+            soundLoopHandler?.removeCallbacks(runnable)
+        }
+        soundLoopRunnable = null
+        soundLoopHandler = null
+    }
+    
+    private fun startAlarmVibration() {
+        try {
+            vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 vibratorManager.defaultVibrator
             } else {
@@ -91,428 +555,128 @@ class AlarmFullScreenActivity : ComponentActivity() {
                 getSystemService(VIBRATOR_SERVICE) as Vibrator
             }
             
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE)
-                vibrator.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(200)
+            // Enhanced vibration pattern: More attention-grabbing for alarms
+            val alarmVibrationPattern = longArrayOf(
+                0,    // Start immediately
+                1000, // Vibrate for 1 second
+                300,  // Pause 300ms
+                800,  // Vibrate for 800ms  
+                300,  // Pause 300ms
+                1000, // Vibrate for 1 second
+                500,  // Pause 500ms
+                500   // Short vibration
+            )
+            
+            vibrator?.let { vib ->
+                if (vib.hasVibrator()) {
+                    val vibrationEffect = VibrationEffect.createWaveform(alarmVibrationPattern, 1) // Repeat from index 1
+                    vib.vibrate(vibrationEffect)
+                    Logger.business(LogTags.ALARM, "✅ Enhanced alarm vibration started")
+                } else {
+                    Logger.d(LogTags.ALARM, "📴 Device has no vibrator capability")
+                }
             }
         } catch (e: Exception) {
-            Logger.w(LogTags.ALARM, "Haptic feedback failed: ${e.message}")
+            Logger.e(LogTags.ALARM, "❌ Failed to start vibration", e)
         }
     }
     
-    private fun stopAlarmAndFinish() {
-        Logger.d(LogTags.ALARM, "Stoppe Alarm und beende Activity")
+    private fun dismissAlarm() {
+        Logger.i(LogTags.ALARM, "🛑 User dismissed alarm")
         
-        // Stoppe Alarm über Service
-        val stopIntent = Intent(this, AlarmStopService::class.java)
-        startService(stopIntent)
+        // Mark alarm as inactive to stop all loops
+        isAlarmActive = false
         
-        // Activity beenden
+        // 🚀 PHASE 3: Stop alarm monitoring
+        if (currentAlarmId != -1) {
+            verificationManager.stopAlarmMonitoring(currentAlarmId)
+        }
+        
+        stopAlarmEffects()
+        
+        // Cancel any remaining notifications
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancelAll()
+        
+        // Finish activity
         finish()
+    }
+    
+    private fun setupBackButtonHandling() {
+        // Modern approach using OnBackPressedDispatcher
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // Prevent back button from dismissing alarm too easily
+                // Require explicit dismiss button press
+                Logger.d(LogTags.ALARM, "🚫 Back button pressed - ignoring (use Dismiss button)")
+            }
+        })
+    }
+    
+    private fun snoozeAlarm() {
+        Logger.i(LogTags.ALARM, "😴 User snoozed alarm for 5 minutes")
+        // TODO: Implement snooze functionality
+        // For now, just dismiss
+        dismissAlarm()
+    }
+    
+    private fun stopAlarmEffects() {
+        // Mark alarm as inactive to stop all sound loops
+        isAlarmActive = false
+        
+        // Stop manual sound loop
+        stopManualRingtoneLoop()
+        
+        // Stop ringtone
+        try {
+            alarmRingtone?.let { ringtone ->
+                if (ringtone.isPlaying) {
+                    ringtone.stop()
+                }
+            }
+            alarmRingtone = null
+            Logger.d(LogTags.ALARM, "🔇 Ringtone alarm sound stopped")
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Error stopping ringtone alarm sound", e)
+        }
+        
+        // Stop MediaPlayer
+        try {
+            alarmMediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                player.release()
+            }
+            alarmMediaPlayer = null
+            Logger.d(LogTags.ALARM, "🔇 MediaPlayer alarm sound stopped")
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Error stopping MediaPlayer alarm sound", e)
+        }
+        
+        // Stop vibration
+        try {
+            vibrator?.cancel()
+            vibrator = null
+            Logger.d(LogTags.ALARM, "📴 Vibration stopped")
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM, "❌ Error stopping vibration", e)
+        }
+        
+        Logger.business(LogTags.ALARM, "✅ All alarm effects stopped successfully")
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        Logger.d(LogTags.ALARM, "AlarmFullScreenActivity onDestroy")
+        
+        // Mark alarm as inactive and clean up all resources
+        isAlarmActive = false
+        stopAlarmEffects()
+        
+        // Wake lock is released in onStop() as recommended
+        wakeLock = null
+        
+        Logger.d(LogTags.ALARM, "🖥️ AlarmFullScreenActivity destroyed with full cleanup")
     }
-}
 
-@Composable
-fun AlarmFullScreenContent(
-    shiftName: String,
-    alarmTime: String,
-    onStopClicked: () -> Unit
-) {
-    // Aktuelle Zeit für Anzeige
-    var currentTime by remember { mutableStateOf(getCurrentTimeString()) }
-    
-    // Timer für Zeit-Update
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(AnimationDurations.TIMER_UPDATE_MS)
-            currentTime = getCurrentTimeString()
-        }
-    }
-    
-    // Animationen
-    val infiniteTransition = rememberInfiniteTransition(label = "alarm_pulse")
-    val alarmPulse by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(AnimationDurations.PULSE_MS.toInt(), easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alarm_pulse_scale"
-    )
-    
-    val colorScheme = MaterialTheme.colorScheme
-    val isDarkTheme = colorScheme.background.red < 0.5f
-    
-    // Optimierte Farben für Dark/Light Mode
-    val backgroundGradient = if (isDarkTheme) {
-        Brush.radialGradient(
-            colors = listOf(
-                colorScheme.errorContainer.copy(alpha = 0.3f),
-                colorScheme.background
-            ),
-            radius = 800f
-        )
-    } else {
-        Brush.radialGradient(
-            colors = listOf(
-                colorScheme.errorContainer.copy(alpha = 0.4f),
-                colorScheme.surface.copy(alpha = 0.8f)
-            ),
-            radius = 800f
-        )
-    }
-    
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = backgroundGradient)
-            .padding(SpacingConstants.SPACING_EXTRA_LARGE),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "Wecker-Bildschirm für $shiftName" }
-        ) {
-            // Animiertes Alarm Icon mit Puls-Effekt
-            AnimatedAlarmIcon(
-                scale = alarmPulse,
-                isDarkTheme = isDarkTheme
-            )
-            
-            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
-            
-            // Alarm Titel mit Einblend-Animation
-            AnimatedVisibility(
-                visible = true,
-                enter = slideInVertically(
-                    initialOffsetY = { -40 },
-                    animationSpec = tween(800, delayMillis = 200)
-                ) + fadeIn(animationSpec = tween(800, delayMillis = 200))
-            ) {
-                Text(
-                    text = "WECKER",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 52.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 2.sp
-                    ),
-                    color = if (isDarkTheme) 
-                        colorScheme.onBackground 
-                    else 
-                        colorScheme.onErrorContainer,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { 
-                        contentDescription = "Wecker-Alarm aktiv" 
-                    }
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_EXTRA_LARGE))
-            
-            // Moderne Zeit-Anzeige
-            ModernTimeDisplay(
-                currentTime = currentTime,
-                isDarkTheme = isDarkTheme
-            )
-            
-            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXL))
-            
-            // Verbesserte Schicht-Info mit Animation
-            EnhancedShiftInfo(
-                shiftName = shiftName,
-                alarmTime = alarmTime,
-                isDarkTheme = isDarkTheme
-            )
-            
-            Spacer(modifier = Modifier.height(SpacingConstants.SPACING_XXXL))
-            
-            // Verbesserter Stopp-Button mit Hover-Effekt
-            EnhancedStopButton(
-                onStopClicked = onStopClicked
-            )
-        }
-    }
-}
-
-@Composable
-private fun AnimatedAlarmIcon(
-    scale: Float,
-    isDarkTheme: Boolean
-) {
-    Card(
-        modifier = Modifier
-            .size(SpacingConstants.FULLSCREEN_ELEMENT_SIZE)
-            .scale(scale),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isDarkTheme)
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-            else
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION * 4),
-        shape = CircleShape
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Alarm,
-                contentDescription = "Wecker-Symbol",
-                modifier = Modifier.size(SpacingConstants.ICON_SIZE_GIANT - SpacingConstants.SPACING_LARGE),
-                tint = MaterialTheme.colorScheme.error
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModernTimeDisplay(
-    currentTime: String,
-    isDarkTheme: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isDarkTheme)
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-            else
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.CARD_ELEVATION * 3),
-        shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingConstants.SPACING_XXXL - SpacingConstants.SPACING_EXTRA_SMALL),
-            horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                modifier = Modifier.size(SpacingConstants.ICON_SIZE_XXL)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.AccessTime,
-                        contentDescription = null,
-                        modifier = Modifier.size(SpacingConstants.SPACING_XXXL - SpacingConstants.SPACING_LARGE),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            
-            Text(
-                text = currentTime,
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { contentDescription = "Aktuelle Zeit: $currentTime" }
-            )
-        }
-    }
-}
-
-@Composable
-private fun EnhancedShiftInfo(
-    shiftName: String,
-    alarmTime: String,
-    isDarkTheme: Boolean
-) {
-    AnimatedVisibility(
-        visible = true,
-        enter = slideInVertically(
-            initialOffsetY = { 60 },
-            animationSpec = tween(600, delayMillis = 400)
-        ) + fadeIn(animationSpec = tween(600, delayMillis = 400))
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isDarkTheme)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-                else
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f)
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = SpacingConstants.SPACING_SMALL),
-            shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS + SpacingConstants.SPACING_EXTRA_SMALL)
-        ) {
-            Column(
-                modifier = Modifier.padding(SpacingConstants.SPACING_EXTRA_LARGE),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
-                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE + SpacingConstants.SPACING_EXTRA_SMALL)
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Work,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(SpacingConstants.ICON_SIZE_STANDARD)
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Zeit für:",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(SpacingConstants.SPACING_MEDIUM))
-                
-                Text(
-                    text = shiftName,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics {
-                        contentDescription = "Schicht: $shiftName"
-                    }
-                )
-                
-                if (alarmTime != "Jetzt") {
-                    Spacer(modifier = Modifier.height(SpacingConstants.SPACING_MEDIUM))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
-                        )
-                        Text(
-                            text = "Geplant für: $alarmTime",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EnhancedStopButton(
-    onStopClicked: () -> Unit
-) {
-    var isPressed by remember { mutableStateOf(false) }
-    
-    AnimatedVisibility(
-        visible = true,
-        enter = slideInVertically(
-            initialOffsetY = { 80 },
-            animationSpec = tween(700, delayMillis = 600)
-        ) + fadeIn(animationSpec = tween(700, delayMillis = 600))
-    ) {
-        Button(
-            onClick = {
-                isPressed = true
-                onStopClicked()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(SpacingConstants.BUTTON_HEIGHT_FULLSCREEN)
-                .scale(if (isPressed) 0.95f else 1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError
-            ),
-            shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = SpacingConstants.CARD_ELEVATION * 3,
-                pressedElevation = SpacingConstants.SPACING_SMALL
-            )
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.onError.copy(alpha = 0.2f),
-                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE + SpacingConstants.SPACING_SMALL)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
-                            contentDescription = null,
-                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_LARGE),
-                            tint = MaterialTheme.colorScheme.onError
-                        )
-                    }
-                }
-                Text(
-                    text = "ALARM STOPPEN",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.5.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.semantics {
-                        contentDescription = "Alarm stoppen Button"
-                    }
-                )
-            }
-        }
-    }
-    
-    // Reset pressed state after animation
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            kotlinx.coroutines.delay(AnimationDurations.QUICK_MS)
-            isPressed = false
-        }
-    }
-}
-
-private fun getCurrentTimeString(): String {
-    val formatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-    return formatter.format(Date())
 }

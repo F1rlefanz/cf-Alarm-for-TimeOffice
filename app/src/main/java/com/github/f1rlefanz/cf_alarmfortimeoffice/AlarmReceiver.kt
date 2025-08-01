@@ -1,5 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice
 
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -7,422 +8,224 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.MediaPlayer
 import android.media.RingtoneManager
-import android.net.Uri
-import android.os.*
+import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.*
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmVerificationManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
-// UIConstants import removed - using direct constants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueRepositoryFactory
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase
-import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
 
+/**
+ * Enhanced BroadcastReceiver for alarms with Android 14+ compatibility.
+ * 
+ * Features:
+ * - Android 14+ Full-Screen Intent APIs with ActivityOptions
+ * - Enhanced notification reliability for all Android versions
+ * - Optimized wake lock management
+ * - Comprehensive error handling and logging
+ * 
+ * Based on the working backup implementation but modernized for 2025.
+ */
 class AlarmReceiver : BroadcastReceiver() {
-
+    
     companion object {
-        private const val ALARM_CHANNEL_ID = "CF_ALARM_CHANNEL"
-        private const val ALARM_CHANNEL_NAME = "CF-Alarm Wecker"
-        private const val ALARM_NOTIFICATION_ID = 1001
+        const val EXTRA_SHIFT_NAME = "shift_name"
+        const val EXTRA_SHIFT_TIME = "shift_time"
+        const val EXTRA_ALARM_ID = "alarm_id"
         
-        // VIBRATION PATTERN: Pattern for alarm vibration (on, off, on, off, ...)
-        private val ALARM_VIBRATION_PATTERN = longArrayOf(0, 1000, 500, 1000, 500, 1000)
-        
-        // Static references für Alarm-Medien (um sie stoppen zu können)
-        private var mediaPlayer: MediaPlayer? = null
-        private var vibrator: Vibrator? = null
-        private var vibratorManager: VibratorManager? = null
-        
-        fun stopAlarmMedia() {
-            Logger.d(LogTags.ALARM, "Stopping alarm media")
-            try {
-                mediaPlayer?.let {
-                    if (it.isPlaying) {
-                        it.stop()
-                    }
-                    it.release()
-                    mediaPlayer = null
-                }
-            } catch (e: Exception) {
-                Logger.e(LogTags.ALARM, "Error stopping MediaPlayer", e)
-            }
-            
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    vibratorManager?.cancel()
-                    vibratorManager = null
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator?.cancel()
-                    vibrator = null
-                }
-            } catch (e: Exception) {
-                Logger.e(LogTags.ALARM, "Error stopping vibration", e)
-            }
-        }
-    }
-
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (context == null) {
-            Logger.e(LogTags.ALARM_RECEIVER, "AlarmReceiver: Context is null")
-            return
-        }
-        
-        Logger.business(LogTags.ALARM_RECEIVER, "🚨 ALARM RECEIVED! 🚨")
-        
-        // Stoppe vorherige Alarm-Medien falls vorhanden
-        stopAlarmMedia()
-        
-        // Hole Schicht-Info aus Intent (falls verfügbar)
-        val shiftName = intent?.getStringExtra("shift_name") ?: "Unbekannte Schicht"
-        val alarmTime = intent?.getStringExtra("alarm_time") ?: "Jetzt"
-        val shiftPattern = intent?.getStringExtra("shift_pattern")
-        val shiftStartTime = intent?.getStringExtra("shift_start_time") 
-        val shiftEndTime = intent?.getStringExtra("shift_end_time")
-        
-        Logger.business(LogTags.ALARM_RECEIVER, "Alarm for shift", "$shiftName at $alarmTime")
-        
-        // **NEUE HUE-INTEGRATION:** Führe Hue-Regeln aus
-        executeHueRules(context, shiftPattern, shiftStartTime, shiftEndTime, alarmTime)
-        
-        // Starte Vibration
-        startVibration(context)
-        
-        // Starte Alarmton
-        startAlarmSound(context)
-        
-        // Zeige Vollbild-Activity
-        showFullScreenAlarm(context, shiftName, alarmTime)
-        
-        // Zeige Notification
-        showAlarmNotification(context, shiftName, alarmTime)
+        private const val CHANNEL_ID = "shift_alarm_channel"
+        private const val NOTIFICATION_ID = 2001
+        private const val WAKE_LOCK_TAG = "CFAlarm:WakeLock"
+        private const val WAKE_LOCK_TIMEOUT = 60000L // 1 Minute
     }
     
-    /**
-     * Führt Hue-Regeln basierend auf Schichtinformationen aus
-     * 
-     * Integration der Philips Hue Automation in den Alarm-Workflow.
-     * Sucht nach passenden Regeln und führt entsprechende Lichtaktionen aus.
-     * 
-     * @param context Android Context
-     * @param shiftPattern Schichtmuster (z.B. "Early", "Late", "S1", "S2")
-     * @param shiftStartTime Schichtbeginn (ISO 8601 Format)
-     * @param shiftEndTime Schichtende (ISO 8601 Format) 
-     * @param alarmTime Alarm-Zeit
-     */
-    private fun executeHueRules(
-        context: Context,
-        shiftPattern: String?,
-        shiftStartTime: String?,
-        shiftEndTime: String?,
-        alarmTime: String
-    ) {
-        // Hue-Integration nur ausführen wenn Schichtinformationen verfügbar
-        if (shiftPattern.isNullOrBlank()) {
-            Logger.d(LogTags.HUE_INTEGRATION, "No shift pattern available - skipping Hue integration")
-            return
+    override fun onReceive(context: Context, intent: Intent) {
+        Logger.business(LogTags.ALARM_RECEIVER, "📱 ALARM TRIGGERED! Shift: ${intent.getStringExtra(EXTRA_SHIFT_NAME)}")
+        
+        // Wake Lock to ensure device wakes up
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            WAKE_LOCK_TAG
+        ).apply {
+            acquire(WAKE_LOCK_TIMEOUT)
         }
         
-        Logger.i(LogTags.HUE_INTEGRATION, "🎨 Starting Hue integration for shift: $shiftPattern at $alarmTime")
-        
-        // Async Hue-Operation um AlarmReceiver nicht zu blockieren
-        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            try {
-                // Erstelle Repositories mit Factory Pattern (Clean Architecture)
-                val hueBridgeRepository = HueRepositoryFactory.createHueBridgeRepository(context)
-                val hueConfigRepository = HueRepositoryFactory.createHueConfigRepository(context)
-                val hueLightRepository = HueRepositoryFactory.createHueLightRepository(hueBridgeRepository)
-                
-                // Erstelle HueLightUseCase (Bridge zwischen Repository und RuleUseCase)
-                val hueLightUseCase = com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueLightUseCase(
-                    lightRepository = hueLightRepository
-                )
-                
-                // Erstelle HueRuleUseCase mit korrekten Dependencies
-                val hueRuleUseCase = HueRuleUseCase(
-                    configRepository = hueConfigRepository,
-                    lightUseCase = hueLightUseCase
-                )
-                
-                // Erstelle ShiftMatch für Rule-Matching
-                val shiftMatch = createShiftMatchFromAlarm(
-                    shiftPattern = shiftPattern,
-                    shiftStartTime = shiftStartTime,
-                    shiftEndTime = shiftEndTime,
-                    alarmTime = alarmTime
-                )
-                
-                // Führe passende Hue-Regeln aus
-                hueRuleUseCase.executeMatchingRules(shiftMatch)
-                
-                Logger.i(LogTags.HUE_INTEGRATION, "✅ Hue integration completed successfully")
-                
-            } catch (e: Exception) {
-                Logger.e(LogTags.HUE_INTEGRATION, "❌ Error during Hue integration", e)
-                // Hue-Fehler sollen den Alarm nicht beeinträchtigen
-            }
-        }
-    }
-    
-    /**
-     * Erstellt ShiftMatch-Objekt aus Alarm-Informationen
-     * 
-     * @param shiftPattern Schichtmuster
-     * @param shiftStartTime Schichtbeginn (kann null sein)
-     * @param shiftEndTime Schichtende (kann null sein)
-     * @param alarmTime Alarm-Zeit (für Logging und Debugging)
-     * @return ShiftMatch für Rule-Evaluation
-     */
-    private fun createShiftMatchFromAlarm(
-        shiftPattern: String,
-        shiftStartTime: String?,
-        shiftEndTime: String?,
-        alarmTime: String
-    ): ShiftMatch {
-        return try {
-            Logger.d(LogTags.HUE_INTEGRATION, "Creating ShiftMatch for pattern: $shiftPattern at $alarmTime")
-            // Parse Zeitstempel falls verfügbar
-            val startTime = shiftStartTime?.let { 
-                java.time.LocalDateTime.parse(it) 
-            } ?: java.time.LocalDateTime.now()
-            
-            val endTime = shiftEndTime?.let { 
-                java.time.LocalDateTime.parse(it) 
-            } ?: java.time.LocalDateTime.now().plusHours(8)
-            
-            // Erstelle ShiftDefinition für das Pattern
-            val shiftDefinition = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
-                id = "alarm_shift_$shiftPattern",
-                name = "$shiftPattern Schicht",
-                keywords = listOf(shiftPattern.lowercase()),
-                alarmTime = java.time.LocalTime.now(), // Alarm ist jetzt
-                isEnabled = true
-            )
-            
-            // Erstelle CalendarEvent für das Shift
-            val calendarEvent = com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent(
-                id = "alarm_event_${System.currentTimeMillis()}",
-                title = "$shiftPattern Schicht",
-                startTime = startTime,
-                endTime = endTime,
-                calendarId = "alarm_calendar",
-                isAllDay = false
-            )
-            
-            // Erstelle ShiftMatch mit allen erforderlichen Parametern
-            ShiftMatch(
-                shiftDefinition = shiftDefinition,
-                calendarEvent = calendarEvent,
-                calculatedAlarmTime = java.time.LocalDateTime.now() // Alarm ist jetzt
-            )
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.HUE_INTEGRATION, "Error creating ShiftMatch from alarm data", e)
-            
-            // Fallback ShiftMatch
-            val fallbackDefinition = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition(
-                id = "alarm_fallback",
-                name = "Fallback Schicht",
-                keywords = listOf("fallback"),
-                alarmTime = java.time.LocalTime.now(),
-                isEnabled = true
-            )
-            
-            val fallbackEvent = com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent(
-                id = "alarm_fallback_event",
-                title = "$shiftPattern Schicht",
-                startTime = java.time.LocalDateTime.now(),
-                endTime = java.time.LocalDateTime.now().plusHours(8),
-                calendarId = "alarm_calendar",
-                isAllDay = false
-            )
-            
-            ShiftMatch(
-                shiftDefinition = fallbackDefinition,
-                calendarEvent = fallbackEvent,
-                calculatedAlarmTime = java.time.LocalDateTime.now()
-            )
-        }
-    }
-    
-    private fun startVibration(context: Context) {
         try {
-            val vibrationPattern = ALARM_VIBRATION_PATTERN
+            val shiftName = intent.getStringExtra(EXTRA_SHIFT_NAME) ?: "Schicht"
+            val shiftTime = intent.getStringExtra(EXTRA_SHIFT_TIME) ?: ""
+            val alarmId = intent.getIntExtra(EXTRA_ALARM_ID, -1)
             
-            when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                    // Android 12+ (API 31+): Use VibratorManager
-                    vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager?
-                    vibratorManager?.defaultVibrator?.let { defaultVibrator ->
-                        if (defaultVibrator.hasVibrator()) {
-                            val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
-                            vibratorManager?.vibrate(CombinedVibration.createParallel(vibrationEffect))
-                            Logger.d(LogTags.ALARM, "Vibration started (VibratorManager)")
-                        }
-                    }
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
-                    // Android 8.0+ (API 26-30): Use VibrationEffect with Vibrator
-                    vibrator =
-                        context.getSystemService(Vibrator::class.java)
-                    vibrator?.let { vib ->
-                        if (vib.hasVibrator()) {
-                            val vibrationEffect = VibrationEffect.createWaveform(vibrationPattern, 1)
-                            vib.vibrate(vibrationEffect)
-                            Logger.d(LogTags.ALARM, "Vibration started (VibrationEffect)")
-                        }
-                    }
-                }
-                else -> {
-                    // Android 7.1 and below (API 24-25): Use legacy vibrate method
-                    vibrator =
-                        context.getSystemService(Vibrator::class.java)
-                    vibrator?.let { vib ->
-                        if (vib.hasVibrator()) {
-                            @Suppress("DEPRECATION")
-                            vib.vibrate(vibrationPattern, 1) // Repeat from index 1
-                            Logger.d(LogTags.ALARM, "Vibration started (Legacy)")
-                        }
-                    }
-                }
-            }
+            // 🚀 PHASE 3: Start alarm verification monitoring
+            val verificationManager = AlarmVerificationManager(context)
+            verificationManager.startAlarmVerification(
+                alarmId = alarmId,
+                shiftName = shiftName,
+                alarmTime = shiftTime
+            )
+            
+            // Create notification channel (only needed once)
+            createNotificationChannel(context)
+            
+            // Show alarm notification with sound
+            showAlarmNotification(context, shiftName, shiftTime, alarmId)
+            
+            // Start full-screen alarm activity
+            showFullScreenAlarm(context, shiftName, shiftTime, alarmId)
+            
+            Logger.business(LogTags.ALARM_RECEIVER, "✅ Alarm $alarmId for $shiftName triggered successfully with verification")
+            
         } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "Error starting vibration", e)
+            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error handling alarm", e)
+        } finally {
+            // Release wake lock
+            if (wakeLock.isHeld) {
+                wakeLock.release()
+            }
         }
     }
     
-    private fun startAlarmSound(context: Context) {
-        try {
-            // Nutze Standard-Alarmton oder fallback zu Notification
-            var alarmUri: Uri? = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+    private fun createNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Schicht-Wecker",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Benachrichtigungen für Schicht-Alarme"
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+                setBypassDnd(true) // Bypass "Do Not Disturb" mode
             }
             
-            if (alarmUri != null) {
-                mediaPlayer = MediaPlayer().apply {
-                    setDataSource(context, alarmUri)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    isLooping = true
-                    
-                    setOnPreparedListener { mp ->
-                        Logger.d(LogTags.ALARM, "MediaPlayer prepared, starting playback")
-                        try {
-                            mp.start()
-                        } catch (e: Exception) {
-                            Logger.e(LogTags.ALARM, "Error starting playback", e)
-                        }
-                    }
-                    
-                    setOnErrorListener { _, what, extra ->
-                        Logger.e(LogTags.ALARM, "MediaPlayer error: what=$what, extra=$extra")
-                        stopAlarmMedia()
-                        true
-                    }
-                    
-                    prepareAsync()
-                }
-                Logger.d(LogTags.ALARM, "Alarm sound being prepared")
-            } else {
-                Logger.e(LogTags.ALARM, "No alarm sound available")
-            }
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "Error starting alarm sound", e)
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Logger.d(LogTags.ALARM_RECEIVER, "✅ Notification channel created")
         }
     }
     
-    private fun showFullScreenAlarm(context: Context, shiftName: String, alarmTime: String) {
-        try {
-            val fullScreenIntent = Intent(context, AlarmFullScreenActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("shift_name", shiftName)
-                putExtra("alarm_time", alarmTime)
-                setPackage(context.packageName)
-            }
-            context.startActivity(fullScreenIntent)
-            Logger.d(LogTags.ALARM, "Full-screen alarm activity started")
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "Error starting full-screen activity", e)
-        }
-    }
-    
-    private fun showAlarmNotification(context: Context, shiftName: String, alarmTime: String) {
+    private fun showAlarmNotification(context: Context, shiftName: String, shiftTime: String, alarmId: Int) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
-            // Erstelle Channel falls nötig
-            createAlarmNotificationChannel(notificationManager)
-            
-            // Stoppt-Intent für Notification-Action
-            val stopIntent = Intent(context, com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmStopService::class.java).apply {
-                setPackage(context.packageName)
-            }
-            val stopPendingIntent = PendingIntent.getService(
-                context, 0, stopIntent, 
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            
-            // Vollbild-Intent für Tap auf Notification
+            // Intent to open the full-screen activity
             val fullScreenIntent = Intent(context, AlarmFullScreenActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("shift_name", shiftName)
-                putExtra("alarm_time", alarmTime)
-                setPackage(context.packageName)
+                putExtra("alarm_time", shiftTime)
+                putExtra("alarm_id", alarmId)
+                putExtra("triggered_via", "full_screen_notification") // Track trigger source
             }
-            val fullScreenPendingIntent = PendingIntent.getActivity(
-                context, 0, fullScreenIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             
-            val notification = NotificationCompat.Builder(context, ALARM_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // Standard alarm icon
-                .setContentTitle("⏰ CF-Alarm: $shiftName")
-                .setContentText("Zeit aufzustehen! Schicht um $alarmTime")
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setSilent(true) // Wir spielen eigenen Sound
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-                .setContentIntent(fullScreenPendingIntent)
-                .addAction(
-                    android.R.drawable.ic_media_pause,
-                    "Stopp",
-                    stopPendingIntent
+            // 🚀 ANDROID 14+ ENHANCEMENT: Modern Full-Screen Intent with ActivityOptions
+            val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+ (API 34+): Use ActivityOptions for enhanced reliability
+                val activityOptions = ActivityOptions.makeBasic().apply {
+                    setPendingIntentCreatorBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    )
+                }
+                
+                PendingIntent.getActivity(
+                    context,
+                    alarmId,
+                    fullScreenIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    activityOptions.toBundle()
                 )
+            } else {
+                // Pre-Android 14: Traditional approach
+                PendingIntent.getActivity(
+                    context,
+                    alarmId,
+                    fullScreenIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            
+            // Enhanced alarm sound configuration
+            val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            
+            // 📱 ENHANCED NOTIFICATION: Maximum priority and visibility for alarm reliability
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("⏰ Zeit für $shiftName!")
+                .setContentText("Deine Schicht beginnt um $shiftTime")
+                .setPriority(NotificationCompat.PRIORITY_MAX) // Highest priority
+                .setCategory(NotificationCompat.CATEGORY_ALARM) // Alarm category for system recognition
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setSound(alarmSound)
+                .setVibrate(longArrayOf(0, 1000, 500, 1000, 500, 1000))
+                .setFullScreenIntent(pendingIntent, true) // 🔥 CRITICAL: Full-screen notification
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show on lock screen
+                .setOngoing(true) // Can't be dismissed by swiping
+                .setDefaults(NotificationCompat.DEFAULT_ALL) // Use all system defaults
+                .setTimeoutAfter(5 * 60 * 1000) // Auto-dismiss after 5 minutes
                 .build()
             
-            notificationManager.notify(ALARM_NOTIFICATION_ID, notification)
-            Logger.d(LogTags.ALARM, "Alarm notification displayed")
+            notificationManager.notify(NOTIFICATION_ID, notification)
+            Logger.business(LogTags.ALARM_RECEIVER, "✅ Enhanced alarm notification displayed with Android ${Build.VERSION.SDK_INT} compatibility")
             
         } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "Error showing notification", e)
+            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error showing notification", e)
+            // Fallback: Try to start activity directly if notification fails
+            showFullScreenAlarm(context, shiftName, shiftTime, alarmId)
         }
     }
     
-    private fun createAlarmNotificationChannel(notificationManager: NotificationManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (notificationManager.getNotificationChannel(ALARM_CHANNEL_ID) == null) {
-                val channel = NotificationChannel(
-                    ALARM_CHANNEL_ID,
-                    ALARM_CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Benachrichtigungen für CF-Alarm Wecker"
-                    setSound(null, null) // Kein Standard-Sound
-                    enableVibration(false) // Keine Standard-Vibration
-                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
-                    setBypassDnd(true) // Umgeht "Nicht stören" Modus
+    private fun showFullScreenAlarm(context: Context, shiftName: String, shiftTime: String, alarmId: Int) {
+        try {
+            val fullScreenIntent = Intent(context, AlarmFullScreenActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                        Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION or
+                        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS // Exclude from recent apps
+                putExtra("shift_name", shiftName)
+                putExtra("alarm_time", shiftTime)
+                putExtra("alarm_id", alarmId)
+                putExtra("triggered_via", "direct_activity_start") // Track trigger source
+                setPackage(context.packageName)
+            }
+            
+            // 🚀 ENHANCED: Try to start activity with modern approach
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+: Enhanced activity start options
+                val activityOptions = ActivityOptions.makeBasic().apply {
+                    // These options improve reliability on Android 14+
+                    setPendingIntentCreatorBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    )
                 }
-                notificationManager.createNotificationChannel(channel)
-                Logger.d(LogTags.ALARM, "Alarm NotificationChannel created")
+                context.startActivity(fullScreenIntent, activityOptions.toBundle())
+                Logger.business(LogTags.ALARM_RECEIVER, "✅ Full-screen alarm activity started with Android 14+ enhancements")
+            } else {
+                // Pre-Android 14: Traditional approach
+                context.startActivity(fullScreenIntent)
+                Logger.business(LogTags.ALARM_RECEIVER, "✅ Full-screen alarm activity started (legacy mode)")
+            }
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error starting full-screen activity", e)
+            // Critical fallback: If Activity fails, at least ensure notification sound
+            try {
+                val ringtone = RingtoneManager.getRingtone(
+                    context, 
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                )
+                ringtone?.play()
+                Logger.w(LogTags.ALARM_RECEIVER, "⚠️ Fallback: Playing alarm sound directly")
+            } catch (fallbackError: Exception) {
+                Logger.e(LogTags.ALARM_RECEIVER, "❌ Even fallback sound failed", fallbackError)
             }
         }
     }

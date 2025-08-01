@@ -101,7 +101,19 @@ class TokenRefreshUseCase(
                     // Clear cache on failure
                     lastTokenValidation = null
                     lastValidationTime = 0L
-                    Logger.w(LogTags.TOKEN, "OAuth2 token failed, falling back to legacy auth", error)
+                    
+                    // Better error handling based on error type
+                    when (error) {
+                        is com.github.f1rlefanz.cf_alarmfortimeoffice.auth.TokenException.NoTokenAvailable -> {
+                            Logger.d(LogTags.TOKEN, "⚡ AUTH-FLOW: No Calendar token - user needs to authorize Calendar access")
+                        }
+                        is com.github.f1rlefanz.cf_alarmfortimeoffice.auth.TokenException.AuthorizationExpired -> {
+                            Logger.d(LogTags.TOKEN, "⚡ AUTH-FLOW: Calendar authorization expired - re-authorization needed")
+                        }
+                        else -> {
+                            Logger.w(LogTags.TOKEN, "⚡ AUTH-FLOW: Calendar token validation failed: ${error.message}")
+                        }
+                    }
                 }
                 
                 result

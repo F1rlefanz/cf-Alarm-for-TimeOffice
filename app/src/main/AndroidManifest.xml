@@ -11,9 +11,13 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     
-    <!-- Alarm & Wake permissions - Optimal Strategy -->
+    <!-- Alarm & Wake permissions - Enhanced Strategy -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Enhanced Audio permissions -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     
     <!-- Notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -27,6 +31,12 @@
     
     <!-- For API 33+ (Android 13+) - The Optimal Way -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    
+    <!-- Boot permission for alarm restoration -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
+    <!-- Enhanced doze mode exemption -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".CFAlarmApplication"
@@ -52,7 +62,7 @@
             </intent-filter>
         </activity>
         
-        <!-- AlarmFullScreenActivity - Shows when alarm goes off -->
+        <!-- Enhanced AlarmFullScreenActivity - Shows when alarm goes off -->
         <activity
             android:name=".AlarmFullScreenActivity"
             android:exported="false"
@@ -61,17 +71,45 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.CFAlarmForTimeOffice"
             android:showWhenLocked="true"
-            android:turnScreenOn="true" />
+            android:turnScreenOn="true"
+            android:directBootAware="true" />
+        
+        <!-- 🚀 PHASE 2: OnePlus Interactive Setup Activity -->
+        <activity
+            android:name=".ui.oneplus.OnePlusSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.CFAlarmForTimeOffice.OnePlusSetup"
+            android:screenOrientation="portrait"
+            android:label="OnePlus Alarm-Optimierung" />
         
         <!-- AlarmReceiver - Handles alarm events -->
         <receiver
             android:name=".AlarmReceiver"
             android:exported="false" />
             
+        <!-- BootReceiver - Restores alarms after device reboot -->
+        <receiver
+            android:name=".alarm.receiver.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+            
         <!-- AlarmStopService - Stops alarm when user dismisses -->
         <service
             android:name=".service.AlarmStopService"
             android:exported="false" />
+        
+        <!-- 🚀 PHASE 3: Hybrid Alarm Fallback Service -->
+        <service
+            android:name=".service.AlarmFallbackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"
+            android:description="@string/fallback_service_description" />
         
         <!-- FileProvider for log file sharing -->
         <provider

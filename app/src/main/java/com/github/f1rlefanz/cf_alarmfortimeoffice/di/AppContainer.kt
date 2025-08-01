@@ -140,8 +140,33 @@ class AppContainer(private val context: Context) {
     // ==============================
     // SERVICES & ENGINES
     // ==============================
+    
+    val wakeLockManager by lazy {
+        com.github.f1rlefanz.cf_alarmfortimeoffice.service.WakeLockManager(context)
+    }
+    
+    val batteryOptimizationManager by lazy {
+        com.github.f1rlefanz.cf_alarmfortimeoffice.service.BatteryOptimizationManager(context)
+    }
+    
+    // OnePlus Configuration Checker - für proaktive Konfigurationsüberwachung
+    val onePlusConfigurationChecker by lazy {
+        com.github.f1rlefanz.cf_alarmfortimeoffice.service.OnePlusConfigurationChecker(
+            context = context,
+            batteryOptimizationManager = batteryOptimizationManager
+        )
+    }
+    
+    val alarmAudioManager by lazy {
+        com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmAudioManager(context, wakeLockManager)
+    }
+    
     val alarmManagerService: AlarmManagerService by lazy {
-        AlarmManagerService(context.applicationContext as android.app.Application)
+        AlarmManagerService(
+            application = context.applicationContext as android.app.Application,
+            batteryOptimizationManager = batteryOptimizationManager,
+            wakeLockManager = wakeLockManager
+        )
     }
     
     val shiftRecognitionEngine: ShiftRecognitionEngine by lazy {

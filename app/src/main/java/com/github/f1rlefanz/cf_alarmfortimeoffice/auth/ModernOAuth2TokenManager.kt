@@ -41,7 +41,7 @@ class ModernOAuth2TokenManager(
                 currentToken == null -> {
                     Logger.w(LogTags.TOKEN, "❌ TOKEN-DIAGNOSTIC: No Calendar token available - authorization required")
                     Logger.d(LogTags.TOKEN, "💡 TOKEN-DIAGNOSTIC: User needs to complete Calendar authorization flow")
-                    Result.failure(Exception("No Calendar API authorization - please authorize Calendar access"))
+                    Result.failure(TokenException.NoTokenAvailable("No Calendar API authorization - please authorize Calendar access"))
                 }
                 
                 currentToken.isValid() -> {
@@ -57,7 +57,7 @@ class ModernOAuth2TokenManager(
                 else -> {
                     Logger.w(LogTags.TOKEN, "❌ TOKEN-DIAGNOSTIC: Calendar token expired and cannot be refreshed - re-authorization required")
                     Logger.d(LogTags.TOKEN, "💡 TOKEN-DIAGNOSTIC: User needs to re-authorize Calendar access")
-                    Result.failure(Exception("Calendar authorization expired - re-authorization required"))
+                    Result.failure(TokenException.AuthorizationExpired("Calendar authorization expired - re-authorization required"))
                 }
             }
         } catch (e: Exception) {
@@ -297,6 +297,16 @@ class ModernOAuth2TokenManager(
             AuthorizationStatus.Error(e)
         }
     }
+}
+
+/**
+ * Specific token-related exceptions for better error handling
+ */
+sealed class TokenException(message: String) : Exception(message) {
+    class NoTokenAvailable(message: String) : TokenException(message)
+    class AuthorizationExpired(message: String) : TokenException(message)
+    class RefreshFailed(message: String) : TokenException(message)
+    class NetworkError(message: String) : TokenException(message)
 }
 
 /**

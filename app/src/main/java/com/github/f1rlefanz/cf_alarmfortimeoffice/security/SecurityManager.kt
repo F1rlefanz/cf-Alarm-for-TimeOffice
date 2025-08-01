@@ -209,6 +209,7 @@ class SecurityManager(private val context: Context) {
     
     /**
      * Calculates overall security level based on all validations
+     * IMPROVED: Build-type aware security assessment
      */
     private fun calculateOverallSecurityLevel(
         runtime: RuntimeSecurityValidation,
@@ -217,30 +218,70 @@ class SecurityManager(private val context: Context) {
         encryption: EncryptionValidation,
         network: NetworkSecurityValidation
     ): OverallSecurityLevel {
-        val criticalIssues = listOf(
-            !integrity.isIntact,
-            root.riskLevel == RiskLevel.HIGH,
-            !encryption.isAvailable
-        ).count { it }
+        // PRODUCTION-OPTIMIZED: Different criteria for debug vs release builds
+        val isDebugBuild = com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig.DEBUG
         
-        val mediumIssues = listOf(
-            runtime.issues.isNotEmpty(),
-            root.riskLevel == RiskLevel.MEDIUM,
-            !network.isSecure
-        ).count { it }
+        val criticalIssues = mutableListOf<String>()
+        val mediumIssues = mutableListOf<String>()
+        
+        // Critical issues (always apply)
+        if (!integrity.isIntact && !isDebugBuild) {
+            criticalIssues.add("App integrity compromised")
+        }
+        
+        if (root.riskLevel == RiskLevel.HIGH) {
+            criticalIssues.add("High-risk root detection")
+        }
+        
+        if (!encryption.isAvailable) {
+            criticalIssues.add("Encryption not available")
+        }
+        
+        // Medium issues (debug-aware)
+        if (runtime.issues.isNotEmpty()) {
+            if (isDebugBuild) {
+                // Debug builds: Only real runtime issues matter
+                val realIssues = runtime.issues.filter { 
+                    it != RuntimeSecurityIssue.EMULATOR_DETECTED 
+                }
+                if (realIssues.isNotEmpty()) {
+                    mediumIssues.add("Runtime security concerns")
+                }
+            } else {
+                mediumIssues.add("Runtime security concerns")
+            }
+        }
+        
+        if (root.riskLevel == RiskLevel.MEDIUM) {
+            mediumIssues.add("Medium-risk root detection")
+        }
+        
+        if (!network.isSecure) {
+            mediumIssues.add("Network security concerns")
+        }
         
         return when {
-            criticalIssues > 0 -> OverallSecurityLevel.HIGH_RISK
-            mediumIssues > 1 -> OverallSecurityLevel.MEDIUM_RISK
-            mediumIssues == 1 -> OverallSecurityLevel.LOW_RISK
+            criticalIssues.isNotEmpty() -> {
+                if (isDebugBuild && criticalIssues.all { it.contains("integrity") }) {
+                    // Debug builds with only integrity issues are medium risk
+                    OverallSecurityLevel.MEDIUM_RISK
+                } else {
+                    OverallSecurityLevel.HIGH_RISK
+                }
+            }
+            mediumIssues.size > 1 -> OverallSecurityLevel.MEDIUM_RISK
+            mediumIssues.size == 1 -> OverallSecurityLevel.LOW_RISK
             else -> OverallSecurityLevel.SECURE
         }
     }
     
     /**
      * Logs comprehensive security assessment results
+     * IMPROVED: Build-type aware logging
      */
     private fun logSecurityAssessment(assessment: SecurityAssessment) {
+        val isDebugBuild = com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig.DEBUG
+        
         Logger.business(LogTags.SECURITY, "🏁 SECURITY-ASSESSMENT: Completed in ${assessment.assessmentTimeMs}ms")
         Logger.business(LogTags.SECURITY, "📊 OVERALL-SECURITY: ${assessment.overallSecurityLevel}")
         
@@ -252,14 +293,22 @@ class SecurityManager(private val context: Context) {
                 Logger.w(LogTags.SECURITY, "⚠️  SECURITY-STATUS: Minor security concerns detected")
             }
             OverallSecurityLevel.MEDIUM_RISK -> {
-                Logger.w(LogTags.SECURITY, "⚠️  SECURITY-STATUS: Moderate security risks detected")
+                if (isDebugBuild) {
+                    Logger.d(LogTags.SECURITY, "🔧 SECURITY-STATUS: Development build - moderate security level expected")
+                } else {
+                    Logger.w(LogTags.SECURITY, "⚠️  SECURITY-STATUS: Moderate security risks detected")
+                }
             }
             OverallSecurityLevel.HIGH_RISK -> {
-                Logger.e(LogTags.SECURITY, "🚨 SECURITY-STATUS: HIGH RISK - Critical security issues detected")
+                if (isDebugBuild) {
+                    Logger.w(LogTags.SECURITY, "🔧 SECURITY-STATUS: Development build - high risk expected for debug/emulator")
+                } else {
+                    Logger.e(LogTags.SECURITY, "🚨 SECURITY-STATUS: HIGH RISK - Critical security issues detected")
+                }
             }
         }
         
-        // Log specific findings
+        // Log specific findings with context
         if (assessment.rootDetection.isRooted) {
             Logger.w(LogTags.SECURITY, "🔓 ROOT-STATUS: Device is rooted (${assessment.rootDetection.riskLevel})")
         }
@@ -269,8 +318,14 @@ class SecurityManager(private val context: Context) {
         }
         
         if (!assessment.appIntegrity.isIntact) {
-            Logger.e(LogTags.SECURITY, "📦 INTEGRITY-STATUS: App integrity compromised")
+            if (isDebugBuild) {
+                Logger.d(LogTags.SECURITY, "🔧 INTEGRITY-STATUS: Debug build - app integrity check expected to show issues")
+            } else {
+                Logger.e(LogTags.SECURITY, "📦 INTEGRITY-STATUS: App integrity compromised")
+            }
         }
+        
+        Logger.business(LogTags.SECURITY, "📋 SECURITY-SUMMARY: Overall Level = ${assessment.overallSecurityLevel}")
     }
     
     // Helper methods

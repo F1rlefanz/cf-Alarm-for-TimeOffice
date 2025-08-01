@@ -19,12 +19,9 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
 import java.time.LocalTime
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -48,18 +45,20 @@ class AlarmUseCase(
 ) : IAlarmUseCase {
     
     /**
-     * PERFORMANCE OPTIMIZATION: Optimized active alarms flow with reduced polling
+     * REACTIVE OPTIMIZATION: Direct repository StateFlow for immediate UI updates
+     * 
+     * FIXED: Replaced polling-based Flow with reactive StateFlow from repository
+     * ✅ Eliminates 10-second delay for UI updates
+     * ✅ Provides immediate reactivity when alarms change
+     * ✅ Better performance (no unnecessary polling)
+     * ✅ Follows reactive programming principles
      */
-    override val activeAlarms: Flow<List<AlarmInfo>> = flow {
-        while (currentCoroutineContext().isActive) {
-            val alarms = alarmRepository.getAllAlarms().getOrNull() ?: emptyList()
-            emit(alarms)
-            delay(10000) // PERFORMANCE: Reduced polling from 5s to 10s for better performance
-        }
-    }.distinctUntilChanged { old, new -> 
-        // PERFORMANCE: Only emit when alarm list actually changes
-        old.size == new.size && old.zip(new).all { (a, b) -> a.id == b.id && a.triggerTime == b.triggerTime }
-    }
+    override val activeAlarms: Flow<List<AlarmInfo>> = 
+        alarmRepository.activeAlarms
+            .distinctUntilChanged { old, new -> 
+                // PERFORMANCE: Only emit when alarm list actually changes
+                old.size == new.size && old.zip(new).all { (a, b) -> a.id == b.id && a.triggerTime == b.triggerTime }
+            }
     
     /**
      * PERFORMANCE OPTIMIZATION: Enhanced alarm creation with atomic clearing and batching
@@ -140,7 +139,11 @@ class AlarmUseCase(
             Logger.d(LogTags.ALARM, "🧹 INTERNAL-CLEAR: Fast internal clearing (system + repository)")
             
             // Step 1: Cancel system alarms
-            alarmManagerService.cancelSystemAlarm()
+            // For now, we need to get active alarms from flow
+            val activeAlarmsList = alarmRepository.activeAlarms.first()
+            for (alarm in activeAlarmsList) {
+                alarmManagerService.cancelSystemAlarm(alarm.id)
+            }
             
             // Step 2: Clear repository
             alarmRepository.deleteAllAlarms().getOrThrow()
@@ -184,7 +187,11 @@ class AlarmUseCase(
                 
                 // ATOMIC STEP 1: Cancel system alarms first (prevents ghost alarms)
                 Logger.d(LogTags.ALARM, "🧹 ATOMIC-CLEAR: Cancelling system alarms...")
-                alarmManagerService.cancelSystemAlarm()
+                // Get all active alarms and cancel them individually
+                val activeAlarmsList = alarmRepository.activeAlarms.first()
+                for (alarm in activeAlarmsList) {
+                    alarmManagerService.cancelSystemAlarm(alarm.id)
+                }
                 
                 // ATOMIC STEP 2: Clear repository (local storage)
                 Logger.d(LogTags.ALARM, "🧹 ATOMIC-CLEAR: Clearing alarm repository...")
@@ -231,13 +238,12 @@ class AlarmUseCase(
             )
             
             val config = shiftConfigRepository.getCurrentShiftConfig().getOrThrow()
-            alarmManagerService.setAlarmFromShiftMatch(shiftMatch, config.autoAlarmEnabled)
+            alarmManagerService.setAlarmFromShiftMatch(shiftMatch, config.autoAlarmEnabled, alarmInfo.id)
         }
     
     override suspend fun cancelSystemAlarm(alarmId: Int): Result<Unit> = 
         SafeExecutor.safeExecute("AlarmUseCase.cancelSystemAlarm") {
-            // For now, cancel all system alarms (AlarmManagerService limitation)
-            alarmManagerService.cancelSystemAlarm()
+            alarmManagerService.cancelSystemAlarm(alarmId)
         }
     
     override suspend fun getAllAlarms(): Result<List<AlarmInfo>> = 

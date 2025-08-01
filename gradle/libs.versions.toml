@@ -30,6 +30,9 @@ googleApiClient = "2.2.0"
 googleApiServicesCalendar = "v3-rev20220715-2.0.0"
 googleHttpClient = "1.43.3"
 
+# Android UI dependencies
+appcompat = "1.7.0"
+
 # Firebase dependencies (2025 Standards)
 googleServices = "4.4.3"
 firebaseBom = "33.5.1"
@@ -73,6 +76,9 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+
+# Android UI libraries
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 # Hue Integration - Network Dependencies
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }

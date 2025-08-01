@@ -45,6 +45,42 @@ class AlarmViewModel(
 
     init {
         observeAlarmStatus()
+        // CLEANUP: Clean expired alarms on startup
+        cleanupExpiredAlarmsOnStartup()
+    }
+    
+    /**
+     * CLEANUP: Remove expired alarms when ViewModel starts
+     */
+    private fun cleanupExpiredAlarmsOnStartup() {
+        viewModelScope.launch {
+            try {
+                // Cast to concrete implementation to access cleanup method
+                val repository = alarmUseCase as? com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.AlarmUseCase
+                if (repository != null) {
+                    // For now, trigger cleanup via deleteAll -> rebuild pattern
+                    Logger.d(LogTags.ALARM, "Startup cleanup: checking for expired alarms")
+                    
+                    // Get all alarms and check for expired ones
+                    alarmUseCase.getAllAlarms().onSuccess { allAlarms ->
+                        val currentTime = System.currentTimeMillis()
+                        val expiredAlarms = allAlarms.filter { it.triggerTime <= currentTime }
+                        
+                        if (expiredAlarms.isNotEmpty()) {
+                            Logger.w(LogTags.ALARM, "Found ${expiredAlarms.size} expired alarms on startup, cleaning up")
+                            // Delete each expired alarm
+                            expiredAlarms.forEach { alarm ->
+                                alarmUseCase.deleteAlarm(alarm.id)
+                            }
+                        } else {
+                            Logger.d(LogTags.ALARM, "No expired alarms found on startup")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "Error during startup cleanup", e)
+            }
+        }
     }
 
     /**
@@ -58,14 +94,24 @@ class AlarmViewModel(
                 alarmUseCase.activeAlarms
                     .distinctUntilChanged()
                     .collect { alarms ->
-                        val nextAlarm = alarms.minByOrNull { it.triggerTime }
+                        // FIXED: Only consider future alarms for "next alarm" calculation
+                        val currentTime = System.currentTimeMillis()
+                        val futureAlarms = alarms.filter { it.triggerTime > currentTime }
+                        val nextAlarm = futureAlarms.minByOrNull { it.triggerTime }
+                        
                         _uiState.value = _uiState.value.copy(
-                            activeAlarms = alarms,
+                            activeAlarms = alarms, // Show all alarms for debugging
                             hasActiveAlarms = alarms.isNotEmpty(),
-                            nextAlarmTime = nextAlarm?.formattedTime // AlarmInfo hat bereits formattedTime
+                            nextAlarmTime = nextAlarm?.formattedTime // Only future alarms
                         )
                         
-                        Logger.d(LogTags.ALARM, "Active alarms updated: ${alarms.size} alarms")
+                        Logger.d(LogTags.ALARM, "Active alarms updated: ${alarms.size} total, ${futureAlarms.size} future")
+                        
+                        // CLEANUP: Log expired alarms for debugging
+                        val expiredAlarms = alarms.filter { it.triggerTime <= currentTime }
+                        if (expiredAlarms.isNotEmpty()) {
+                            Logger.w(LogTags.ALARM, "Found ${expiredAlarms.size} expired alarms: ${expiredAlarms.map { it.formattedTime }}")
+                        }
                     }
             } catch (e: Exception) {
                 Logger.e(LogTags.ALARM, "Error observing alarm status", e)
