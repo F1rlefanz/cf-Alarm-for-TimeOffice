@@ -86,14 +86,7 @@
             android:directBootAware="true"
             android:lockTaskMode="if_whitelisted" />
         
-        <!-- 🚀 PHASE 2: OnePlus Interactive Setup Activity -->
-        <activity
-            android:name=".ui.oneplus.OnePlusSetupActivity"
-            android:exported="false"
-            android:theme="@style/Theme.CFAlarmForTimeOffice.OnePlusSetup"
-            android:screenOrientation="portrait"
-            android:label="OnePlus Alarm-Optimierung" />
-        
+
         <!-- AlarmReceiver - Handles alarm events -->
         <receiver
             android:name=".AlarmReceiver"
@@ -111,18 +104,8 @@
             </intent-filter>
         </receiver>
             
-        <!-- AlarmStopService - Stops alarm when user dismisses -->
-        <service
-            android:name=".service.AlarmStopService"
-            android:exported="false" />
-        
-        <!-- 🚀 PHASE 3: Enhanced Hybrid Alarm Fallback Service -->
-        <service
-            android:name=".service.AlarmFallbackService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback|specialUse"
-            android:description="@string/fallback_service_description" />
-        
+
+
         <!-- FileProvider for log file sharing -->
         <provider
             android:name="androidx.core.content.FileProvider"
