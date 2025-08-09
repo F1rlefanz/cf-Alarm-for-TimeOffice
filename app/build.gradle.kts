@@ -2,7 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    kotlin("plugin.serialization") version "2.2.0"
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.hilt)
+    kotlin("kapt")
     
     // Firebase plugins (2025 Standards)
     alias(libs.plugins.google.services)
@@ -12,6 +14,31 @@ plugins {
 android {
     namespace = "com.github.f1rlefanz.cf_alarmfortimeoffice"
     compileSdk = 36
+
+    // ==============================
+    // 🔐 PROFESSIONAL SIGNING CONFIGURATION
+    // ==============================
+    signingConfigs {
+        create("release") {
+            // Production signing configuration
+            storeFile = file("../cf-alarm-release.keystore")
+            storePassword = "CFAlarm2025!"
+            keyAlias = "cf-alarm-key"
+            keyPassword = "CFAlarm2025!"
+            
+            // Enhanced security settings
+            enableV1Signing = true  // JAR Signature (for older Android versions)
+            enableV2Signing = true  // APK Signature Scheme v2 (Android 7.0+)
+            enableV3Signing = true  // APK Signature Scheme v3 (Android 9.0+)
+            enableV4Signing = true  // APK Signature Scheme v4 (Android 11+)
+        }
+        
+        // Debug signing config (explicit for clarity)
+        getByName("debug") {
+            // Uses default debug keystore from ~/.android/debug.keystore
+            // This is automatic, but explicitly documented for transparency
+        }
+    }
 
     defaultConfig {
         applicationId = "com.github.f1rlefanz.cf_alarmfortimeoffice"
@@ -31,6 +58,13 @@ android {
 
     buildTypes {
         release {
+            // ==============================
+            // 🚀 PRODUCTION BUILD CONFIGURATION
+            // ==============================
+            
+            // SIGNING: Use production keystore
+            signingConfig = signingConfigs.getByName("release")
+            
             // SECURITY: Enable code obfuscation and optimization
             isMinifyEnabled = true
             isShrinkResources = true
@@ -38,20 +72,54 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
             // SECURITY: Disable debugging in release builds
             isDebuggable = false
             isJniDebuggable = false
             
             // SECURITY: Enable dead code elimination
             isPseudoLocalesEnabled = false
+            
+            // APP IDENTIFICATION: Clear production naming
+            // No suffix - this is the production version
         }
+        
         debug {
+            // ==============================
+            // 🛠️ DEVELOPMENT BUILD CONFIGURATION  
+            // ==============================
+            
+            // SIGNING: Uses default debug keystore (automatic)
+            // signingConfig = signingConfigs.getByName("debug") // Not needed, automatic
+            
             // Development settings
             isMinifyEnabled = false
             isShrinkResources = false
             isDebuggable = true
-            // applicationIdSuffix = ".debug"  // TEMP: Disabled for Google Auth compatibility
+            
+            // APP IDENTIFICATION: Clear debug identification
+            // applicationIdSuffix = ".debug"  // TEMP: Disabled for Google Services compatibility
             versionNameSuffix = "-DEBUG"
+        }
+        
+        // ==============================
+        // 🧪 OPTIONAL: STAGING BUILD TYPE
+        // ==============================
+        create("staging") {
+            // Hybrid configuration: Production signing + Limited debugging
+            initWith(getByName("release"))
+            
+            // Override for staging-specific settings
+            isDebuggable = true
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-STAGING"
+            
+            // IMPORTANT: Disable minification for staging to allow proper debugging
+            isMinifyEnabled = false
+            isShrinkResources = false
+            
+            // Use production signing for realistic testing
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -71,10 +139,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
     }
 
     packaging {
@@ -135,6 +199,9 @@ dependencies {
 
     // Logging
     implementation(libs.timber)
+    
+    // 🚀 PHASE 3: WorkManager für Background-Services
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Firebase (2025 Standards) 
     implementation(platform(libs.firebase.bom))
@@ -143,6 +210,10 @@ dependencies {
 
     // Desugaring for LocalDateTime support
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // Dependency Injection
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
 
     // Testing dependencies
     testImplementation(libs.junit)

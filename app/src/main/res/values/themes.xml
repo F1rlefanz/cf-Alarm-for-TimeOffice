@@ -1,14 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.CFAlarmForTimeOffice" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- 🚀 FIXED: Main app theme now uses AppCompat to support AppCompatActivity -->
+    <!-- Changed from android:Theme.Material.Light.NoActionBar to Theme.AppCompat.Light.NoActionBar -->
+    <style name="Theme.CFAlarmForTimeOffice" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Add any custom styling here -->
+        <item name="colorPrimary">@android:color/holo_blue_bright</item>
+        <item name="colorPrimaryDark">@android:color/holo_blue_dark</item>
+        <item name="colorAccent">@android:color/holo_orange_light</item>
+    </style>
     
-    <!-- AppCompat theme for OnePlusSetupActivity -->
+    <!-- Enhanced AppCompat theme for OnePlusSetupActivity -->
     <style name="Theme.CFAlarmForTimeOffice.OnePlusSetup" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="colorPrimary">@android:color/holo_blue_bright</item>
         <item name="colorPrimaryDark">@android:color/holo_blue_dark</item>
         <item name="colorAccent">@android:color/holo_orange_light</item>
         <item name="android:windowBackground">@android:color/white</item>
+    </style>
+    
+    <!-- 🔥 NEW: Specific theme for AlarmFullScreenActivity with enhanced wake-up properties -->
+    <style name="Theme.CFAlarmForTimeOffice.AlarmFullScreen" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@android:color/holo_blue_bright</item>
+        <item name="colorPrimaryDark">@android:color/holo_blue_dark</item>
+        <item name="colorAccent">@android:color/holo_red_light</item>
+        <item name="android:windowBackground">@android:color/holo_blue_bright</item>
+        <!-- Enhanced full-screen properties for alarm -->
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowShowWallpaper">false</item>
     </style>
     
 </resources>

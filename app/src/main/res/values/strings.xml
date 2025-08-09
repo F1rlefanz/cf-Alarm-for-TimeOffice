@@ -1,4 +1,44 @@
 <resources>
     <string name="app_name">CF-Alarm for TimeOffice</string>
     <string name="fallback_service_description">Hybrid Alarm Fallback Service - Ensures alarms trigger even when the system alarm manager fails</string>
+    
+    <!-- OnePlus Setup Activity -->
+    <string name="oneplus_setup_title">OnePlus für CF-Alarm optimieren</string>
+    <string name="oneplus_setup_subtitle">Maximale Alarm-Zuverlässigkeit in wenigen Schritten</string>
+    <string name="oneplus_setup_welcome">Willkommen! Optimieren Sie Ihr OnePlus-Gerät für maximale Alarm-Zuverlässigkeit.</string>
+    <string name="oneplus_setup_alarm_failure">Ihr Alarm ist möglicherweise ausgefallen. Konfigurieren Sie diese Einstellungen für zuverlässige Alarme.</string>
+    
+    <!-- Configuration Steps -->
+    <string name="oneplus_battery_optimization_title">Akkuoptimierung deaktivieren</string>
+    <string name="oneplus_battery_optimization_desc">App von Akkuoptimierung ausnehmen</string>
+    <string name="oneplus_auto_startup_title">Autostart aktivieren</string>
+    <string name="oneplus_auto_startup_desc">App-Autostart zulassen</string>
+    <string name="oneplus_background_running_title">Hintergrund-Ausführung</string>
+    <string name="oneplus_background_running_desc">Hintergrund-Ausführung zulassen</string>
+    <string name="oneplus_recent_apps_lock_title">Recent Apps sperren</string>
+    <string name="oneplus_recent_apps_lock_desc">App in Recent Apps sperren</string>
+    
+    <!-- Action Buttons -->
+    <string name="oneplus_open_settings">Einstellungen öffnen</string>
+    <string name="oneplus_help">Hilfe</string>
+    <string name="oneplus_mark_completed">Erledigt</string>
+    <string name="oneplus_setup_complete">Einrichtung abschließen</string>
+    <string name="oneplus_setup_skip">Überspringen</string>
+    <string name="oneplus_setup_later">Problem später lösen</string>
+    
+    <!-- Status Messages -->
+    <string name="oneplus_step_configured">Konfiguriert</string>
+    <string name="oneplus_step_action_required">Aktion erforderlich</string>
+    <string name="oneplus_reliability_current">Aktuelle Zuverlässigkeit: %d%%</string>
+    <string name="oneplus_steps_completed">Konfigurierte Schritte: %d/%d</string>
+    
+    <!-- Warnings -->
+    <string name="oneplus_warning_updates">OnePlus setzt Einstellungen bei System-Updates zurück!</string>
+    <string name="oneplus_warning_critical">Akkuoptimierung ist aktiv - Alarme können ausfallen!</string>
+    
+    <!-- Help Dialog -->
+    <string name="oneplus_help_impact">Auswirkung: %d%% der Alarm-Zuverlässigkeit</string>
+    <string name="oneplus_help_instructions">Schritt-für-Schritt Anleitung</string>
+    <string name="oneplus_help_troubleshooting">Problemlösung</string>
+    <string name="oneplus_help_understood">Verstanden</string>
 </resources>

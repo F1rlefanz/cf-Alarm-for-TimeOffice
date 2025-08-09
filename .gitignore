@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 🔐 SECURITY: Never commit production keystores to Git
+*.keystore
+*.jks
+keystore.properties
+release.properties
+
+# 📱 Sensitive configuration files
+google-services.json.backup
+firebase-debug.json

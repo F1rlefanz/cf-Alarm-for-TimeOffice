@@ -37,6 +37,17 @@
     
     <!-- Enhanced doze mode exemption -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    
+    <!-- Foreground Service Permissions (Android 9+ / Android 14+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
+    <!-- 🚀 ENHANCED Android 14+ Foreground Service Types for Alarm App -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    
+    <!-- 🔧 OnePlus-specific: Additional service reliability -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
 
     <application
         android:name=".CFAlarmApplication"
@@ -69,10 +80,11 @@
             android:launchMode="singleTask"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.CFAlarmForTimeOffice"
+            android:theme="@style/Theme.CFAlarmForTimeOffice.AlarmFullScreen"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:directBootAware="true" />
+            android:directBootAware="true"
+            android:lockTaskMode="if_whitelisted" />
         
         <!-- 🚀 PHASE 2: OnePlus Interactive Setup Activity -->
         <activity
@@ -104,11 +116,11 @@
             android:name=".service.AlarmStopService"
             android:exported="false" />
         
-        <!-- 🚀 PHASE 3: Hybrid Alarm Fallback Service -->
+        <!-- 🚀 PHASE 3: Enhanced Hybrid Alarm Fallback Service -->
         <service
             android:name=".service.AlarmFallbackService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback"
+            android:foregroundServiceType="mediaPlayback|specialUse"
             android:description="@string/fallback_service_description" />
         
         <!-- FileProvider for log file sharing -->

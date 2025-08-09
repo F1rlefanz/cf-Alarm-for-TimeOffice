@@ -48,13 +48,28 @@ class CalendarUseCase(
             val accessToken = if (tokenRefreshUseCase != null) {
                 Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for calendar access...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
-                    Logger.business(LogTags.CALENDAR, "🔄 FALLBACK: Using legacy token system...")
-                    getLegacyAccessToken()
+                    Logger.e(LogTags.TOKEN, "❌ CRITICAL-TOKEN-ERROR: OAuth2 token refresh failed - calendar access not possible!", error)
+                    
+                    // CRITICAL FIX: Don't fall back to potentially same expired token!
+                    // Instead, throw the error to force user to re-authenticate
+                    throw Exception("Calendar access requires re-authentication. Please sign out and sign in again. Error: ${error.message}")
                 }
             } else {
                 Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system (no OAuth2 available)...")
-                getLegacyAccessToken()
+                
+                // Even in legacy mode, check if token is expired before using it
+                val legacyToken = getLegacyAccessToken()
+                val authData = authDataStoreRepository.authData.first()
+                val tokenExpiryTime = authData.tokenExpiryTime ?: 0L
+                val currentTime = System.currentTimeMillis()
+                
+                if (currentTime >= tokenExpiryTime) {
+                    Logger.e(LogTags.TOKEN, "❌ LEGACY-TOKEN-EXPIRED: Legacy token expired at ${java.util.Date(tokenExpiryTime)}, current time: ${java.util.Date(currentTime)}")
+                    throw Exception("Calendar access token expired. Please sign out and sign in again to refresh authorization.")
+                }
+                
+                Logger.business(LogTags.CALENDAR, "✅ LEGACY-TOKEN-VALID: Using valid legacy token")
+                legacyToken
             }
             
             Logger.d(LogTags.CALENDAR_API, "Loading available calendars with token...")
@@ -120,12 +135,27 @@ class CalendarUseCase(
             val accessToken = if (tokenRefreshUseCase != null) {
                 Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for events...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
-                    getLegacyAccessToken()
+                    Logger.e(LogTags.TOKEN, "❌ CRITICAL-TOKEN-ERROR: OAuth2 token refresh failed - calendar events not accessible!", error)
+                    
+                    // CRITICAL FIX: Don't fall back to potentially same expired token!
+                    throw Exception("Calendar access requires re-authentication. Please sign out and sign in again. Error: ${error.message}")
                 }
             } else {
                 Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system for events...")
-                getLegacyAccessToken()
+                
+                // Even in legacy mode, check if token is expired before using it
+                val legacyToken = getLegacyAccessToken()
+                val authData = authDataStoreRepository.authData.first()
+                val tokenExpiryTime = authData.tokenExpiryTime ?: 0L
+                val currentTime = System.currentTimeMillis()
+                
+                if (currentTime >= tokenExpiryTime) {
+                    Logger.e(LogTags.TOKEN, "❌ LEGACY-TOKEN-EXPIRED: Legacy token expired at ${java.util.Date(tokenExpiryTime)}, current time: ${java.util.Date(currentTime)}")
+                    throw Exception("Calendar access token expired. Please sign out and sign in again to refresh authorization.")
+                }
+                
+                Logger.business(LogTags.CALENDAR, "✅ LEGACY-TOKEN-VALID: Using valid legacy token")
+                legacyToken
             }
             
             if (calendarIds.isEmpty()) {
@@ -243,12 +273,27 @@ class CalendarUseCase(
             val accessToken = if (tokenRefreshUseCase != null) {
                 Logger.business(LogTags.CALENDAR, "🔐 MODERN-TOKEN: Using OAuth2 token system for events...")
                 tokenRefreshUseCase.ensureValidToken().getOrElse { error ->
-                    Logger.w(LogTags.TOKEN, "❌ MODERN-TOKEN: OAuth2 token failed, falling back to legacy auth", error)
-                    getLegacyAccessToken()
+                    Logger.e(LogTags.TOKEN, "❌ CRITICAL-TOKEN-ERROR: OAuth2 token refresh failed - calendar events not accessible!", error)
+                    
+                    // CRITICAL FIX: Don't fall back to potentially same expired token!
+                    throw Exception("Calendar access requires re-authentication. Please sign out and sign in again. Error: ${error.message}")
                 }
             } else {
                 Logger.w(LogTags.CALENDAR, "⚠️ LEGACY-ONLY: Using legacy auth system for events...")
-                getLegacyAccessToken()
+                
+                // Even in legacy mode, check if token is expired before using it
+                val legacyToken = getLegacyAccessToken()
+                val authData = authDataStoreRepository.authData.first()
+                val tokenExpiryTime = authData.tokenExpiryTime ?: 0L
+                val currentTime = System.currentTimeMillis()
+                
+                if (currentTime >= tokenExpiryTime) {
+                    Logger.e(LogTags.TOKEN, "❌ LEGACY-TOKEN-EXPIRED: Legacy token expired at ${java.util.Date(tokenExpiryTime)}, current time: ${java.util.Date(currentTime)}")
+                    throw Exception("Calendar access token expired. Please sign out and sign in again to refresh authorization.")
+                }
+                
+                Logger.business(LogTags.CALENDAR, "✅ LEGACY-TOKEN-VALID: Using valid legacy token")
+                legacyToken
             }
             
             if (calendarIds.isEmpty()) {

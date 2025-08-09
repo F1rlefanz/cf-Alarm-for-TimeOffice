@@ -1,20 +1,30 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.oneplus
 
 import android.content.Context
-import android.os.Build
+import android.graphics.Color
+import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.core.content.ContextCompat
+import androidx.core.view.setPadding
+import com.github.f1rlefanz.cf_alarmfortimeoffice.R
 import com.github.f1rlefanz.cf_alarmfortimeoffice.service.oneplus.model.*
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.oneplus.util.OnePlusUIConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import java.util.*
 
 /**
- * UI Builder for OnePlus Setup Activity
+ * 🎨 Modern OnePlus Setup UI Builder
  * 
- * Handles all UI creation and updates for the OnePlus setup process.
- * Separates UI concerns from business logic following Clean Architecture principles.
+ * Creates a beautiful, intuitive UI for OnePlus device configuration
+ * with step-by-step guidance, progress indicators, and interactive elements.
+ * 
+ * Features:
+ * - Material Design 3 inspired styling
+ * - Progress indicators and success animations
+ * - Device-specific recommendations
+ * - Interactive help and guidance
+ * - Debug information for developers
  */
 class OnePlusSetupUIBuilder(
     private val context: Context,
@@ -23,426 +33,545 @@ class OnePlusSetupUIBuilder(
     private val showDebugInfo: Boolean
 ) {
     
-    // UI Components
-    private lateinit var reliabilityProgressBar: ProgressBar
-    private lateinit var reliabilityText: TextView
-    private lateinit var confidenceText: TextView
-    private lateinit var deviceInfoLayout: LinearLayout
-    private lateinit var stepsContainer: LinearLayout
-    private lateinit var warningsContainer: LinearLayout
-    private lateinit var debugContainer: LinearLayout
+    // UI Constants for consistent styling
+    private companion object {
+        const val PADDING_STANDARD = 24
+        const val PADDING_SMALL = 16
+        const val PADDING_LARGE = 32
+        const val CORNER_RADIUS = 16f
+        const val ELEVATION = 8f
+        
+        // Colors (using standard Android colors as fallback)
+        const val COLOR_PRIMARY = "#1976D2"
+        const val COLOR_SUCCESS = "#4CAF50"
+        const val COLOR_WARNING = "#FF9800"
+        const val COLOR_ERROR = "#F44336"
+        const val COLOR_SURFACE = "#FFFFFF"
+        const val COLOR_ON_SURFACE = "#212121"
+        const val COLOR_SECONDARY = "#757575"
+    }
     
-    private lateinit var stepCardBuilder: OnePlusStepCardBuilder
+    // UI State
+    private var loadingProgressBar: ProgressBar? = null
+    private var mainContentLayout: LinearLayout? = null
+    private var headerSection: LinearLayout? = null
+    private var configStepsContainer: LinearLayout? = null
+    private var reliabilitySection: LinearLayout? = null
+    private var debugSection: LinearLayout? = null
+    private var actionButtonsLayout: LinearLayout? = null
     
+    /**
+     * Creates the main OnePlus setup UI
+     */
     fun createEnhancedOnePlusUI(
         onFinishSetup: (Boolean) -> Unit,
         onShowDebugDialog: () -> Unit
     ): ScrollView {
-        
-        stepCardBuilder = OnePlusStepCardBuilder(context)
-        
-        // Create programmatic UI for enhanced OnePlus setup
-        val rootScrollView = ScrollView(context).apply {
-            setPadding(24, 24, 24, 24)
+        val scrollView = ScrollView(context).apply {
+            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            isFillViewport = true
         }
         
-        val mainLayout = LinearLayout(context).apply {
+        val rootLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
+            setPadding(PADDING_STANDARD)
         }
         
-        // Create all UI sections
-        val headerLayout = createHeaderSection()
-        stepsContainer = createStepsContainer()
-        warningsContainer = createWarningsContainer()
-        debugContainer = createDebugContainer()
-        val buttonLayout = createButtonSection(onFinishSetup, onShowDebugDialog)
+        // Create UI sections
+        createHeaderSection(rootLayout)
+        createLoadingSection(rootLayout)
+        createMainContentSection(rootLayout)
+        createActionButtonsSection(rootLayout, onFinishSetup, onShowDebugDialog)
         
-        // Assemble UI
-        mainLayout.addView(headerLayout)
-        mainLayout.addView(stepsContainer)
-        mainLayout.addView(warningsContainer)
-        if (showDebugInfo) {
-            mainLayout.addView(debugContainer)
-        }
-        mainLayout.addView(buttonLayout)
-        
-        rootScrollView.addView(mainLayout)
-        return rootScrollView
+        scrollView.addView(rootLayout)
+        return scrollView
     }
     
-    private fun createHeaderSection(): LinearLayout {
-        val headerLayout = LinearLayout(context).apply {
+    private fun createHeaderSection(parent: LinearLayout) {
+        headerSection = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, 32)
+            setBackgroundColor(Color.parseColor(COLOR_PRIMARY))
+            setPadding(PADDING_LARGE)
+            
+            // Title
+            val title = TextView(context).apply {
+                text = when {
+                    isFromAlarmFailure -> "🔧 OnePlus Alarm-Problem beheben"
+                    isFirstTimeSetup -> "🚀 OnePlus für CF-Alarm optimieren"
+                    else -> "⚙️ OnePlus-Einstellungen prüfen"
+                }
+                textSize = 24f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, PADDING_SMALL)
+            }
+            
+            // Subtitle
+            val subtitle = TextView(context).apply {
+                text = when {
+                    isFromAlarmFailure -> "Ihr Alarm ist möglicherweise ausgefallen. Konfigurieren Sie diese Einstellungen für zuverlässige Alarme."
+                    isFirstTimeSetup -> "Willkommen! Optimieren Sie Ihr OnePlus-Gerät in wenigen Schritten für maximale Alarm-Zuverlässigkeit."
+                    else -> "Prüfen und aktualisieren Sie Ihre OnePlus-Einstellungen für optimale Alarm-Performance."
+                }
+                textSize = 16f
+                setTextColor(Color.parseColor("#E3F2FD"))
+                gravity = Gravity.CENTER
+                lineHeight = (textSize * 1.4f).toInt()
+            }
+            
+            addView(title)
+            addView(subtitle)
         }
         
-        val titleText = TextView(context).apply {
-            text = when {
-                isFirstTimeSetup -> "🔴 Willkommen bei CF-Alarm!"
-                isFromAlarmFailure -> "🔴 OnePlus Alarm-Problem erkannt"
-                else -> "🔴 Enhanced OnePlus Alarm-Optimierung"
-            }
-            textSize = 24f
-            setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_dark))
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 16)
+        parent.addView(headerSection)
+    }
+    
+    private fun createLoadingSection(parent: LinearLayout) {
+        val loadingLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(PADDING_LARGE)
+            visibility = View.GONE
         }
         
-        val subtitleText = TextView(context).apply {
-            text = when {
-                isFirstTimeSetup -> "Dein OnePlus ${Build.MODEL} braucht spezielle Konfiguration für 100% zuverlässige Alarme"
-                isFromAlarmFailure -> "Wir haben ein Alarm-Problem erkannt. Lass uns das mit enhanced Detection beheben!"
-                else -> "Enhanced OnePlus Detection mit research-basierten Konfigurationsempfehlungen"
-            }
+        loadingProgressBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+            setPadding(0, 0, PADDING_STANDARD, 0)
+        }
+        
+        val loadingText = TextView(context).apply {
+            text = "OnePlus-Konfiguration wird analysiert..."
             textSize = 16f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 24)
+            setTextColor(Color.parseColor(COLOR_ON_SURFACE))
         }
         
-        // Device Information Section
-        deviceInfoLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 12, 16, 12)
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.background_light))
-        }
-        
-        // Validation Confidence Section
-        val confidenceLabel = TextView(context).apply {
-            text = "Validierungs-Zuverlässigkeit:"
-            textSize = 12f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 4)
-        }
-        
-        confidenceText = TextView(context).apply {
-            text = "Wird validiert..."
-            textSize = 14f
-            setTextColor(ContextCompat.getColor(context, android.R.color.holo_blue_dark))
-            setPadding(0, 0, 0, 12)
-        }
-        
-        // Reliability Progress Section
-        val reliabilityLabel = TextView(context).apply {
-            text = "Geschätzte Alarm-Zuverlässigkeit:"
-            textSize = 14f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 8)
-        }
-        
-        reliabilityProgressBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-            setPadding(0, 0, 0, 8)
-        }
-        
-        reliabilityText = TextView(context).apply {
-            text = "Wird berechnet..."
-            textSize = 14f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 24)
-        }
-        
-        // Assemble header
-        headerLayout.addView(titleText)
-        headerLayout.addView(subtitleText)
-        headerLayout.addView(deviceInfoLayout)
-        headerLayout.addView(confidenceLabel)
-        headerLayout.addView(confidenceText)
-        headerLayout.addView(reliabilityLabel)
-        headerLayout.addView(reliabilityProgressBar)
-        headerLayout.addView(reliabilityText)
-        
-        return headerLayout
+        loadingLayout.addView(loadingProgressBar)
+        loadingLayout.addView(loadingText)
+        parent.addView(loadingLayout)
     }
     
-    private fun createStepsContainer(): LinearLayout {
-        return LinearLayout(context).apply {
+    private fun createMainContentSection(parent: LinearLayout) {
+        mainContentLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, 24)
+            visibility = View.GONE // Initially hidden until configuration is loaded
         }
+        
+        // Configuration steps container
+        configStepsContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        
+        // Reliability metrics section
+        reliabilitySection = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        
+        // Debug section (only shown if enabled)
+        if (showDebugInfo) {
+            debugSection = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+        }
+        
+        mainContentLayout?.apply {
+            addView(configStepsContainer)
+            addView(reliabilitySection)
+            debugSection?.let { addView(it) }
+        }
+        
+        parent.addView(mainContentLayout)
     }
     
-    private fun createWarningsContainer(): LinearLayout {
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_orange_light))
-        }
-    }
-    
-    private fun createDebugContainer(): LinearLayout {
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.background_dark))
-            visibility = if (showDebugInfo) LinearLayout.VISIBLE else LinearLayout.GONE
-        }
-    }
-    
-    private fun createButtonSection(
+    private fun createActionButtonsSection(
+        parent: LinearLayout,
         onFinishSetup: (Boolean) -> Unit,
         onShowDebugDialog: () -> Unit
-    ): LinearLayout {
-        val buttonLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 24, 0, 0)
+    ) {
+        actionButtonsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(PADDING_STANDARD)
         }
         
-        val continueButton = Button(context).apply {
-            text = when {
-                isFirstTimeSetup -> "Los geht's! 🚀"
-                else -> "Optimierung abgeschlossen"
-            }
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
-            setTextColor(ContextCompat.getColor(context, android.R.color.white))
-            setPadding(24, 12, 24, 12)
+        // Primary action button
+        val completeButton = Button(context).apply {
+            text = if (isFirstTimeSetup) "✅ Einrichtung abschließen" else "🔄 Konfiguration aktualisieren"
+            textSize = 18f
+            setBackgroundColor(Color.parseColor(COLOR_SUCCESS))
+            setTextColor(Color.WHITE)
+            setPadding(PADDING_STANDARD)
             setOnClickListener { onFinishSetup(true) }
         }
         
+        // Secondary action button
         val skipButton = Button(context).apply {
-            text = when {
-                isFirstTimeSetup -> "Später konfigurieren"
-                isFromAlarmFailure -> "Problem ignorieren"
-                else -> "Später konfigurieren"
-            }
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
-            setTextColor(ContextCompat.getColor(context, android.R.color.white))
-            setPadding(24, 12, 24, 12)
+            text = if (isFromAlarmFailure) "❌ Problem später lösen" else "⏭️ Überspringen"
+            textSize = 16f
+            setBackgroundColor(Color.parseColor(COLOR_SECONDARY))
+            setTextColor(Color.WHITE)
+            setPadding(PADDING_SMALL)
             setOnClickListener { onFinishSetup(false) }
         }
         
-        val debugButton = Button(context).apply {
-            text = "🧪 Debug Info"
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_purple))
-            setTextColor(ContextCompat.getColor(context, android.R.color.white))
-            setPadding(24, 12, 24, 12)
-            visibility = if (showDebugInfo) Button.VISIBLE else Button.GONE
-            setOnClickListener { onShowDebugDialog() }
-        }
-        
-        buttonLayout.addView(continueButton)
-        buttonLayout.addView(skipButton)
-        if (showDebugInfo) {
-            buttonLayout.addView(debugButton)
-        }
-        
-        return buttonLayout
-    }
-    
-    fun updateLoadingState(isLoading: Boolean) {
-        // Defensive Programmierung: Prüfen ob UI-Komponenten initialisiert sind
-        if (!::reliabilityText.isInitialized || !::confidenceText.isInitialized) {
-            Logger.w(LogTags.BATTERY_OPTIMIZATION, "⚠️ UI components not initialized in updateLoadingState - skipping UI update")
-            return
-        }
-        
-        try {
-            if (isLoading) {
-                reliabilityText.text = "Analysiere OnePlus-Gerät..."
-                confidenceText.text = "Validiere Geräteerkennung..."
-                Logger.d(LogTags.BATTERY_OPTIMIZATION, "✅ Loading state updated successfully")
-            } else {
-                Logger.d(LogTags.BATTERY_OPTIMIZATION, "✅ Loading state cleared successfully")
+        actionButtonsLayout?.apply {
+            addView(completeButton)
+            if (!isFromAlarmFailure) { // Don't show skip for alarm failures
+                addView(skipButton)
             }
-        } catch (e: Exception) {
-            Logger.e(LogTags.BATTERY_OPTIMIZATION, "❌ Failed to update loading state UI", e)
-        }
-    }
-    
-    fun showErrorState(message: String) {
-        // Defensive Programmierung: Prüfen ob UI-Komponenten initialisiert sind
-        if (!::reliabilityText.isInitialized || !::confidenceText.isInitialized || !::reliabilityProgressBar.isInitialized) {
-            Logger.w(LogTags.ALARM, "⚠️ UI components not initialized in showErrorState - skipping UI update")
-            return
+            
+            // Debug button
+            if (showDebugInfo) {
+                val debugButton = Button(context).apply {
+                    text = "🧪 Debug Info"
+                    textSize = 14f
+                    setBackgroundColor(Color.parseColor(COLOR_WARNING))
+                    setTextColor(Color.WHITE)
+                    setPadding(PADDING_SMALL)
+                    setOnClickListener { onShowDebugDialog() }
+                }
+                addView(debugButton)
+            }
         }
         
-        try {
-            reliabilityText.text = "Fehler: $message"
-            confidenceText.text = "Validierung fehlgeschlagen"
-            reliabilityProgressBar.progress = 0
-            Logger.d(LogTags.ALARM, "✅ Error state updated successfully")
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "❌ Failed to update error state UI", e)
-        }
+        parent.addView(actionButtonsLayout)
     }
     
+    /**
+     * Updates the configuration display with enhanced OnePlus data
+     */
     fun updateConfigurationDisplay(
         configStatus: EnhancedOnePlusConfigStatus,
         onStepAction: (String) -> Unit,
         onStepConfirmation: (String) -> Unit,
         onStepHelp: (OnePlusConfigurationStep) -> Unit
     ) {
-        // Defensive Programmierung: Prüfen ob UI-Komponenten initialisiert sind
-        if (!::deviceInfoLayout.isInitialized || !::stepsContainer.isInitialized || 
-            !::warningsContainer.isInitialized || !::reliabilityText.isInitialized ||
-            !::reliabilityProgressBar.isInitialized || !::confidenceText.isInitialized) {
-            Logger.w(LogTags.ALARM, "⚠️ UI components not initialized in updateConfigurationDisplay - skipping UI update")
-            return
-        }
-        
         try {
-            updateDeviceInfoDisplay(configStatus.deviceInfo, configStatus.capabilities, configStatus.validationConfidence)
-            updateReliabilityDisplay(configStatus.estimatedReliability)
-            updateStepsDisplay(configStatus.configurationSteps, onStepAction, onStepConfirmation, onStepHelp)
-            updateWarningsDisplay(configStatus.criticalWarnings)
+            configStepsContainer?.removeAllViews()
             
-            if (showDebugInfo && ::debugContainer.isInitialized) {
-                updateDebugDisplay(configStatus)
+            // Create device info section
+            createDeviceInfoSection(configStatus)
+            
+            // Create configuration steps
+            configStatus.configurationSteps.forEach { step ->
+                createStepCard(step, onStepAction, onStepConfirmation, onStepHelp)
             }
-            Logger.d(LogTags.ALARM, "✅ Configuration display updated successfully")
+            
+            // Create reliability metrics
+            createReliabilityMetrics(configStatus.estimatedReliability)
+            
+            // Create warnings section
+            if (configStatus.criticalWarnings.isNotEmpty()) {
+                createWarningsSection(configStatus.criticalWarnings)
+            }
+            
+            // Show debug info if enabled
+            if (showDebugInfo && debugSection != null) {
+                createDebugSection(configStatus)
+            }
+            
+            // Show main content
+            mainContentLayout?.visibility = View.VISIBLE
+            
         } catch (e: Exception) {
-            Logger.e(LogTags.ALARM, "❌ Failed to update configuration display", e)
+            Logger.e(LogTags.ALARM, "Error updating configuration display", e)
+            showErrorState("Fehler beim Anzeigen der Konfiguration: ${e.message}")
         }
     }
     
-    private fun updateDeviceInfoDisplay(
-        deviceInfo: OnePlusDeviceInfo,
-        capabilities: OnePlusDeviceCapabilities,
-        confidence: Float
-    ) {
-        deviceInfoLayout.removeAllViews()
+    private fun createDeviceInfoSection(configStatus: EnhancedOnePlusConfigStatus) {
+        val deviceInfoCard = createCard("📱 Geräteinformation")
         
-        val deviceTitle = TextView(context).apply {
-            text = "📱 Geräteinformationen"
+        val deviceInfo = """
+            Gerät: ${configStatus.deviceInfo.model}
+            Android: ${configStatus.deviceInfo.androidVersion}
+            ${configStatus.deviceInfo.oxygenOSVersion?.let { "OxygenOS: $it" } ?: ""}
+            Erkennungsgenauigkeit: ${String.format(Locale.US, "%.1f%%", configStatus.validationConfidence * 100)}
+        """.trimIndent()
+        
+        val deviceText = TextView(context).apply {
+            text = deviceInfo
             textSize = 14f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 8)
-        }
-        deviceInfoLayout.addView(deviceTitle)
-        
-        val deviceDetails = listOf(
-            "Modell: ${deviceInfo.model}",
-            "Hersteller: ${deviceInfo.manufacturer}",
-            "Android: ${deviceInfo.androidVersion}",
-            "OxygenOS: ${deviceInfo.oxygenOSVersion ?: "Nicht erkannt"}",
-            "Enhanced Optimization: ${if (capabilities.hasEnhancedOptimization) "Unterstützt" else "Nicht verfügbar"}"
-        )
-        
-        deviceDetails.forEach { detail ->
-            val detailText = TextView(context).apply {
-                text = "  • $detail"
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(context, android.R.color.black))
-                setPadding(0, 2, 0, 2)
-            }
-            deviceInfoLayout.addView(detailText)
+            setTextColor(Color.parseColor(COLOR_ON_SURFACE))
+            setPadding(PADDING_STANDARD)
         }
         
-        confidenceText.text = "Geräteerkennung: ${String.format("%.1f%%", confidence * 100)} Zuverlässigkeit"
-        confidenceText.setTextColor(ContextCompat.getColor(context, 
-            if (confidence >= 0.9f) android.R.color.holo_green_dark
-            else if (confidence >= 0.7f) android.R.color.holo_blue_dark
-            else android.R.color.holo_orange_dark
-        ))
+        deviceInfoCard.addView(deviceText)
+        configStepsContainer?.addView(deviceInfoCard)
     }
     
-    private fun updateReliabilityDisplay(reliabilityMetrics: OnePlusReliabilityMetrics) {
-        reliabilityProgressBar.progress = reliabilityMetrics.currentReliability
-        
-        val reliabilityColor = when (reliabilityMetrics.reliabilityLevel) {
-            OnePlusReliabilityLevel.EXCELLENT -> android.R.color.holo_green_dark
-            OnePlusReliabilityLevel.GOOD -> android.R.color.holo_blue_dark
-            OnePlusReliabilityLevel.FAIR -> android.R.color.holo_orange_dark
-            OnePlusReliabilityLevel.POOR -> android.R.color.holo_red_dark
-        }
-        
-        reliabilityText.apply {
-            text = buildString {
-                append("${reliabilityMetrics.currentReliability}% Zuverlässigkeit ")
-                append("(${reliabilityMetrics.completedSteps}/${reliabilityMetrics.totalSteps} Schritte)")
-                appendLine()
-                append("Level: ${reliabilityMetrics.reliabilityLevel.displayName}")
-            }
-            setTextColor(ContextCompat.getColor(context, reliabilityColor))
-        }
-    }
-    
-    private fun updateStepsDisplay(
-        steps: List<OnePlusConfigurationStep>,
+    private fun createStepCard(
+        step: OnePlusConfigurationStep,
         onStepAction: (String) -> Unit,
         onStepConfirmation: (String) -> Unit,
         onStepHelp: (OnePlusConfigurationStep) -> Unit
     ) {
-        stepsContainer.removeAllViews()
+        val stepCard = createCard(getStepTitle(step))
         
-        val stepsTitle = TextView(context).apply {
-            text = "🔧 Konfigurationsschritte"
+        // Step status indicator
+        val statusLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(PADDING_STANDARD)
+        }
+        
+        val statusIcon = TextView(context).apply {
+            text = if (step.isCompleted) "✅" else when (step.priority) {
+                OnePlusConfigPriority.CRITICAL -> "🔴"
+                OnePlusConfigPriority.HIGH -> "🟡"
+                else -> "🔵"
+            }
+            textSize = 20f
+            setPadding(0, 0, PADDING_SMALL, 0)
+        }
+        
+        val statusText = TextView(context).apply {
+            text = if (step.isCompleted) "Konfiguriert" else "Aktion erforderlich"
             textSize = 16f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 16)
+            setTextColor(Color.parseColor(if (step.isCompleted) COLOR_SUCCESS else COLOR_WARNING))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        stepsContainer.addView(stepsTitle)
         
-        steps.forEach { step ->
-            val stepCard = stepCardBuilder.createStepCard(step, onStepAction, onStepConfirmation, onStepHelp)
-            stepsContainer.addView(stepCard)
+        statusLayout.addView(statusIcon)
+        statusLayout.addView(statusText)
+        
+        // Step description
+        val descriptionText = TextView(context).apply {
+            text = step.description
+            textSize = 14f
+            setTextColor(Color.parseColor(COLOR_SECONDARY))
+            setPadding(PADDING_STANDARD, 0, PADDING_STANDARD, PADDING_SMALL)
         }
+        
+        // Action buttons
+        val buttonsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(PADDING_STANDARD)
+        }
+        
+        if (!step.isCompleted) {
+            val actionButton = Button(context).apply {
+                text = "⚙️ Einstellungen öffnen"
+                textSize = 14f
+                setBackgroundColor(Color.parseColor(COLOR_PRIMARY))
+                setTextColor(Color.WHITE)
+                setPadding(PADDING_SMALL)
+                setOnClickListener { onStepAction(step.id.name.lowercase()) }
+            }
+            buttonsLayout.addView(actionButton)
+        }
+        
+        val helpButton = Button(context).apply {
+            text = "❓ Hilfe"
+            textSize = 14f
+            setBackgroundColor(Color.parseColor(COLOR_SECONDARY))
+            setTextColor(Color.WHITE)
+            setPadding(PADDING_SMALL)
+            setOnClickListener { onStepHelp(step) }
+        }
+        buttonsLayout.addView(helpButton)
+        
+        if (step.detectionMethod == ConfigDetectionMethod.USER_CONFIRMED_ONLY && !step.isCompleted) {
+            val confirmButton = Button(context).apply {
+                text = "✓ Erledigt"
+                textSize = 14f
+                setBackgroundColor(Color.parseColor(COLOR_SUCCESS))
+                setTextColor(Color.WHITE)
+                setPadding(PADDING_SMALL)
+                setOnClickListener { onStepConfirmation(step.id.name.lowercase()) }
+            }
+            buttonsLayout.addView(confirmButton)
+        }
+        
+        stepCard.apply {
+            addView(statusLayout)
+            addView(descriptionText)
+            addView(buttonsLayout)
+        }
+        
+        configStepsContainer?.addView(stepCard)
     }
     
-    private fun updateWarningsDisplay(warnings: List<String>) {
-        warningsContainer.removeAllViews()
+    private fun createReliabilityMetrics(reliability: OnePlusReliabilityMetrics) {
+        val reliabilityCard = createCard("📊 Zuverlässigkeits-Bewertung")
         
-        if (warnings.isEmpty()) {
-            warningsContainer.visibility = LinearLayout.GONE
-            return
+        // Progress bar for reliability
+        val progressLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(PADDING_STANDARD)
         }
         
-        warningsContainer.visibility = LinearLayout.VISIBLE
-        
-        val warningsTitle = TextView(context).apply {
-            text = "⚠️ Kritische OnePlus-Hinweise (Research-basiert)"
+        val reliabilityText = TextView(context).apply {
+            text = "Aktuelle Zuverlässigkeit: ${reliability.currentReliability}%"
             textSize = 16f
-            setTextColor(ContextCompat.getColor(context, android.R.color.black))
-            setPadding(0, 0, 0, 12)
+            setTextColor(Color.parseColor(COLOR_ON_SURFACE))
+            gravity = Gravity.CENTER
         }
-        warningsContainer.addView(warningsTitle)
+        
+        val progressBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = reliability.currentReliability
+            setPadding(0, PADDING_SMALL, 0, PADDING_SMALL)
+        }
+        
+        val levelText = TextView(context).apply {
+            text = "Stufe: ${reliability.reliabilityLevel.displayName}"
+            textSize = 14f
+            setTextColor(Color.parseColor(getReliabilityColor(reliability.reliabilityLevel)))
+            gravity = Gravity.CENTER
+        }
+        
+        val stepsText = TextView(context).apply {
+            text = "Konfigurierte Schritte: ${reliability.completedSteps}/${reliability.totalSteps}"
+            textSize = 14f
+            setTextColor(Color.parseColor(COLOR_SECONDARY))
+            gravity = Gravity.CENTER
+        }
+        
+        progressLayout.apply {
+            addView(reliabilityText)
+            addView(progressBar)
+            addView(levelText)
+            addView(stepsText)
+        }
+        
+        reliabilityCard.addView(progressLayout)
+        reliabilitySection?.addView(reliabilityCard)
+    }
+    
+    private fun createWarningsSection(warnings: List<String>) {
+        val warningsCard = createCard("⚠️ Wichtige Hinweise")
         
         warnings.forEach { warning ->
             val warningText = TextView(context).apply {
                 text = warning
                 textSize = 14f
-                setTextColor(ContextCompat.getColor(context, android.R.color.black))
-                setPadding(0, 4, 0, 4)
+                setTextColor(Color.parseColor(COLOR_ERROR))
+                setPadding(PADDING_STANDARD, PADDING_SMALL, PADDING_STANDARD, PADDING_SMALL)
             }
-            warningsContainer.addView(warningText)
+            warningsCard.addView(warningText)
+        }
+        
+        reliabilitySection?.addView(warningsCard)
+    }
+    
+    private fun createDebugSection(configStatus: EnhancedOnePlusConfigStatus) {
+        val debugCard = createCard("🧪 Debug-Information")
+        
+        val debugText = TextView(context).apply {
+            text = """
+                Validation Details: ${configStatus.validationDetails}
+                Capabilities: ${configStatus.capabilities}
+                Last Updated: ${configStatus.estimatedReliability.lastCalculated}
+            """.trimIndent()
+            textSize = 12f
+            setTextColor(Color.parseColor(COLOR_SECONDARY))
+            setPadding(PADDING_STANDARD)
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+        
+        debugCard.addView(debugText)
+        debugSection?.addView(debugCard)
+    }
+    
+    private fun createCard(title: String): LinearLayout {
+        val cardLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor(COLOR_SURFACE))
+            setPadding(0, 0, 0, PADDING_STANDARD)
+            
+            // Add some visual separation
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, PADDING_SMALL, 0, PADDING_SMALL)
+            }
+            layoutParams = params
+        }
+        
+        // Card title
+        val titleView = TextView(context).apply {
+            text = title
+            textSize = 18f
+            setTextColor(Color.parseColor(COLOR_ON_SURFACE))
+            setPadding(PADDING_STANDARD, PADDING_STANDARD, PADDING_STANDARD, PADDING_SMALL)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        
+        cardLayout.addView(titleView)
+        return cardLayout
+    }
+    
+    private fun getStepTitle(step: OnePlusConfigurationStep): String {
+        return "${getPriorityEmoji(step.priority)} ${step.title}"
+    }
+    
+    private fun getPriorityEmoji(priority: OnePlusConfigPriority): String {
+        return when (priority) {
+            OnePlusConfigPriority.CRITICAL -> "🔴"
+            OnePlusConfigPriority.HIGH -> "🟡"
+            OnePlusConfigPriority.MEDIUM -> "🔵"
+            OnePlusConfigPriority.LOW -> "⚪"
         }
     }
     
-    private fun updateDebugDisplay(configStatus: EnhancedOnePlusConfigStatus) {
-        if (!showDebugInfo) return
+    private fun getReliabilityColor(level: OnePlusReliabilityLevel): String {
+        return when (level) {
+            OnePlusReliabilityLevel.EXCELLENT -> COLOR_SUCCESS
+            OnePlusReliabilityLevel.GOOD -> COLOR_PRIMARY
+            OnePlusReliabilityLevel.FAIR -> COLOR_WARNING
+            OnePlusReliabilityLevel.POOR -> COLOR_ERROR
+        }
+    }
+    
+    /**
+     * Updates the loading state
+     */
+    fun updateLoadingState(isLoading: Boolean) {
+        loadingProgressBar?.parent?.let { loadingParent ->
+            (loadingParent as LinearLayout).visibility = if (isLoading) View.VISIBLE else View.GONE
+        }
         
-        debugContainer.removeAllViews()
+        mainContentLayout?.visibility = if (isLoading) View.GONE else View.VISIBLE
+    }
+    
+    /**
+     * Shows an error state
+     */
+    fun showErrorState(message: String) {
+        configStepsContainer?.removeAllViews()
         
-        val debugTitle = TextView(context).apply {
-            text = "🧪 Debug Information"
+        val errorLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(PADDING_LARGE)
+        }
+        
+        val errorIcon = TextView(context).apply {
+            text = "❌"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, PADDING_STANDARD)
+        }
+        
+        val errorText = TextView(context).apply {
+            text = message
             textSize = 16f
-            setTextColor(ContextCompat.getColor(context, android.R.color.white))
-            setPadding(0, 0, 0, 12)
+            setTextColor(Color.parseColor(COLOR_ERROR))
+            gravity = Gravity.CENTER
         }
-        debugContainer.addView(debugTitle)
         
-        val debugInfo = listOf(
-            "Validation Confidence: ${String.format("%.3f", configStatus.validationConfidence)}",
-            "Device Generation: ${configStatus.capabilities.recommendedConfigSteps.size} recommended steps",
-            "Reset Risk: ${String.format("%.1f%%", configStatus.capabilities.batteryOptimizationResetRisk * 100)}",
-            "Enhanced Optimization: ${configStatus.capabilities.hasEnhancedOptimization}",
-            "Last Calculated: ${configStatus.estimatedReliability.lastCalculated}"
-        )
+        errorLayout.addView(errorIcon)
+        errorLayout.addView(errorText)
+        configStepsContainer?.addView(errorLayout)
         
-        debugInfo.forEach { info ->
-            val debugText = TextView(context).apply {
-                text = "  • $info"
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(context, android.R.color.white))
-                setPadding(0, 2, 0, 2)
-            }
-            debugContainer.addView(debugText)
-        }
+        mainContentLayout?.visibility = View.VISIBLE
+        updateLoadingState(false)
     }
     
+    /**
+     * Shows feedback when user confirms a step
+     */
     fun showStepConfirmationFeedback() {
-        Toast.makeText(context, "✅ Schritt als abgeschlossen markiert!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "✅ Schritt als abgeschlossen markiert", Toast.LENGTH_SHORT).show()
     }
 }

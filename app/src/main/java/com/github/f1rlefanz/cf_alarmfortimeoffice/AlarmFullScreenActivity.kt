@@ -1,7 +1,6 @@
 package com.github.f1rlefanz.cf_alarmfortimeoffice
 
 import android.app.NotificationManager
-
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.*
@@ -12,6 +11,7 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmVerificationManager
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.BatteryOptimizationManager
 import com.github.f1rlefanz.cf_alarmfortimeoffice.service.VerificationSource
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -46,6 +46,10 @@ class AlarmFullScreenActivity : AppCompatActivity() {
     private lateinit var verificationManager: AlarmVerificationManager
     private var currentAlarmId: Int = -1
     
+    // OnePlus tolerance tracking
+    private var onePlusPauseStartTime: Long = 0
+    private var onePlusResumeCount: Int = 0
+    
     // UI Components
     private lateinit var shiftNameText: TextView
     private lateinit var alarmTimeText: TextView
@@ -77,6 +81,11 @@ class AlarmFullScreenActivity : AppCompatActivity() {
             Logger.w(LogTags.ALARM, "   1. Settings > Battery > Battery optimization > CF-Alarm > Don't optimize")
             Logger.w(LogTags.ALARM, "   2. Settings > App Management > CF-Alarm > Allow Auto Startup")
             Logger.w(LogTags.ALARM, "   3. Lock CF-Alarm in Recent Apps list")
+            
+            // Automatic OnePlus setup assistant activation if not optimized
+            if (!BatteryOptimizationManager(this).isIgnoringBatteryOptimizations()) {
+                Logger.w(LogTags.ALARM, "🔴 OnePlus device not optimized - setup assistant needed")
+            }
         }
         
         // Configure as full-screen, lock-screen overlay
@@ -97,7 +106,7 @@ class AlarmFullScreenActivity : AppCompatActivity() {
         // Start alarm sound and vibration
         startAlarmEffects()
         
-        // 🚀 PHASE 3: Verify alarm success
+        // 🚀 PHASE 3: Verify alarm success (with race condition tolerance)
         if (currentAlarmId != -1) {
             verificationManager.verifyAlarmSuccess(currentAlarmId, VerificationSource.FULL_SCREEN_ACTIVITY)
         }
@@ -112,7 +121,34 @@ class AlarmFullScreenActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Logger.i(LogTags.ALARM, "▶️ AlarmFullScreenActivity RESUMED")
+        
+        // Track OnePlus resume patterns
+        if (Build.MANUFACTURER.equals("OnePlus", ignoreCase = true)) {
+            onePlusResumeCount++
+            val pauseDuration = if (onePlusPauseStartTime > 0) {
+                System.currentTimeMillis() - onePlusPauseStartTime
+            } else 0
+            
+            Logger.i(LogTags.ALARM, "▶️ AlarmFullScreenActivity RESUMED (OnePlus: Resume #$onePlusResumeCount, Pause duration: ${pauseDuration}ms)")
+            
+            // 🚀 ENHANCED OnePlus Recovery: Multiple quick pause/resume patterns
+            if (pauseDuration in 1..5000) { // Extended tolerance up to 5 seconds
+                Logger.d(LogTags.ALARM, "✅ OnePlus pause/resume detected (${pauseDuration}ms) - maintaining alarm state")
+                
+                // Re-verify alarm success since OnePlus may have interfered
+                if (currentAlarmId != -1) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        verificationManager.verifyAlarmSuccess(currentAlarmId, VerificationSource.FULL_SCREEN_ACTIVITY)
+                        Logger.d(LogTags.ALARM, "🔄 Re-verified alarm success after OnePlus interference")
+                    }, 200) // Small delay to ensure activity is stable
+                }
+                
+                // Reset pause tracking
+                onePlusPauseStartTime = 0
+            }
+        } else {
+            Logger.i(LogTags.ALARM, "▶️ AlarmFullScreenActivity RESUMED")
+        }
         
         // 🔊 SOUND RECOVERY: Restart alarm sound if it was stopped during pause
         if (isAlarmActive && alarmRingtone?.isPlaying != true) {
@@ -123,11 +159,14 @@ class AlarmFullScreenActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        Logger.w(LogTags.ALARM, "⏸️ AlarmFullScreenActivity PAUSED - System intervention?")
         
-        // 🚨 CRITICAL OnePlus Detection: Log aggressive power management
+        // Track OnePlus pause patterns
         if (Build.MANUFACTURER.equals("OnePlus", ignoreCase = true)) {
+            onePlusPauseStartTime = System.currentTimeMillis()
+            Logger.w(LogTags.ALARM, "⏸️ AlarmFullScreenActivity PAUSED - OnePlus interference detected")
             Logger.e(LogTags.ALARM, "🔴 OnePlus DETECTED: Activity paused - likely aggressive power management!")
+        } else {
+            Logger.w(LogTags.ALARM, "⏸️ AlarmFullScreenActivity PAUSED - System intervention?")
         }
         
         // IMPORTANT: Keep wake lock active during pause for OnePlus compatibility
@@ -178,18 +217,25 @@ class AlarmFullScreenActivity : AppCompatActivity() {
             )
         }
         
-        // 📱 ENHANCED FULL-SCREEN CONFIGURATION
+        // 📱 ENHANCED FULL-SCREEN CONFIGURATION - Use modern APIs when possible
         window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
+        
+        // Modern keyguard dismissal - deprecated flags are maintained for compatibility
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+        }
         
         // 🎯 MODERN UI VISIBILITY: Compatible with Android 14+ edge-to-edge
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ (API 30): Modern window insets approach with null-safety
+            // Android 11+ (API 30): Modern window insets approach
             try {
-                window.decorView?.let { decorView ->
+                window.decorView.let { decorView ->
                     window.insetsController?.let { controller ->
                         controller.hide(
                             android.view.WindowInsets.Type.statusBars() or 
@@ -208,16 +254,13 @@ class AlarmFullScreenActivity : AppCompatActivity() {
                             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                         )
                     }
-                } ?: run {
-                    Logger.e(LogTags.ALARM, "❌ DecorView is null - cannot configure full-screen mode")
-                    // Try to continue without full-screen setup - better than crashing
                 }
             } catch (e: Exception) {
                 Logger.e(LogTags.ALARM, "❌ Failed to configure modern insets controller", e)
                 // Fallback to legacy approach on any exception
                 try {
                     @Suppress("DEPRECATION")
-                    window.decorView?.systemUiVisibility = (
+                    window.decorView.systemUiVisibility = (
                         View.SYSTEM_UI_FLAG_FULLSCREEN or
                         View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
                         View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -227,9 +270,9 @@ class AlarmFullScreenActivity : AppCompatActivity() {
                 }
             }
         } else {
-            // Legacy approach for Android 10 and below with null-safety
+            // Legacy approach for Android 10 and below
             try {
-                window.decorView?.let { decorView ->
+                window.decorView.let { decorView ->
                     @Suppress("DEPRECATION")
                     decorView.systemUiVisibility = (
                         View.SYSTEM_UI_FLAG_FULLSCREEN or
@@ -237,8 +280,6 @@ class AlarmFullScreenActivity : AppCompatActivity() {
                         View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     )
                     Logger.d(LogTags.ALARM, "✅ Legacy system UI visibility configured successfully")
-                } ?: run {
-                    Logger.e(LogTags.ALARM, "❌ DecorView is null - cannot configure legacy full-screen mode")
                 }
             } catch (e: Exception) {
                 Logger.e(LogTags.ALARM, "❌ Failed to configure legacy system UI visibility", e)
@@ -255,18 +296,17 @@ class AlarmFullScreenActivity : AppCompatActivity() {
         try {
             val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             
-            // 🔋 MODERN WAKE LOCK: Optimized for alarm use case
+            // Modern WAKE LOCK: Use PARTIAL_WAKE_LOCK for alarm compatibility
+            // The screen is already turned on by the full-screen activity setup
             wakeLock = powerManager.newWakeLock(
-                // Use SCREEN_BRIGHT_WAKE_LOCK for full alarm functionality
-                // ACQUIRE_CAUSES_WAKEUP ensures the screen turns on immediately
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.PARTIAL_WAKE_LOCK,
                 WAKE_LOCK_TAG
             ).apply {
                 setReferenceCounted(false) // Manual management for precise control
                 acquire(WAKE_LOCK_TIMEOUT)
             }
             
-            Logger.business(LogTags.ALARM, "✅ Enhanced wake lock acquired for full-screen activity (timeout: ${WAKE_LOCK_TIMEOUT}ms)")
+            Logger.business(LogTags.ALARM, "✅ Modern wake lock acquired for full-screen activity (timeout: ${WAKE_LOCK_TIMEOUT}ms)")
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM, "❌ Failed to acquire wake lock", e)
             // Continue without wake lock - the activity may still work
@@ -357,7 +397,7 @@ class AlarmFullScreenActivity : AppCompatActivity() {
         isAlarmActive = true
         
         // 🔊 ENHANCED ALARM SOUND: Multi-tier reliability approach
-        var soundStarted = false
+        var soundStarted: Boolean
         
         // Tier 1: Try RingtoneManager (preferred for alarm sounds)
         soundStarted = tryStartRingtoneAlarm()

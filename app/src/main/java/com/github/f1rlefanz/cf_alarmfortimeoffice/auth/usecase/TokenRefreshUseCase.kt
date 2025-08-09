@@ -43,6 +43,7 @@ class TokenRefreshUseCase(
      * 
      * MODERNIZED + OPTIMIZED: Uses ModernOAuth2TokenManager with smart caching
      * HYBRID-SUPPORT: Handles both legacy tokens and modern Credential Manager tokens
+     * CRITICAL FIX: Enhanced error handling and token validation
      */
     suspend fun ensureValidToken(): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -54,8 +55,10 @@ class TokenRefreshUseCase(
             lastTokenValidation?.let { cachedToken ->
                 val cacheAge = currentTime - lastValidationTime
                 if (cacheAge < TOKEN_VALIDATION_CACHE_MS) {
-                    Logger.d(LogTags.TOKEN, "✅ TOKEN-DIAGNOSTIC: Using valid Calendar access token (${(TOKEN_VALIDATION_CACHE_MS - cacheAge) / 1000}min remaining)")
+                    Logger.d(LogTags.TOKEN, "✅ TOKEN-DIAGNOSTIC: Using valid Calendar access token (${(TOKEN_VALIDATION_CACHE_MS - cacheAge) / 1000}s cache remaining)")
                     return@withContext Result.success(cachedToken)
+                } else {
+                    Logger.d(LogTags.TOKEN, "⏰ TOKEN-CACHE: Cache expired (${cacheAge / 1000}s old), validating token")
                 }
             }
             
@@ -81,37 +84,46 @@ class TokenRefreshUseCase(
             validationInProgress = true
             
             try {
-                Logger.d(LogTags.TOKEN, "Ensuring valid token")
+                Logger.business(LogTags.TOKEN, "🔍 TOKEN-VALIDATION: Starting comprehensive token validation")
                 
-                // Use modern token manager directly
+                // Use modern token manager directly with enhanced error handling
                 val result = modernOAuth2TokenManager.getValidCalendarToken()
                 
-                // PERFORMANCE: Cache successful token validation
+                // PERFORMANCE: Cache successful token validation with enhanced diagnostics
                 result.onSuccess { token ->
                     lastTokenValidation = token
                     lastValidationTime = currentTime
                     
-                    if (token == "credential_manager_auth_pending") {
-                        Logger.d(LogTags.TOKEN, "MODERN-AUTH: Using Credential Manager authentication flow")
-                        // This is valid - the token will trigger hybrid authentication in CalendarRepository
-                    } else {
-                        Logger.d(LogTags.TOKEN, "Using valid Calendar access token")
+                    when {
+                        token == "credential_manager_auth_pending" -> {
+                            Logger.d(LogTags.TOKEN, "🔐 MODERN-AUTH: Using Credential Manager authentication flow")
+                            // This is valid - the token will trigger hybrid authentication in CalendarRepository
+                        }
+                        token.startsWith("ya29.") -> {
+                            Logger.business(LogTags.TOKEN, "✅ TOKEN-OK: Real Google OAuth2 access token validated (ya29.)")
+                        }
+                        token.length < 10 -> {
+                            Logger.w(LogTags.TOKEN, "⚠️ TOKEN-SUSPICIOUS: Token seems too short (${token.length} chars)")
+                        }
+                        else -> {
+                            Logger.business(LogTags.TOKEN, "✅ TOKEN-VALID: Using validated Calendar access token (${token.take(20)}...)")
+                        }
                     }
                 }.onFailure { error ->
                     // Clear cache on failure
                     lastTokenValidation = null
                     lastValidationTime = 0L
                     
-                    // Better error handling based on error type
+                    // Enhanced error handling based on error type
                     when (error) {
                         is com.github.f1rlefanz.cf_alarmfortimeoffice.auth.TokenException.NoTokenAvailable -> {
-                            Logger.d(LogTags.TOKEN, "⚡ AUTH-FLOW: No Calendar token - user needs to authorize Calendar access")
+                            Logger.e(LogTags.TOKEN, "❌ AUTH-REQUIRED: No Calendar token - user needs to authorize Calendar access")
                         }
                         is com.github.f1rlefanz.cf_alarmfortimeoffice.auth.TokenException.AuthorizationExpired -> {
-                            Logger.d(LogTags.TOKEN, "⚡ AUTH-FLOW: Calendar authorization expired - re-authorization needed")
+                            Logger.e(LogTags.TOKEN, "❌ REAUTH-REQUIRED: Calendar authorization expired - re-authorization needed")
                         }
                         else -> {
-                            Logger.w(LogTags.TOKEN, "⚡ AUTH-FLOW: Calendar token validation failed: ${error.message}")
+                            Logger.e(LogTags.TOKEN, "❌ TOKEN-ERROR: Calendar token validation failed", error)
                         }
                     }
                 }
@@ -126,7 +138,20 @@ class TokenRefreshUseCase(
             throw e // Re-throw cancellation
         } catch (e: Exception) {
             Logger.e(LogTags.TOKEN, "Error ensuring valid token", e)
-            Result.failure(TokenException.UnknownError(e))
+            
+            // Enhanced error classification
+            val tokenException = when {
+                e.message?.contains("re-authentication") == true -> 
+                    TokenException.AuthorizationExpired("Calendar authorization expired - re-authentication required")
+                e.message?.contains("No user account") == true -> 
+                    TokenException.NoTokenAvailable
+                e.message?.contains("NetworkError") == true -> 
+                    TokenException.NetworkError("Network error during token validation")
+                else -> 
+                    TokenException.UnknownError(e)
+            }
+            
+            Result.failure(tokenException)
         }
     }
     
@@ -265,6 +290,10 @@ sealed class TokenException : Exception() {
     object NoTokenAvailable : TokenException() {
         override val message = "No authentication token available"
     }
+    
+    data class AuthorizationExpired(override val message: String) : TokenException()
+    
+    data class NetworkError(override val message: String) : TokenException()
     
     object RefreshNotPossible : TokenException() {
         override val message = "Token cannot be refreshed - re-authentication required"

@@ -55,6 +55,9 @@ class CFAlarmApplication : Application() {
         
         // Initialize OAuth2 token system and perform migrations
         initializeApp()
+        
+        // 🚀 PHASE 3: Initialize Background Services
+        initializeBackgroundServices()
     }
     
     /**
@@ -135,6 +138,27 @@ class CFAlarmApplication : Application() {
                 Logger.i(LogTags.APP, "App initialization completed successfully")
             } catch (e: Exception) {
                 Logger.e(LogTags.APP, "Error during app initialization", e)
+            }
+        }
+    }
+    
+    /**
+     * 🚀 PHASE 3: Initialize Background Services
+     * 
+     * Starts token refresh and OnePlus monitoring services
+     */
+    private fun initializeBackgroundServices() {
+        applicationScope.launch {
+            try {
+                Logger.business(LogTags.TOKEN, "🚀 PHASE 3: Initializing background services")
+                
+                // Initialize background service manager
+                appContainer.backgroundServiceManager.initializeBackgroundServices()
+                
+                Logger.business(LogTags.TOKEN, "✅ Background services initialized successfully")
+                
+            } catch (e: Exception) {
+                Logger.e(LogTags.TOKEN, "❌ Failed to initialize background services", e)
             }
         }
     }

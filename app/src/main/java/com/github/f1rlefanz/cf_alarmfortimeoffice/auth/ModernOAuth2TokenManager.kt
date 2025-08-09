@@ -32,6 +32,7 @@ class ModernOAuth2TokenManager(
      * 
      * MODERNIZED: Supports both legacy tokens and modern GoogleAuthUtil authentication
      * CRITICAL DIAGNOSTIC: Enhanced logging for token troubleshooting
+     * CRITICAL FIX: Improved token refresh logic for better reliability
      */
     suspend fun getValidCalendarToken(): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -49,9 +50,20 @@ class ModernOAuth2TokenManager(
                     Result.success(currentToken.accessToken)
                 }
                 
-                currentToken.canRefresh() -> {
+                currentToken.canRefresh() && !currentToken.accessToken.isBlank() -> {
                     Logger.business(LogTags.TOKEN, "🔄 TOKEN-DIAGNOSTIC: Calendar token expired (${-currentToken.getRemainingLifetimeMinutes()}min ago), attempting refresh")
-                    refreshCalendarToken(currentToken.refreshToken!!)
+                    
+                    // CRITICAL FIX: Improved token refresh with better error handling
+                    val refreshResult = refreshCalendarTokenImproved(currentToken.refreshToken)
+                    
+                    if (refreshResult.isSuccess) {
+                        Logger.business(LogTags.TOKEN, "✅ TOKEN-REFRESH: Calendar token refreshed successfully")
+                        refreshResult
+                    } else {
+                        Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Failed to refresh Calendar token", refreshResult.exceptionOrNull())
+                        Logger.w(LogTags.TOKEN, "💡 TOKEN-DIAGNOSTIC: Token refresh failed - user needs to re-authorize Calendar access")
+                        Result.failure(TokenException.AuthorizationExpired("Calendar token refresh failed - re-authorization required"))
+                    }
                 }
                 
                 else -> {
@@ -149,6 +161,84 @@ class ModernOAuth2TokenManager(
     }
     
     /**
+     * CRITICAL FIX: Improved Calendar token refresh with enhanced error handling
+     * Replaces the legacy refresh method with better diagnostics and fallback strategies
+     */
+    private suspend fun refreshCalendarTokenImproved(refreshToken: String?): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            Logger.business(LogTags.TOKEN, "🔄 TOKEN-REFRESH: Starting improved Calendar token refresh")
+            
+            if (refreshToken.isNullOrBlank()) {
+                Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Cannot refresh - no refresh token available")
+                return@withContext Result.failure(TokenException.RefreshFailed("No refresh token available"))
+            }
+            
+            // Clear any cached tokens to force fresh token request
+            GoogleAuthUtil.clearToken(context, refreshToken)
+            
+            // Get current user account (we need this for refresh)
+            val userEmail = getUserEmailFromAccounts()
+            
+            if (userEmail == null) {
+                Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Cannot refresh Calendar token - no user account found")
+                return@withContext Result.failure(TokenException.RefreshFailed("No user account available for token refresh"))
+            }
+            
+            Logger.d(LogTags.TOKEN, "📧 TOKEN-REFRESH: Using user account: $userEmail")
+            
+            val googleAccount = android.accounts.Account(userEmail, "com.google")
+            
+            // Get fresh access token with proper error handling
+            val newAccessToken = try {
+                GoogleAuthUtil.getToken(
+                    context,
+                    googleAccount,
+                    "oauth2:${CalendarScopes.CALENDAR_READONLY}"
+                )
+            } catch (e: Exception) {
+                Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: GoogleAuthUtil.getToken failed", e)
+                
+                val errorMessage = when {
+                    e.message?.contains("NetworkError") == true -> "Network error during token refresh"
+                    e.message?.contains("ServiceDisabled") == true -> "Google Calendar API service disabled"
+                    e.message?.contains("UserRecoverableAuth") == true -> "User interaction required for token refresh"
+                    e.message?.contains("Account not found") == true -> "Google account not found on device"
+                    else -> "Unknown error during token refresh: ${e.localizedMessage}"
+                }
+                
+                return@withContext Result.failure(TokenException.RefreshFailed(errorMessage))
+            }
+            
+            if (newAccessToken.isNullOrEmpty()) {
+                Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Empty token received from GoogleAuthUtil")
+                return@withContext Result.failure(TokenException.RefreshFailed("Empty access token received"))
+            }
+            
+            Logger.business(LogTags.TOKEN, "✅ TOKEN-REFRESH: New Calendar token obtained (${newAccessToken.take(20)}...)")
+            
+            val newExpiresAt = System.currentTimeMillis() + (3600L * 1000) // 1 hour
+            
+            // Update stored token
+            val updateResult = tokenStorage.updateAccessToken(
+                newAccessToken = newAccessToken,
+                newExpiresAt = newExpiresAt
+            )
+            
+            if (updateResult.isFailure) {
+                Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Failed to update stored Calendar token", updateResult.exceptionOrNull())
+                return@withContext Result.failure(TokenException.RefreshFailed("Failed to update stored Calendar token"))
+            }
+            
+            Logger.business(LogTags.TOKEN, "✅ TOKEN-REFRESH: Calendar access token refreshed successfully")
+            Result.success(newAccessToken)
+            
+        } catch (e: Exception) {
+            Logger.e(LogTags.TOKEN, "❌ TOKEN-REFRESH: Unexpected error during token refresh", e)
+            Result.failure(TokenException.RefreshFailed("Unexpected error: ${e.localizedMessage}"))
+        }
+    }
+    
+    /**
      * Refreshes Calendar access token using Google Account system.
      */
     private suspend fun refreshCalendarToken(refreshToken: String): Result<String> = withContext(Dispatchers.IO) {
@@ -198,36 +288,64 @@ class ModernOAuth2TokenManager(
     }
     
     /**
-     * Helper to get user email from SharedPreferences (consistent with AuthViewModel).
-     * CRITICAL FIX: Use same storage as AuthViewModel instead of Android Accounts system
+     * CRITICAL FIX: Enhanced user email retrieval with better diagnostics and fallbacks
+     * Gets user email from SharedPreferences (consistent with AuthViewModel) with Android Accounts fallback
      */
     private fun getUserEmailFromAccounts(): String? {
         return try {
+            Logger.d(LogTags.AUTH, "🔍 EMAIL-LOOKUP: Searching for user email...")
+            
             // CRITICAL FIX: Read from SharedPreferences where AuthViewModel stores it
             val prefs = context.getSharedPreferences("cf_alarm_auth", Context.MODE_PRIVATE)
             val email = prefs.getString("current_user_email", null)
             
             if (email != null) {
-                Logger.d(LogTags.AUTH, "User email retrieved from SharedPreferences: $email")
+                Logger.business(LogTags.AUTH, "✅ EMAIL-FOUND: User email retrieved from SharedPreferences: $email")
                 return email
             }
+            
+            Logger.w(LogTags.AUTH, "⚠️ EMAIL-MISSING: No user email found in SharedPreferences, trying Android Accounts fallback")
             
             // FALLBACK: Try Android Accounts system if SharedPreferences is empty
             val accountManager = context.getSystemService(Context.ACCOUNT_SERVICE) as android.accounts.AccountManager
             val accounts = accountManager.getAccountsByType("com.google")
+            
+            Logger.d(LogTags.AUTH, "📱 ANDROID-ACCOUNTS: Found ${accounts.size} Google accounts on device")
+            
+            if (accounts.isEmpty()) {
+                Logger.e(LogTags.AUTH, "❌ NO-ACCOUNTS: No Google accounts found on device")
+                Logger.e(LogTags.AUTH, "💡 ACCOUNT-HELP: User needs to add Google account to device in Settings")
+                return null
+            }
+            
             val fallbackEmail = accounts.firstOrNull()?.name
             
             if (fallbackEmail != null) {
-                Logger.d(LogTags.AUTH, "User email retrieved from Android Accounts as fallback: $fallbackEmail")
+                Logger.business(LogTags.AUTH, "✅ EMAIL-FALLBACK: User email retrieved from Android Accounts: $fallbackEmail")
+                
                 // Save to SharedPreferences for future use
                 prefs.edit().putString("current_user_email", fallbackEmail).apply()
+                Logger.d(LogTags.AUTH, "💾 EMAIL-SAVED: Email saved to SharedPreferences for future use")
+                
+                return fallbackEmail
             } else {
-                Logger.w(LogTags.AUTH, "No user email found in SharedPreferences or Android Accounts")
+                Logger.e(LogTags.AUTH, "❌ EMAIL-ERROR: Found Google accounts but no email addresses")
+                return null
             }
             
-            fallbackEmail
         } catch (e: Exception) {
-            Logger.e(LogTags.AUTH, "Error getting user email", e)
+            Logger.e(LogTags.AUTH, "❌ EMAIL-EXCEPTION: Error getting user email", e)
+            
+            // Enhanced error reporting
+            when {
+                e.message?.contains("SecurityException") == true -> {
+                    Logger.e(LogTags.AUTH, "💡 PERMISSION-HELP: App doesn't have permission to access accounts")
+                }
+                e.message?.contains("AccountManager") == true -> {
+                    Logger.e(LogTags.AUTH, "💡 ACCOUNT-HELP: AccountManager service not available")
+                }
+            }
+            
             null
         }
     }

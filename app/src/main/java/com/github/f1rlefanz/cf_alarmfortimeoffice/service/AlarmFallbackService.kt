@@ -13,6 +13,8 @@ import android.media.RingtoneManager
 import android.os.*
 import androidx.core.app.NotificationCompat
 import com.github.f1rlefanz.cf_alarmfortimeoffice.AlarmFullScreenActivity
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.FallbackActivationReason
+import com.github.f1rlefanz.cf_alarmfortimeoffice.service.EscalationLevel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.*
@@ -475,24 +477,4 @@ class AlarmFallbackService : Service() {
     }
 }
 
-/**
- * 🎯 Reasons why the fallback service was activated
- */
-enum class FallbackActivationReason(val displayName: String) {
-    ACTIVITY_FAILURE("Activity konnte nicht gestartet werden"),
-    ACTIVITY_KILLED("Activity wurde vom System beendet"),
-    ONEPLUS_INTERFERENCE("OnePlus Power Management Interferenz"),
-    USER_REQUESTED("Benutzer-angefordert"),
-    EXTREME_RELIABILITY("Extreme Zuverlässigkeits-Modus"),
-    TESTING("Test-Modus")
-}
 
-/**
- * 📈 Escalation levels for progressive alarm intensity
- */
-enum class EscalationLevel {
-    GENTLE,     // Start quietly for false alarms
-    STANDARD,   // Normal alarm intensity
-    AGGRESSIVE, // Higher intensity for heavy sleepers
-    MAXIMUM     // Maximum intensity for extreme cases
-}

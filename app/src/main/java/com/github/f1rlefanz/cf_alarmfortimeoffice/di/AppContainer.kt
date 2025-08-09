@@ -157,6 +157,11 @@ class AppContainer(private val context: Context) {
         )
     }
     
+    // 🚀 PHASE 3: Background Service Manager - für Token-Refresh und OnePlus-Monitoring
+    val backgroundServiceManager by lazy {
+        com.github.f1rlefanz.cf_alarmfortimeoffice.service.BackgroundServiceManager.getInstance(context)
+    }
+    
     val alarmAudioManager by lazy {
         com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmAudioManager(context, wakeLockManager)
     }
