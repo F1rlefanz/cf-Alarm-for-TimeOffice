@@ -12,28 +12,22 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmVerificationManager
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.oneplus.validation.OnePlusDeviceValidator
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.oneplus.validation.OnePlusDeviceValidationResult
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.oneplus.OnePlusSetupActivity
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
- * Enhanced BroadcastReceiver for alarms with Android 14+ compatibility.
+ * Simplified BroadcastReceiver for alarms - Focus on reliable core functionality.
  * 
- * Features:
- * - Android 14+ Full-Screen Intent APIs with ActivityOptions
- * - Enhanced notification reliability for all Android versions
- * - Optimized wake lock management
- * - Comprehensive error handling and logging
- * - OnePlus device detection and failure monitoring
+ * REFACTORED: Removed all complex OnePlus-specific verification and fallback mechanisms.
+ * This version focuses on the essential alarm functionality that already works perfectly.
  * 
- * Based on the working backup implementation but modernized for 2025.
+ * Core Features:
+ * - Reliable wake lock management
+ * - Android 14+ Full-Screen Intent compatibility  
+ * - Enhanced notification with high priority
+ * - Clean, simple, and maintainable code
+ * 
+ * Philosophy: If the alarm works (and it does!), keep it simple.
  */
 class AlarmReceiver : BroadcastReceiver() {
     
@@ -65,17 +59,6 @@ class AlarmReceiver : BroadcastReceiver() {
             val shiftTime = intent.getStringExtra(EXTRA_SHIFT_TIME) ?: ""
             val alarmId = intent.getIntExtra(EXTRA_ALARM_ID, -1)
             
-            // Start alarm verification monitoring
-            val verificationManager = AlarmVerificationManager(context)
-            verificationManager.startAlarmVerification(
-                alarmId = alarmId,
-                shiftName = shiftName,
-                alarmTime = shiftTime
-            )
-            
-            // Start alarm failure detection for OnePlus devices
-            startAlarmFailureDetection(context, alarmId, shiftName)
-            
             // Create notification channel (only needed once)
             createNotificationChannel(context)
             
@@ -85,7 +68,7 @@ class AlarmReceiver : BroadcastReceiver() {
             // Start full-screen alarm activity
             showFullScreenAlarm(context, shiftName, shiftTime, alarmId)
             
-            Logger.business(LogTags.ALARM_RECEIVER, "✅ Alarm $alarmId for $shiftName triggered successfully with verification")
+            Logger.business(LogTags.ALARM_RECEIVER, "✅ Alarm $alarmId for $shiftName triggered successfully - Simple and reliable!")
             
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM_RECEIVER, "❌ Error handling alarm", e)
@@ -94,212 +77,6 @@ class AlarmReceiver : BroadcastReceiver() {
             if (wakeLock.isHeld) {
                 wakeLock.release()
             }
-        }
-    }
-    
-    /**
-     * Start alarm failure detection for OnePlus-specific problems
-     */
-    private fun startAlarmFailureDetection(context: Context, alarmId: Int, shiftName: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Logger.business(LogTags.ALARM_RECEIVER, "🔍 FAILURE-DETECTION: Starting monitoring for alarm $alarmId")
-                
-                // Wait for verification completion or failure
-                delay(30000) // Wait 30 seconds for normal verification
-                
-                // Check if alarm verification succeeded
-                val verificationManager = AlarmVerificationManager(context)
-                val verificationStatus = verificationManager.getVerificationStatus(alarmId)
-                
-                when (verificationStatus) {
-                    "SUCCESS" -> {
-                        Logger.business(LogTags.ALARM_RECEIVER, "✅ FAILURE-DETECTION: Alarm $alarmId verified successfully")
-                        return@launch
-                    }
-                    "TIMEOUT", "UNKNOWN", "FAILED" -> {
-                        Logger.w(LogTags.ALARM_RECEIVER, "⚠️ FAILURE-DETECTION: Alarm $alarmId failed verification - Status: $verificationStatus")
-                        handleAlarmFailure(context, alarmId, shiftName, verificationStatus)
-                    }
-                    else -> {
-                        Logger.w(LogTags.ALARM_RECEIVER, "⚠️ FAILURE-DETECTION: Alarm $alarmId has unknown status: $verificationStatus")
-                        handleAlarmFailure(context, alarmId, shiftName, "UNKNOWN_STATUS")
-                    }
-                }
-                
-            } catch (e: Exception) {
-                Logger.e(LogTags.ALARM_RECEIVER, "❌ FAILURE-DETECTION: Error monitoring alarm $alarmId", e)
-                // Defensive: Even if monitoring fails, try to detect OnePlus issues
-                if (isOnePlusDevice(context)) {
-                    Logger.business(LogTags.ALARM_RECEIVER, "🔧 FAILURE-DETECTION: OnePlus device detected, recommending configuration check")
-                    triggerOnePlusSetupIfNeeded(context, "MONITORING_ERROR")
-                }
-            }
-        }
-    }
-    
-    /**
-     * Handle detected alarm failures with OnePlus-specific logic
-     */
-    private suspend fun handleAlarmFailure(context: Context, alarmId: Int, shiftName: String, failureReason: String) {
-        Logger.business(LogTags.ALARM_RECEIVER, "🚨 ALARM-FAILURE: Handling failure for alarm $alarmId - Reason: $failureReason")
-        
-        // Check if this is a OnePlus device
-        if (isOnePlusDevice(context)) {
-            Logger.business(LogTags.ALARM_RECEIVER, "📱 OnePlus device detected - analyzing failure pattern")
-            
-            // Track failure in SharedPreferences for pattern analysis
-            trackAlarmFailure(context, alarmId, shiftName, failureReason)
-            
-            // Check failure frequency
-            val recentFailures = getRecentAlarmFailures(context)
-            
-            when {
-                recentFailures >= 2 -> {
-                    Logger.business(LogTags.ALARM_RECEIVER, "🔥 CRITICAL: $recentFailures recent alarm failures detected - Triggering OnePlus setup")
-                    triggerOnePlusSetupIfNeeded(context, "MULTIPLE_FAILURES")
-                }
-                failureReason == "TIMEOUT" -> {
-                    Logger.w(LogTags.ALARM_RECEIVER, "⏱️ TIMEOUT detected - Likely OnePlus power management interference")
-                    delay(5000) // Wait 5 seconds, then check setup need
-                    triggerOnePlusSetupIfNeeded(context, "TIMEOUT_PATTERN")
-                }
-                failureReason == "UNKNOWN" -> {
-                    Logger.w(LogTags.ALARM_RECEIVER, "❓ Unknown failure - Could be OnePlus lifecycle interruption")
-                    triggerOnePlusSetupIfNeeded(context, "UNKNOWN_FAILURE")
-                }
-            }
-        } else {
-            Logger.i(LogTags.ALARM_RECEIVER, "📱 Non-OnePlus device - Using standard failure handling")
-            // For non-OnePlus devices, log the failure but don't trigger OnePlus setup
-            trackAlarmFailure(context, alarmId, shiftName, failureReason)
-        }
-    }
-    
-    /**
-     * Track alarm failures in SharedPreferences for pattern analysis
-     */
-    private fun trackAlarmFailure(context: Context, alarmId: Int, shiftName: String, reason: String) {
-        try {
-            val prefs = context.getSharedPreferences("alarm_failures", Context.MODE_PRIVATE)
-            val currentTime = System.currentTimeMillis()
-            
-            // Record this failure
-            val failureKey = "failure_${currentTime}"
-            prefs.edit()
-                .putString(failureKey, "$alarmId|$shiftName|$reason|$currentTime")
-                .putLong("last_failure_time", currentTime)
-                .apply()
-                
-            Logger.business(LogTags.ALARM_RECEIVER, "📊 TRACKING: Alarm failure recorded - ID:$alarmId, Reason:$reason")
-            
-            // Cleanup old failures (older than 7 days)
-            cleanupOldFailures(prefs, currentTime)
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error tracking alarm failure", e)
-        }
-    }
-    
-    /**
-     * Analyze recent alarm failures (last 24h)
-     */
-    private fun getRecentAlarmFailures(context: Context): Int {
-        return try {
-            val prefs = context.getSharedPreferences("alarm_failures", Context.MODE_PRIVATE)
-            val currentTime = System.currentTimeMillis()
-            val oneDayAgo = currentTime - (24 * 60 * 60 * 1000) // 24 hours ago
-            
-            var recentFailures = 0
-            
-            for ((key, value) in prefs.all) {
-                if (key.startsWith("failure_") && value is String) {
-                    val parts = value.split("|")
-                    if (parts.size >= 4) {
-                        val failureTime = parts[3].toLongOrNull()
-                        if (failureTime != null && failureTime > oneDayAgo) {
-                            recentFailures++
-                        }
-                    }
-                }
-            }
-            
-            Logger.business(LogTags.ALARM_RECEIVER, "📈 ANALYSIS: $recentFailures recent alarm failures in last 24h")
-            recentFailures
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error analyzing recent failures", e)
-            0
-        }
-    }
-    
-    /**
-     * Clean up old failure records (older than 7 days)
-     */
-    private fun cleanupOldFailures(prefs: android.content.SharedPreferences, currentTime: Long) {
-        try {
-            val sevenDaysAgo = currentTime - (7 * 24 * 60 * 60 * 1000) // 7 days ago
-            val editor = prefs.edit()
-            var cleanedCount = 0
-            
-            for ((key, value) in prefs.all) {
-                if (key.startsWith("failure_") && value is String) {
-                    val parts = value.split("|")
-                    if (parts.size >= 4) {
-                        val failureTime = parts[3].toLongOrNull()
-                        if (failureTime != null && failureTime < sevenDaysAgo) {
-                            editor.remove(key)
-                            cleanedCount++
-                        }
-                    }
-                }
-            }
-            
-            if (cleanedCount > 0) {
-                editor.apply()
-                Logger.d(LogTags.ALARM_RECEIVER, "🧹 CLEANUP: Removed $cleanedCount old alarm failure records")
-            }
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error during failure cleanup", e)
-        }
-    }
-    
-    /**
-     * Trigger OnePlus Setup Activity for detected problems
-     */
-    private fun triggerOnePlusSetupIfNeeded(context: Context, trigger: String) {
-        try {
-            // Check if OnePlus setup was recently shown (avoid spam)
-            val prefs = context.getSharedPreferences("oneplus_setup", Context.MODE_PRIVATE)
-            val lastShown = prefs.getLong("last_shown_time", 0)
-            val currentTime = System.currentTimeMillis()
-            val sixHoursAgo = currentTime - (6 * 60 * 60 * 1000) // 6 hours
-            
-            if (lastShown > sixHoursAgo) {
-                Logger.d(LogTags.ALARM_RECEIVER, "⏭️ SETUP-THROTTLE: OnePlus setup shown recently, skipping")
-                return
-            }
-            
-            // Update last shown time
-            prefs.edit()
-                .putLong("last_shown_time", currentTime)
-                .putString("last_trigger_reason", trigger)
-                .apply()
-            
-            // Launch OnePlus Setup Activity
-            val setupIntent = Intent(context, OnePlusSetupActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("trigger_reason", trigger)
-                putExtra("triggered_by", "alarm_failure_detection")
-                putExtra("trigger_time", currentTime)
-            }
-            
-            context.startActivity(setupIntent)
-            Logger.business(LogTags.ALARM_RECEIVER, "🚀 SETUP-TRIGGER: OnePlus setup launched due to: $trigger")
-            
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error triggering OnePlus setup", e)
         }
     }
     
@@ -339,7 +116,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 putExtra("shift_name", shiftName)
                 putExtra("alarm_time", shiftTime)
                 putExtra("alarm_id", alarmId)
-                putExtra("triggered_via", "full_screen_notification") // Track trigger source
+                putExtra("triggered_via", "full_screen_notification")
             }
             
             // Android 14+ ENHANCEMENT: Modern Full-Screen Intent with ActivityOptions
@@ -410,7 +187,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 putExtra("shift_name", shiftName)
                 putExtra("alarm_time", shiftTime)
                 putExtra("alarm_id", alarmId)
-                putExtra("triggered_via", "direct_activity_start") // Track trigger source
+                putExtra("triggered_via", "direct_activity_start")
                 setPackage(context.packageName)
             }
             
@@ -432,20 +209,6 @@ class AlarmReceiver : BroadcastReceiver() {
             
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM_RECEIVER, "❌ Error starting full-screen activity", e)
-        }
-    }
-    
-    /**
-     * Helper method to check if device is OnePlus
-     */
-    private fun isOnePlusDevice(context: Context): Boolean {
-        return try {
-            val validator = OnePlusDeviceValidator(context)
-            val result = validator.validateOnePlusDevice()
-            result is OnePlusDeviceValidationResult.Valid
-        } catch (e: Exception) {
-            Logger.e(LogTags.ALARM_RECEIVER, "❌ Error checking OnePlus device", e)
-            false
         }
     }
 }

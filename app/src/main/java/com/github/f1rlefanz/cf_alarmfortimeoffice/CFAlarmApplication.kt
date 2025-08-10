@@ -2,7 +2,6 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice
 
 import android.app.Application
 import com.github.f1rlefanz.cf_alarmfortimeoffice.di.AppContainer
-import com.github.f1rlefanz.cf_alarmfortimeoffice.security.SecurityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +17,20 @@ import java.io.File
 import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
+/**
+ * Simplified Application class - Focus on reliable core functionality.
+ * 
+ * REFACTORED: Removed complex security assessments and background service monitoring.
+ * This version focuses on the essential app initialization that already works perfectly.
+ * 
+ * Core Features:
+ * - Firebase Crashlytics initialization
+ * - Dependency injection container
+ * - OAuth2 token system initialization
+ * - Clean resource management
+ * 
+ * Philosophy: If the app works (and it does!), keep it simple.
+ */
 class CFAlarmApplication : Application() {
     
     // Application scope for long-running operations
@@ -26,9 +39,6 @@ class CFAlarmApplication : Application() {
     // Dependency container
     lateinit var appContainer: AppContainer
         private set
-        
-    // PHASE 2: Security Manager for enhanced security validation
-    private lateinit var securityManager: SecurityManager
     
     override fun onCreate() {
         super.onCreate()
@@ -39,13 +49,10 @@ class CFAlarmApplication : Application() {
         // Initialize dependency container
         appContainer = AppContainer(this)
         
-        // PHASE 2: Initialize Security Manager
-        securityManager = SecurityManager(this)
-        
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
             
-            // File-Logging für 3-Tage-Analyse
+            // File-Logging für Debug-Analyse
             val logFile = File(getExternalFilesDir(null), "debug_logs.txt")
             Timber.plant(SimpleFileTree(logFile))
             
@@ -53,11 +60,10 @@ class CFAlarmApplication : Application() {
             Logger.i(LogTags.APP, "🗂️ Debug logs will be saved to: ${logFile.absolutePath}")
         }
         
-        // Initialize OAuth2 token system and perform migrations
+        // Initialize app components
         initializeApp()
         
-        // 🚀 PHASE 3: Initialize Background Services
-        initializeBackgroundServices()
+        Logger.i(LogTags.APP, "✅ CFAlarmApplication initialized - Simple and reliable!")
     }
     
     /**
@@ -89,21 +95,11 @@ class CFAlarmApplication : Application() {
     private fun initializeApp() {
         applicationScope.launch {
             try {
-                // PERFORMANCE: Initialize critical components first
+                // Initialize critical components first
                 Logger.d(LogTags.AUTH, "Initializing OAuth2 token storage")
                 appContainer.initializeTokenStorage()
                 
-                // PHASE 2: Perform comprehensive security assessment
-                Logger.business(LogTags.SECURITY, "🔒 PHASE-2: Performing comprehensive security assessment...")
-                val securityAssessment = securityManager.performSecurityAssessment()
-                
-                // Log security assessment summary
-                Logger.business(LogTags.SECURITY, "📋 SECURITY-SUMMARY: Overall Level = ${securityAssessment.overallSecurityLevel}")
-                if (securityAssessment.rootDetection.isRooted) {
-                    Logger.w(LogTags.SECURITY, "⚠️  USER-NOTICE: Device root detected - using enhanced security measures")
-                }
-                
-                // TIMING FIX: Initialize ShiftConfig early to prevent race conditions
+                // Initialize ShiftConfig early to prevent race conditions
                 Logger.d(LogTags.SHIFT_CONFIG, "🔄 STARTUP: Initializing ShiftConfig early to prevent timing issues")
                 launch {
                     try {
@@ -128,13 +124,6 @@ class CFAlarmApplication : Application() {
                     }
                 }
                 
-                // PERFORMANCE: Defer non-critical migrations to reduce startup time
-                launch {
-                    Logger.d(LogTags.DATASTORE, "Running DataStore migration")
-                    // Migration call removed to avoid blocking main thread
-                    // appContainer.authDataStoreRepository.migrateTokenExpiryIfNeeded()
-                }
-                
                 Logger.i(LogTags.APP, "App initialization completed successfully")
             } catch (e: Exception) {
                 Logger.e(LogTags.APP, "Error during app initialization", e)
@@ -143,28 +132,7 @@ class CFAlarmApplication : Application() {
     }
     
     /**
-     * 🚀 PHASE 3: Initialize Background Services
-     * 
-     * Starts token refresh and OnePlus monitoring services
-     */
-    private fun initializeBackgroundServices() {
-        applicationScope.launch {
-            try {
-                Logger.business(LogTags.TOKEN, "🚀 PHASE 3: Initializing background services")
-                
-                // Initialize background service manager
-                appContainer.backgroundServiceManager.initializeBackgroundServices()
-                
-                Logger.business(LogTags.TOKEN, "✅ Background services initialized successfully")
-                
-            } catch (e: Exception) {
-                Logger.e(LogTags.TOKEN, "❌ Failed to initialize background services", e)
-            }
-        }
-    }
-    
-    /**
-     * LIFECYCLE FIX: Properly dispose resources to prevent Race Conditions
+     * Properly dispose resources to prevent Race Conditions
      * Especially important for Development when AS forces app termination
      */
     override fun onTerminate() {
