@@ -149,15 +149,7 @@ class AppContainer(private val context: Context) {
         com.github.f1rlefanz.cf_alarmfortimeoffice.service.BatteryOptimizationManager(context)
     }
     
-    // OnePlus Configuration Checker - für proaktive Konfigurationsüberwachung
-    val onePlusConfigurationChecker by lazy {
-        com.github.f1rlefanz.cf_alarmfortimeoffice.service.OnePlusConfigurationChecker(
-            context = context,
-            batteryOptimizationManager = batteryOptimizationManager
-        )
-    }
-    
-    // 🚀 PHASE 3: Background Service Manager - für Token-Refresh und OnePlus-Monitoring
+    // Background Service Manager - für Token-Refresh
     val backgroundServiceManager by lazy {
         com.github.f1rlefanz.cf_alarmfortimeoffice.service.BackgroundServiceManager.getInstance(context)
     }

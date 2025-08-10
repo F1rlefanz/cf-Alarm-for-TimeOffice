@@ -5,7 +5,6 @@ import android.os.Build
 import androidx.work.*
 import androidx.work.CoroutineWorker
 import com.github.f1rlefanz.cf_alarmfortimeoffice.service.worker.BackgroundTokenRefreshWorker
-import com.github.f1rlefanz.cf_alarmfortimeoffice.service.worker.OnePlusConfigurationMonitorWorker
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import kotlinx.coroutines.Dispatchers
@@ -13,10 +12,17 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * 🚀 PHASE 3: Background Service Manager
+ * Simplified Background Service Manager - Focus on reliable core functionality.
  * 
- * Centralized manager for all background services including token refresh
- * and OnePlus configuration monitoring.
+ * REFACTORED: Removed OnePlus-specific monitoring and complex configuration tracking.
+ * This version focuses on the essential token refresh service that already works perfectly.
+ * 
+ * Core Features:
+ * - Background token refresh worker management
+ * - Clean service lifecycle management
+ * - Simple alarm failure handling
+ * 
+ * Philosophy: If the service works (and it does!), keep it simple.
  */
 class BackgroundServiceManager(
     private val context: Context
@@ -37,20 +43,14 @@ class BackgroundServiceManager(
     private val preferences = context.getSharedPreferences("background_services", Context.MODE_PRIVATE)
     
     /**
-     * Initializes all background services
+     * Initializes background services
      */
     fun initializeBackgroundServices() {
         Logger.business(LogTags.TOKEN, "🚀 Initializing background services")
         
         try {
-            // Always start token refresh service
+            // Start token refresh service
             BackgroundTokenRefreshWorker.scheduleTokenRefresh(context)
-            
-            // Start OnePlus monitoring only on OnePlus devices
-            if (BatteryOptimizationManager.isOnePlusDevice()) {
-                OnePlusConfigurationMonitorWorker.startMonitoring(context)
-                Logger.business(LogTags.BATTERY_OPTIMIZATION, "🔴 OnePlus monitoring started")
-            }
             
             // Mark services as started
             preferences.edit()
@@ -58,7 +58,7 @@ class BackgroundServiceManager(
                 .putString("device_info", "${Build.MANUFACTURER} ${Build.MODEL}")
                 .apply()
             
-            Logger.business(LogTags.TOKEN, "✅ Background services initialized successfully")
+            Logger.business(LogTags.TOKEN, "✅ Background services initialized successfully - Simple and reliable!")
             
         } catch (e: Exception) {
             Logger.e(LogTags.TOKEN, "❌ Failed to initialize background services", e)
@@ -86,13 +86,11 @@ class BackgroundServiceManager(
         // Trigger urgent token refresh in case it was an auth issue
         triggerUrgentTokenRefresh()
         
-        // Log failure for OnePlus monitoring
-        if (BatteryOptimizationManager.isOnePlusDevice()) {
-            preferences.edit()
-                .putLong("last_alarm_failure", System.currentTimeMillis())
-                .putString("last_failure_reason", failureReason)
-                .apply()
-        }
+        // Log failure for tracking
+        preferences.edit()
+            .putLong("last_alarm_failure", System.currentTimeMillis())
+            .putString("last_failure_reason", failureReason)
+            .apply()
     }
     
     /**
@@ -101,7 +99,6 @@ class BackgroundServiceManager(
     fun stopAllBackgroundServices() {
         try {
             BackgroundTokenRefreshWorker.cancelTokenRefresh(context)
-            OnePlusConfigurationMonitorWorker.stopMonitoring(context)
             
             Logger.business(LogTags.TOKEN, "🛑 All background services stopped")
         } catch (e: Exception) {

@@ -17,15 +17,15 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 
 /**
  * Enhanced AlarmManager service with maximum reliability and doze mode compatibility.
- * 
+ *
  * Key Features:
- * - Uses setAlarmClock() for maximum doze mode reliability  
+ * - Uses setAlarmClock() for maximum doze mode reliability
  * - Integrated battery optimization management
  * - Structured error handling with Result types
  * - Resource management and cleanup
  * - Comprehensive debugging capabilities
  * - 🚀 PHASE 3: Proactive Token-Refresh-Integration
- * 
+ *
  * Architecture: Clean separation of concerns with dependency injection support
  */
 class AlarmManagerService(
@@ -40,7 +40,7 @@ class AlarmManagerService(
         val systemAlarmSet: Boolean,
         val canScheduleExactAlarms: Boolean,
         val alarmStatusMessage: String?,
-        val batteryOptimizationStatus: BatteryOptimizationStatus? = null,
+        val batteryOptimizationExempt: Boolean = false,
         val recommendedActions: List<String> = emptyList()
     )
 
@@ -55,38 +55,37 @@ class AlarmManagerService(
      */
     fun checkAlarmPermissions(): AlarmPermissionStatus {
         val canScheduleExact = canScheduleExactAlarms()
-        val batteryStatus = batteryOptimizationManager.getBatteryOptimizationStatus()
-        
+        val batteryExempt = batteryOptimizationManager.isIgnoringBatteryOptimizations()
+
         val overallStatus = when {
-            canScheduleExact && batteryStatus.isExempt -> AlarmPermissionLevel.OPTIMAL
-            canScheduleExact && !batteryStatus.isExempt -> AlarmPermissionLevel.GOOD_BUT_RISKY
-            !canScheduleExact && batteryStatus.isExempt -> AlarmPermissionLevel.MISSING_EXACT_ALARM
+            canScheduleExact && batteryExempt -> AlarmPermissionLevel.OPTIMAL
+            canScheduleExact && !batteryExempt -> AlarmPermissionLevel.GOOD_BUT_RISKY
+            !canScheduleExact && batteryExempt -> AlarmPermissionLevel.MISSING_EXACT_ALARM
             else -> AlarmPermissionLevel.CRITICAL_MISSING
         }
-        
+
         return AlarmPermissionStatus(
             level = overallStatus,
             canScheduleExactAlarms = canScheduleExact,
-            batteryOptimizationExempt = batteryStatus.isExempt,
-            recommendations = buildRecommendations(canScheduleExact, batteryStatus)
+            batteryOptimizationExempt = batteryExempt,
+            recommendations = buildRecommendations(canScheduleExact, batteryExempt)
         )
     }
-    
-    private fun buildRecommendations(canScheduleExact: Boolean, batteryStatus: BatteryOptimizationStatus): List<String> {
+
+    private fun buildRecommendations(
+        canScheduleExact: Boolean,
+        batteryExempt: Boolean
+    ): List<String> {
         val recommendations = mutableListOf<String>()
-        
+
         if (!canScheduleExact) {
             recommendations.add("Aktiviere 'Exakte Alarme' in den App-Einstellungen")
         }
-        
-        if (!batteryStatus.isExempt) {
+
+        if (!batteryExempt) {
             recommendations.add("Aktiviere Akkuoptimierung-Ausnahme für zuverlässige Alarme")
         }
-        
-        batteryStatus.manufacturerSpecificNote?.let { note ->
-            recommendations.add(note)
-        }
-        
+
         return recommendations
     }
 
@@ -120,7 +119,7 @@ class AlarmManagerService(
                     )
                 )
                 NextAlarmInfo(
-                    triggerTime = triggerTime, 
+                    triggerTime = triggerTime,
                     formattedTime = formattedTime,
                     isAlarmClockType = true // AlarmClock API used
                 )
@@ -135,13 +134,13 @@ class AlarmManagerService(
 
     /**
      * Setzt einen Alarm für eine Schicht mit EINDEUTIGEM Request Code
-     * 
+     *
      * @param shiftMatch Die Schicht-Informationen
      * @param autoAlarmEnabled Ob Auto-Alarm aktiviert ist
      * @param alarmId EINDEUTIGE ID für diesen Alarm (z.B. aus der Datenbank)
      */
     fun setAlarmFromShiftMatch(
-        shiftMatch: ShiftMatch, 
+        shiftMatch: ShiftMatch,
         autoAlarmEnabled: Boolean,
         alarmId: Int // NEU: Eindeutige Alarm-ID!
     ): AlarmStatus {
@@ -166,7 +165,10 @@ class AlarmManagerService(
         )
 
         if (!permissionStatus.canScheduleExactAlarms) {
-            Logger.w(LogTags.ALARM_MANAGER, "❌ No permission for exact alarms - requesting permission")
+            Logger.w(
+                LogTags.ALARM_MANAGER,
+                "❌ No permission for exact alarms - requesting permission"
+            )
             // Auto-request permission for better UX
             requestExactAlarmPermission()
             return createAlarmStatus(
@@ -267,7 +269,7 @@ class AlarmManagerService(
             action = "com.github.f1rlefanz.cf_alarmfortimeoffice.ENHANCED_ALARM_$alarmId"
         }
     }
-    
+
     /**
      * Creates PendingIntent for alarm with proper flags
      */
@@ -279,7 +281,7 @@ class AlarmManagerService(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
-    
+
     /**
      * Creates show intent for AlarmClockInfo (when user taps on system alarm)
      */
@@ -290,7 +292,7 @@ class AlarmManagerService(
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             setPackage(application.packageName)
         }
-        
+
         return PendingIntent.getActivity(
             application,
             alarmId + 10000, // Offset to avoid conflicts
@@ -298,7 +300,7 @@ class AlarmManagerService(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
-    
+
     /**
      * Creates AlarmStatus with comprehensive information
      */
@@ -307,13 +309,11 @@ class AlarmManagerService(
         message: String,
         recommendations: List<String> = emptyList()
     ): AlarmStatus {
-        val batteryStatus = batteryOptimizationManager.getBatteryOptimizationStatus()
-        
         return AlarmStatus(
             systemAlarmSet = systemAlarmSet,
             canScheduleExactAlarms = canScheduleExactAlarms(),
             alarmStatusMessage = message,
-            batteryOptimizationStatus = batteryStatus,
+            batteryOptimizationExempt = batteryOptimizationManager.isIgnoringBatteryOptimizations(),
             recommendedActions = recommendations
         )
     }
@@ -323,13 +323,16 @@ class AlarmManagerService(
      */
     fun cancelSystemAlarm(alarmId: Int): AlarmStatus {
         return try {
-            Logger.business(LogTags.ALARM_MANAGER, "🗑️ ENHANCED ALARM: Cancelling alarm ID: $alarmId")
-            
+            Logger.business(
+                LogTags.ALARM_MANAGER,
+                "🗑️ ENHANCED ALARM: Cancelling alarm ID: $alarmId"
+            )
+
             val alarmIntent = Intent(application, AlarmReceiver::class.java).apply {
                 setPackage(application.packageName)
                 action = "com.github.f1rlefanz.cf_alarmfortimeoffice.ENHANCED_ALARM_$alarmId"
             }
-            
+
             val pendingIntent = PendingIntent.getBroadcast(
                 application,
                 alarmId,
@@ -341,8 +344,11 @@ class AlarmManagerService(
             alarmManager.cancel(pendingIntent)
             pendingIntent.cancel()
 
-            Logger.business(LogTags.ALARM_MANAGER, "✅ ENHANCED ALARM: System alarm cancelled (ID: $alarmId)")
-            
+            Logger.business(
+                LogTags.ALARM_MANAGER,
+                "✅ ENHANCED ALARM: System alarm cancelled (ID: $alarmId)"
+            )
+
             createAlarmStatus(
                 systemAlarmSet = false,
                 message = "Alarm abgebrochen"
@@ -367,9 +373,9 @@ class AlarmManagerService(
      */
     fun getEnhancedAlarmDebugInfo(): String {
         val permissionStatus = checkAlarmPermissions()
-        val batteryStatus = batteryOptimizationManager.getBatteryOptimizationStatus()
+        val batteryStatus = batteryOptimizationManager.getBasicStatus()
         val nextAlarm = getNextAlarmInfo()
-        
+
         return buildString {
             appendLine("=== ENHANCED ALARM DEBUG INFO ===")
             appendLine("Permission Level: ${permissionStatus.level}")
@@ -386,7 +392,7 @@ class AlarmManagerService(
             }
             appendLine()
             appendLine("=== BATTERY OPTIMIZATION ===")
-            append(batteryOptimizationManager.getDebugInfo())
+            appendLine(batteryStatus)
             appendLine("==================================")
         }
     }
