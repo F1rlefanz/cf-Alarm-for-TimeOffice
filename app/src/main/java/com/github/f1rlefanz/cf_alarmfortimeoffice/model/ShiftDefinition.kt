@@ -73,21 +73,21 @@ object ShiftDefinitionFactory {
             ShiftDefinition(
                 id = "early_shift",
                 name = "Frühschicht",
-                keywords = listOf("Früh", "FD", "FS", "Frühschicht", "F", "IMCF"),
+                keywords = listOf("F", "IMCF"),
                 alarmTime = LocalTime.of(5, 30),
                 isEnabled = true
             ),
             ShiftDefinition(
                 id = "late_shift", 
                 name = "Spätschicht",
-                keywords = listOf("Spät", "SD", "SS", "Spätschicht", "S", "IMCS"),
+                keywords = listOf("S", "IMCS"),
                 alarmTime = LocalTime.of(12, 30),
                 isEnabled = true
             ),
             ShiftDefinition(
                 id = "night_shift",
                 name = "Nachtschicht", 
-                keywords = listOf("Nacht", "ND", "NS", "Nachtschicht", "N", "IMCN"),
+                keywords = listOf("N", "IMCN"),
                 alarmTime = LocalTime.of(20, 0),
                 isEnabled = true
             ),
@@ -101,7 +101,7 @@ object ShiftDefinitionFactory {
             ShiftDefinition(
                 id = "intermediate_shift",
                 name = "Zwischendienst",
-                keywords = listOf("Zwischendienst", "IMCZ"),
+                keywords = listOf("IMCZ"),
                 alarmTime = LocalTime.of(7, 0),
                 isEnabled = true
             )
