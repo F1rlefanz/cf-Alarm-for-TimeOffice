@@ -26,22 +26,36 @@ data class ShiftConfig(
                 ShiftDefinition(
                     id = "early_shift",
                     name = "Frühschicht",
-                    keywords = listOf("Früh", "FD", "FS", "Frühschicht", "F"),
+                    keywords = listOf("Früh", "FD", "FS", "Frühschicht", "F", "IMCF"),
                     alarmTime = LocalTime.of(5, 30),
                     isEnabled = true
                 ),
                 ShiftDefinition(
                     id = "late_shift", 
                     name = "Spätschicht",
-                    keywords = listOf("Spät", "SD", "SS", "Spätschicht", "S2"),
-                    alarmTime = LocalTime.of(13, 0),
+                    keywords = listOf("Spät", "SD", "SS", "Spätschicht", "S", "IMCS"),
+                    alarmTime = LocalTime.of(12, 30),
                     isEnabled = true
                 ),
                 ShiftDefinition(
                     id = "night_shift",
                     name = "Nachtschicht",
-                    keywords = listOf("Nacht", "ND", "NS", "Nachtschicht"),
-                    alarmTime = LocalTime.of(21, 0),
+                    keywords = listOf("Nacht", "ND", "NS", "Nachtschicht", "N", "IMCN"),
+                    alarmTime = LocalTime.of(20, 0),
+                    isEnabled = true
+                ),
+                ShiftDefinition(
+                    id = "s2_shift",
+                    name = "S2",
+                    keywords = listOf("S2"),
+                    alarmTime = LocalTime.of(14, 30),
+                    isEnabled = true
+                ),
+                ShiftDefinition(
+                    id = "intermediate_shift",
+                    name = "Zwischendienst",
+                    keywords = listOf("Zwischendienst", "IMCZ"),
+                    alarmTime = LocalTime.of(7, 0),
                     isEnabled = true
                 )
             )

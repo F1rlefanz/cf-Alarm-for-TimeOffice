@@ -27,6 +27,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.DebugLogInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.BuildConfig
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.BatteryOptimizationHelper
 
 
 // Firebase Crashlytics
