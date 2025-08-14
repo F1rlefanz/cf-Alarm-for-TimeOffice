@@ -2,6 +2,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.security
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.security.crypto.EncryptedSharedPreferences
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
@@ -112,15 +113,43 @@ class SecurityManager(private val context: Context) {
     
     /**
      * Validates app integrity and signing
+     * MODERNIZED: Uses PackageInfo.signingInfo for API 28+ while maintaining backward compatibility
      */
     private fun validateAppIntegrity(): AppIntegrityValidation {
         val issues = mutableListOf<AppIntegrityIssue>()
         
         try {
-            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                // API 28+: Use modern signing info API
+                context.packageManager.getPackageInfo(
+                    context.packageName, 
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                )
+            } else {
+                // Legacy API: Use deprecated signatures API for backward compatibility
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(
+                    context.packageName, 
+                    PackageManager.GET_SIGNATURES
+                )
+            }
             
-            // Check if app is signed
-            val hasSignature = packageInfo.signatures?.isNotEmpty() == true
+            // Check if app is signed using appropriate API
+            val hasSignature = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                // Modern approach: Check signingInfo
+                packageInfo.signingInfo?.let { signingInfo ->
+                    if (signingInfo.hasMultipleSigners()) {
+                        signingInfo.apkContentsSigners?.isNotEmpty() == true
+                    } else {
+                        signingInfo.signingCertificateHistory?.isNotEmpty() == true
+                    }
+                } ?: false
+            } else {
+                // Legacy approach: Check signatures
+                @Suppress("DEPRECATION")
+                packageInfo.signatures?.isNotEmpty() == true
+            }
+            
             if (!hasSignature) {
                 issues.add(AppIntegrityIssue.UNSIGNED_APK)
                 Logger.w(LogTags.SECURITY, "⚠️  APP-INTEGRITY: App appears to be unsigned")

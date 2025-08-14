@@ -131,6 +131,7 @@ class CalendarAuthUseCase(
                 try {
                     // Use GoogleAuthUtil to get OAuth 2.0 token
                     val scopes = "oauth2:${CalendarScopes.CALENDAR_READONLY}"
+                    @Suppress("DEPRECATION") // GoogleAuthUtil: Complex migration to Credential Manager API
                     val token = com.google.android.gms.auth.GoogleAuthUtil.getToken(
                         context,
                         accountName,

@@ -3,6 +3,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -127,7 +128,14 @@ class HueMdnsDiscoveryService(private val context: Context) {
             }
             
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                Logger.d(LogTags.HUE_DISCOVERY, "Service resolved: ${serviceInfo.serviceName} -> ${serviceInfo.host}")
+                // Extract hostname/host for logging (backward compatible)
+                val hostInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    serviceInfo.hostname?.hostName ?: "unknown"
+                } else {
+                    @Suppress("DEPRECATION")
+                    serviceInfo.host?.hostName ?: "unknown"
+                }
+                Logger.d(LogTags.HUE_DISCOVERY, "Service resolved: ${serviceInfo.serviceName} -> $hostInfo")
                 callback(serviceInfo)
             }
         }
@@ -141,10 +149,21 @@ class HueMdnsDiscoveryService(private val context: Context) {
         }
     }
     
+    /**
+     * Creates HueBridge from resolved NsdServiceInfo
+     * MODERNIZED: Uses hostname for API 34+ while maintaining backward compatibility
+     */
     private fun createHueBridgeFromService(serviceInfo: NsdServiceInfo): HueBridge? {
         return try {
-            val host = serviceInfo.host
-            val hostAddress = host?.hostAddress
+            // Modern approach: Use hostname for API 34+, fallback to host for older versions
+            val hostAddress = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // API 34+: Use hostname 
+                serviceInfo.hostname?.hostAddress
+            } else {
+                // Legacy API: Use deprecated host property for backward compatibility
+                @Suppress("DEPRECATION")
+                serviceInfo.host?.hostAddress
+            }
             
             if (hostAddress != null) {
                 // Extract bridge ID from service name if possible
