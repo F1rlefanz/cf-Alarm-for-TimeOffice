@@ -13,7 +13,7 @@ plugins {
 
 android {
     namespace = "com.github.f1rlefanz.cf_alarmfortimeoffice"
-    compileSdk = 36
+    compileSdk = 35
 
     // ==============================
     // 🔐 PROFESSIONAL SIGNING CONFIGURATION
@@ -43,9 +43,9 @@ android {
     defaultConfig {
         applicationId = "com.github.f1rlefanz.cf_alarmfortimeoffice"
         minSdk = 26
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -103,8 +103,10 @@ android {
         }
         
         // ==============================
-        // 🧪 OPTIONAL: STAGING BUILD TYPE
+        // 🧪 OPTIONAL: STAGING BUILD TYPE (DISABLED)
         // ==============================
+        // Uncomment if you need staging builds with separate package ID
+        /*
         create("staging") {
             // Hybrid configuration: Production signing + Limited debugging
             initWith(getByName("release"))
@@ -121,6 +123,7 @@ android {
             // Use production signing for realistic testing
             signingConfig = signingConfigs.getByName("release")
         }
+        */
     }
 
     compileOptions {
@@ -139,6 +142,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    lint {
+        // Production-ready lint configuration
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+        // Remove baseline after fixing backup rules
+        // baseline = file("lint-baseline.xml") 
     }
 
     packaging {

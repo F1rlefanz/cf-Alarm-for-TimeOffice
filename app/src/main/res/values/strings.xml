@@ -30,7 +30,7 @@
     <string name="oneplus_step_configured">Konfiguriert</string>
     <string name="oneplus_step_action_required">Aktion erforderlich</string>
     <string name="oneplus_reliability_current">Aktuelle Zuverlässigkeit: %d%%</string>
-    <string name="oneplus_steps_completed">Konfigurierte Schritte: %d/%d</string>
+    <string name="oneplus_steps_completed" formatted="false">Konfigurierte Schritte: %d/%d</string>
     
     <!-- Warnings -->
     <string name="oneplus_warning_updates">OnePlus setzt Einstellungen bei System-Updates zurück!</string>
