@@ -193,7 +193,7 @@ fun HomeTabContent(
                     )
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 if (calendarState.events.isNotEmpty()) {
                     // LAZY LOADING: Show limited events overview in home tab

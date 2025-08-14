@@ -254,7 +254,7 @@ private fun CacheStatusCard(calendarViewModel: CalendarViewModel?) {
                 }
             }
             
-            Divider()
+            HorizontalDivider()
             
             // Cache Statistics
             Text(

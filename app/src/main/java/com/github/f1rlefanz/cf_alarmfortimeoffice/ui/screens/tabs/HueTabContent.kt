@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -294,7 +295,7 @@ private fun EnhancedBridgeConnectionCard(
                                 shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Help,
+                                    imageVector = Icons.AutoMirrored.Default.Help,
                                     contentDescription = null,
                                     modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
                                 )

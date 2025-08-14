@@ -29,7 +29,7 @@
     <!-- Status Messages -->
     <string name="oneplus_step_configured">Konfiguriert</string>
     <string name="oneplus_step_action_required">Aktion erforderlich</string>
-    <string name="oneplus_reliability_current">Aktuelle Zuverlässigkeit: %d%%</string>
+    <string name="oneplus_reliability_current" formatted="false">Aktuelle Zuverlässigkeit: %d%%</string>
     <string name="oneplus_steps_completed" formatted="false">Konfigurierte Schritte: %d/%d</string>
     
     <!-- Warnings -->
@@ -37,7 +37,7 @@
     <string name="oneplus_warning_critical">Akkuoptimierung ist aktiv - Alarme können ausfallen!</string>
     
     <!-- Help Dialog -->
-    <string name="oneplus_help_impact">Auswirkung: %d%% der Alarm-Zuverlässigkeit</string>
+    <string name="oneplus_help_impact" formatted="false">Auswirkung: %d%% der Alarm-Zuverlässigkeit</string>
     <string name="oneplus_help_instructions">Schritt-für-Schritt Anleitung</string>
     <string name="oneplus_help_troubleshooting">Problemlösung</string>
     <string name="oneplus_help_understood">Verstanden</string>
