@@ -1,0 +1,54 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/repository/HueBridgeRepository.kt</file>
+  <line>78</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueBridgeRepository java.lang.Object testBridgeConnection(com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge bridge, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.lang.Boolean&gt;&gt; $completion)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>config</highlighted_element>
+  <language>kotlin</language>
+  <offset>20</offset>
+  <length>6</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/repository/HueBridgeRepository.kt</file>
+  <line>132</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueBridgeRepository java.lang.Object validateConnection(kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.lang.Boolean&gt;&gt; $completion)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>config</highlighted_element>
+  <language>kotlin</language>
+  <offset>16</offset>
+  <length>6</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/ui/screens/tabs/SettingsTabContent.kt</file>
+  <line>30</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs.SettingsTabContentKt void SettingsTabContent(com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AuthViewModel authViewModel, com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftViewModel shiftViewModel, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onShowShiftConfig, kotlin.jvm.functions.Function0&lt;kotlin.Unit&gt; onShowCalendarSelection)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>context</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>7</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/viewmodel/HueViewModel.kt</file>
+  <line>374</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel void testRuleExecution(com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule rule)" />
+  <problem_class id="UnusedVariable" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Unused variable</problem_class>
+  <description>Unused variable</description>
+  <highlighted_element>batchResult</highlighted_element>
+  <language>kotlin</language>
+  <offset>28</offset>
+  <length>11</length>
+</problem>
+</problems>

@@ -1,0 +1,134 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>192</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 1, but got 2.</description>
+  <highlighted_element>2.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>204</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 1, but got 3.</description>
+  <highlighted_element>3.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>357</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 1, but got 2.</description>
+  <highlighted_element>2.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>358</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 2, but got 3.</description>
+  <highlighted_element>3.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>359</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 3, but got 4.</description>
+  <highlighted_element>4.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>360</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 4, but got 5.</description>
+  <highlighted_element>5.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>361</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 5, but got 6.</description>
+  <highlighted_element>6.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>362</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 6, but got 7.</description>
+  <highlighted_element>7.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>363</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 7, but got 8.</description>
+  <highlighted_element>8.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/CONTRIBUTING.md</file>
+  <line>364</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/CONTRIBUTING.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 8, but got 9.</description>
+  <highlighted_element>9.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/DEPLOYMENT_SETUP.md</file>
+  <line>33</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/DEPLOYMENT_SETUP.md" />
+  <problem_class id="MarkdownIncorrectlyNumberedListItem" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Incorrectly numbered list item</problem_class>
+  <description>Item is not correctly numbered. Expected item number 1, but got 5.</description>
+  <highlighted_element>5.</highlighted_element>
+  <language>Markdown</language>
+  <offset>0</offset>
+  <length>3</length>
+</problem>
+</problems>

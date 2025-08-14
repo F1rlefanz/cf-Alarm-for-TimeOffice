@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/discovery/HueMdnsDiscoveryService.kt</file>
+  <line>44</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery.HueMdnsDiscoveryService java.lang.Object discoverBridges(kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.util.List&lt;? extends com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge&gt;&gt;&gt; $completion)" />
+  <problem_class id="RemoveExplicitTypeArguments" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Unnecessary type argument</problem_class>
+  <description>Explicit type arguments can be inferred</description>
+  <highlighted_element>&lt;List&lt;HueBridge&gt;&gt;</highlighted_element>
+  <language>kotlin</language>
+  <offset>43</offset>
+  <length>17</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/usecase/CalendarUseCase.kt</file>
+  <line>163</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.usecase</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarUseCase java.lang.Object getCalendarEventsWithCache(java.util.Set&lt;java.lang.String&gt; calendarIds, int daysAhead, boolean forceRefresh, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.util.List&lt;? extends com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent&gt;&gt;&gt; $completion)" />
+  <problem_class id="RemoveExplicitTypeArguments" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Unnecessary type argument</problem_class>
+  <description>Explicit type arguments can be inferred</description>
+  <highlighted_element>&lt;CalendarEvent&gt;</highlighted_element>
+  <language>kotlin</language>
+  <offset>25</offset>
+  <length>15</length>
+</problem>
+</problems>

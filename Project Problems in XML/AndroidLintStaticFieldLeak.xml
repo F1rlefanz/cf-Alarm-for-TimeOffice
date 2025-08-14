@@ -1,0 +1,16 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/service/BackgroundServiceManager.kt</file>
+  <line>32</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.service</package>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/service/BackgroundServiceManager.kt" />
+  <problem_class id="AndroidLintStaticFieldLeak" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Static Field Leaks</problem_class>
+  <hints />
+  <description>&lt;html&gt;Do not place Android context classes in static fields (static reference to &lt;code&gt;BackgroundServiceManager&lt;/code&gt; which has field &lt;code&gt;context&lt;/code&gt; pointing to &lt;code&gt;Context&lt;/code&gt;); this is a memory leak&lt;/html&gt;</description>
+  <highlighted_element>@Volatile private var instance: BackgroundServiceManager? = null</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>72</length>
+</problem>
+</problems>

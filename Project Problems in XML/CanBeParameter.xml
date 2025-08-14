@@ -1,0 +1,106 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/data/AuthDataStoreRepository.kt</file>
+  <line>36</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.data</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository AuthDataStoreRepository(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>38</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/data/CalendarSelectionRepository.kt</file>
+  <line>34</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.data</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.data.CalendarSelectionRepository CalendarSelectionRepository(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>12</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/discovery/EnhancedHueDiscoveryService.kt</file>
+  <line>34</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery.EnhancedHueDiscoveryService EnhancedHueDiscoveryService(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>42</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/discovery/OfficialHueDiscoveryService.kt</file>
+  <line>27</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.discovery.OfficialHueDiscoveryService OfficialHueDiscoveryService(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>42</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/repository/HueBridgeRepository.kt</file>
+  <line>22</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.repository.HueBridgeRepository HueBridgeRepository(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>34</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/service/WakeLockManager.kt</file>
+  <line>47</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.service</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.service.WakeLockManager WakeLockManager(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>12</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/shift/ShiftConfigRepository.kt</file>
+  <line>38</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.shift</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository ShiftConfigRepository(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>12</offset>
+  <length>3</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/util/NetworkStateMonitor.kt</file>
+  <line>23</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.util</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.util.NetworkStateMonitor NetworkStateMonitor(android.content.Context context)" />
+  <problem_class id="CanBeParameter" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Constructor parameter is never used as a property</problem_class>
+  <description>Constructor parameter is never used as a property</description>
+  <highlighted_element>val</highlighted_element>
+  <language>kotlin</language>
+  <offset>34</offset>
+  <length>3</length>
+</problem>
+</problems>

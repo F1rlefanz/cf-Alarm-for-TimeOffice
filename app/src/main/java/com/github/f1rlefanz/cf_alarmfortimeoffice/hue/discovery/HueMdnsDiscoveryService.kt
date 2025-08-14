@@ -118,6 +118,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
         }
     }
     
+    @Suppress("DEPRECATION")
     private fun resolveService(serviceInfo: NsdServiceInfo, callback: (NsdServiceInfo?) -> Unit) {
         val resolveListener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
@@ -132,6 +133,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
         }
         
         try {
+            @Suppress("DEPRECATION")
             nsdManager.resolveService(serviceInfo, resolveListener)
         } catch (e: Exception) {
             Logger.e(LogTags.HUE_DISCOVERY, "Failed to resolve service", e)

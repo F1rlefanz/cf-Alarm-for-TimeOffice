@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
 
@@ -30,6 +31,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
  * ✅ FIXED: hasSelectedCalendars wird jetzt korrekt überwacht
  * ✅ CRITICAL FIX: Auto-triggers calendar loading after authentication
  */
+@OptIn(FlowPreview::class)
 class MainViewModel(
     private val authUseCase: IAuthUseCase,
     private val shiftUseCase: IShiftUseCase,

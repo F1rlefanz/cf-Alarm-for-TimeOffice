@@ -1,0 +1,16 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/ui/screens/tabs/HueTabContent.kt</file>
+  <line>482</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs</package>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/ui/screens/tabs/HueTabContent.kt" />
+  <problem_class id="AndroidLintSimpleDateFormat" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Implied locale in date format</problem_class>
+  <hints />
+  <description>&lt;html&gt;To get local formatting use &lt;code&gt;getDateInstance()&lt;/code&gt;, &lt;code&gt;getDateTimeInstance()&lt;/code&gt;, or &lt;code&gt;getTimeInstance()&lt;/code&gt;, or use &lt;code&gt;new SimpleDateFormat(String template, Locale locale)&lt;/code&gt; with for example &lt;code&gt;Locale.US&lt;/code&gt; for ASCII dates.&lt;/html&gt;</description>
+  <highlighted_element>java.text.SimpleDateFormat(&quot;HH:mm:ss&quot;)</highlighted_element>
+  <language>kotlin</language>
+  <offset>32</offset>
+  <length>38</length>
+</problem>
+</problems>

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
 
 data class ShiftUiState(
     val isLoading: Boolean = false,
@@ -25,6 +26,7 @@ data class ShiftUiState(
     val error: String? = null
 )
 
+@OptIn(FlowPreview::class)
 class ShiftViewModel(
     private val shiftUseCase: IShiftUseCase,
     private val errorHandler: ErrorHandler,

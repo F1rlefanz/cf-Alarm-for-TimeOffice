@@ -1,0 +1,15 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/test/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/HueIntegrationTest.kt</file>
+  <line>272</line>
+  <module>CF-Alarm_for_TimeOffice.app.unitTest</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.HueController java.util.List&lt;java.lang.Integer&gt; calculateBrightnessCurve(int duration, int target)" />
+  <problem_class id="ReplaceJavaStaticMethodWithKotlinAnalog" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Java methods should be replaced with Kotlin analog</problem_class>
+  <description>Should be replaced with Kotlin function</description>
+  <highlighted_element>pow(progress, 2.2)</highlighted_element>
+  <language>kotlin</language>
+  <offset>44</offset>
+  <length>18</length>
+</problem>
+</problems>

@@ -20,6 +20,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
  * 
  * Single responsibility: Token persistence operations only.
  */
+@Suppress("DEPRECATION") // EncryptedSharedPreferences/MasterKey: No stable alternative available yet
 class SecureTokenStorage(private val context: Context) {
     
     private val json = Json {

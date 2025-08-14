@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/usecase/HueRuleUseCase.kt</file>
+  <line>145</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase java.lang.Object findApplicableRules(com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch shift, java.time.LocalTime currentTime, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.util.List&lt;? extends com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule&gt;&gt;&gt; $completion)" />
+  <problem_class id="RemoveCurlyBracesFromTemplate" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Redundant curly braces in string template</problem_class>
+  <description>Redundant curly braces in string template</description>
+  <highlighted_element>${currentTime}</highlighted_element>
+  <language>kotlin</language>
+  <offset>108</offset>
+  <length>14</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/usecase/HueRuleUseCase.kt</file>
+  <line>181</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.HueRuleUseCase java.lang.Object executeRulesForAlarm(com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch shift, java.time.LocalTime alarmTime, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.RuleExecutionResult&gt;&gt; $completion)" />
+  <problem_class id="RemoveCurlyBracesFromTemplate" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Redundant curly braces in string template</problem_class>
+  <description>Redundant curly braces in string template</description>
+  <highlighted_element>${alarmTime}</highlighted_element>
+  <language>kotlin</language>
+  <offset>68</offset>
+  <length>12</length>
+</problem>
+</problems>

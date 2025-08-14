@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
  * ✅ Result-basierte API für konsistente Fehlerbehandlung
  * ✅ Erweiterte Business Logic für Auth-Management
  */
+@Suppress("DEPRECATION") // GoogleSignIn APIs: Complex migration required, keeping for stability
 class CalendarAuthUseCase(
     private val authDataStoreRepository: IAuthDataStoreRepository,
     private val calendarRepository: ICalendarRepository

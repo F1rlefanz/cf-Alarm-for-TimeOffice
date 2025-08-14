@@ -1,0 +1,68 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/build.gradle.kts</file>
+  <line>16</line>
+  <module>CF-Alarm_for_TimeOffice.app</module>
+  <package>&lt;default&gt;</package>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/app/build.gradle.kts" />
+  <problem_class id="AndroidLintGradleDependency" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Gradle Dependency</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of &lt;code&gt;compileSdkVersion&lt;/code&gt; than 35 is available: 36&lt;/html&gt;</description>
+  <highlighted_element>compileSdk = 35</highlighted_element>
+  <language>kotlin</language>
+  <offset>4</offset>
+  <length>15</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/gradle/libs.versions.toml</file>
+  <line>6</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/gradle/libs.versions.toml" />
+  <problem_class id="AndroidLintGradleDependency" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Gradle Dependency</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of androidx.core:core-ktx than 1.13.1 is available: 1.17.0&lt;/html&gt;</description>
+  <highlighted_element>&quot;1.13.1&quot;</highlighted_element>
+  <language>TOML</language>
+  <offset>10</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/gradle/libs.versions.toml</file>
+  <line>40</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/gradle/libs.versions.toml" />
+  <problem_class id="AndroidLintGradleDependency" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Gradle Dependency</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of androidx.work:work-runtime-ktx than 2.10.0 is available: 2.10.3&lt;/html&gt;</description>
+  <highlighted_element>&quot;2.10.0&quot;</highlighted_element>
+  <language>TOML</language>
+  <offset>14</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/gradle/libs.versions.toml</file>
+  <line>44</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/gradle/libs.versions.toml" />
+  <problem_class id="AndroidLintGradleDependency" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Gradle Dependency</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of com.google.firebase:firebase-bom than 34.0.0 is available: 34.1.0&lt;/html&gt;</description>
+  <highlighted_element>&quot;34.0.0&quot;</highlighted_element>
+  <language>TOML</language>
+  <offset>14</offset>
+  <length>8</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/gradle/libs.versions.toml</file>
+  <line>45</line>
+  <module>CF-Alarm_for_TimeOffice</module>
+  <entry_point TYPE="file" FQNAME="file://$PROJECT_DIR$/gradle/libs.versions.toml" />
+  <problem_class id="AndroidLintGradleDependency" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Obsolete Gradle Dependency</problem_class>
+  <hints />
+  <description>&lt;html&gt;A newer version of com.google.firebase.crashlytics than 3.0.5 is available: 3.0.6&lt;/html&gt;</description>
+  <highlighted_element>&quot;3.0.5&quot;</highlighted_element>
+  <language>TOML</language>
+  <offset>28</offset>
+  <length>7</length>
+</problem>
+</problems>

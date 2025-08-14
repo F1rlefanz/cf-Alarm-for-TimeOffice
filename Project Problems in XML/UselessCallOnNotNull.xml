@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/auth/ModernOAuth2TokenManager.kt</file>
+  <line>105</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.auth</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.auth.ModernOAuth2TokenManager java.lang.Object authorizeCalendarAccess(java.lang.String userEmail, kotlin.coroutines.Continuation&lt;? super com.github.f1rlefanz.cf_alarmfortimeoffice.auth.AuthResult&gt; $completion)" />
+  <problem_class id="UselessCallOnNotNull" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Useless call on not-null type</problem_class>
+  <description>Call on not-null type may be reduced</description>
+  <highlighted_element>.isNullOrEmpty</highlighted_element>
+  <language>kotlin</language>
+  <offset>29</offset>
+  <length>14</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/auth/ModernOAuth2TokenManager.kt</file>
+  <line>212</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.auth</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.auth.ModernOAuth2TokenManager java.lang.Object refreshCalendarTokenImproved(java.lang.String refreshToken, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends java.lang.String&gt;&gt; $completion)" />
+  <problem_class id="UselessCallOnNotNull" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Useless call on not-null type</problem_class>
+  <description>Call on not-null type may be reduced</description>
+  <highlighted_element>.isNullOrEmpty</highlighted_element>
+  <language>kotlin</language>
+  <offset>30</offset>
+  <length>14</length>
+</problem>
+</problems>

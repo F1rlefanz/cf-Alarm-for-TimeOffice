@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/data/HueGroup.kt</file>
+  <line>32</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.GroupState GroupState(boolean any_on, boolean all_on)" />
+  <problem_class id="PropertyName" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Property naming convention</problem_class>
+  <description>Property name &lt;code&gt;any_on&lt;/code&gt; should not contain underscores #loc</description>
+  <highlighted_element>any_on</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>6</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/hue/data/HueGroup.kt</file>
+  <line>33</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.GroupState GroupState(boolean any_on, boolean all_on)" />
+  <problem_class id="PropertyName" severity="WEAK WARNING" attribute_key="INFO_ATTRIBUTES">Property naming convention</problem_class>
+  <description>Property name &lt;code&gt;all_on&lt;/code&gt; should not contain underscores #loc</description>
+  <highlighted_element>all_on</highlighted_element>
+  <language>kotlin</language>
+  <offset>8</offset>
+  <length>6</length>
+</problem>
+</problems>

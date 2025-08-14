@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
  * @author CF-Alarm Development Team
  * @since Security Phase 2
  */
+@Suppress("DEPRECATION") // EncryptedSharedPreferences/MasterKey: No stable alternative available yet
 class SecurityManager(private val context: Context) {
     
     /**

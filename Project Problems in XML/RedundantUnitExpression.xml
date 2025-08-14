@@ -1,0 +1,28 @@
+<problems>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/usecase/CalendarAuthUseCase.kt</file>
+  <line>151</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.usecase</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarAuthUseCase java.lang.Object saveAccessToken(com.google.android.gms.auth.api.signin.GoogleSignInAccount account, android.content.Context context, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends kotlin.Unit&gt;&gt; $completion)" />
+  <problem_class id="RedundantUnitExpression" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Redundant 'Unit'</problem_class>
+  <description>Redundant 'Unit'</description>
+  <highlighted_element>Unit</highlighted_element>
+  <language>kotlin</language>
+  <offset>24</offset>
+  <length>4</length>
+</problem>
+<problem>
+  <file>file://$PROJECT_DIR$/app/src/main/java/com/github/f1rlefanz/cf_alarmfortimeoffice/usecase/CalendarAuthUseCase.kt</file>
+  <line>172</line>
+  <module>CF-Alarm_for_TimeOffice.app.main</module>
+  <package>com.github.f1rlefanz.cf_alarmfortimeoffice.usecase</package>
+  <entry_point TYPE="method" FQNAME="com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarAuthUseCase java.lang.Object saveAccessToken(com.google.android.gms.auth.api.signin.GoogleSignInAccount account, android.content.Context context, kotlin.coroutines.Continuation&lt;? super kotlin.Result&lt;? extends kotlin.Unit&gt;&gt; $completion)" />
+  <problem_class id="RedundantUnitExpression" severity="WARNING" attribute_key="WARNING_ATTRIBUTES">Redundant 'Unit'</problem_class>
+  <description>Redundant 'Unit'</description>
+  <highlighted_element>Unit</highlighted_element>
+  <language>kotlin</language>
+  <offset>24</offset>
+  <length>4</length>
+</problem>
+</problems>

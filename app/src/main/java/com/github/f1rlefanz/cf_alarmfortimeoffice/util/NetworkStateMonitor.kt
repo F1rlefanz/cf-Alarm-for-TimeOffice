@@ -77,7 +77,7 @@ class NetworkStateMonitor(private val context: Context) {
             networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         } else {
-            @Suppress("DEPRECATION")
+            @Suppress("DEPRECATION") // Legacy Android support: activeNetworkInfo deprecated but no alternative for API < 23
             val activeNetworkInfo = connectivityManager.activeNetworkInfo
             activeNetworkInfo?.isConnected == true
         }
