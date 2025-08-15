@@ -15,6 +15,11 @@ import androidx.core.app.NotificationCompat
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.SkipProcessResult
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftMatch
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.CalendarEvent
+import java.time.LocalDateTime
+import java.time.LocalTime
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -27,6 +32,7 @@ import kotlinx.coroutines.runBlocking
  * - Reliable wake lock management
  * - Android 14+ Full-Screen Intent compatibility  
  * - Enhanced notification with high priority
+ * - 🎨 HUE INTEGRATION: Automatic light control based on shift patterns
  * - Clean, simple, and maintainable code
  * 
  * Philosophy: If the alarm works (and it does!), keep it simple.
@@ -81,6 +87,9 @@ class AlarmReceiver : BroadcastReceiver() {
         // Existing alarm logic continues here...
         Logger.business(LogTags.ALARM_RECEIVER, "📱 ALARM TRIGGERED! Shift: $shiftName")
         
+        // 🎨 NEW: HUE INTEGRATION - Execute matching light rules
+        executeHueRulesForAlarm(context, shiftName)
+        
         // Wake Lock to ensure device wakes up
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
@@ -115,29 +124,27 @@ class AlarmReceiver : BroadcastReceiver() {
     }
     
     private fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Schicht-Wecker",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Benachrichtigungen für Schicht-Alarme"
-                setSound(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
-                setBypassDnd(true) // Bypass "Do Not Disturb" mode
-            }
-            
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-            Logger.d(LogTags.ALARM_RECEIVER, "✅ Notification channel created")
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Schicht-Wecker",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Benachrichtigungen für Schicht-Alarme"
+            setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+            setBypassDnd(true) // Bypass "Do Not Disturb" mode
         }
+        
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+        Logger.d(LogTags.ALARM_RECEIVER, "✅ Notification channel created")
     }
     
     private fun showAlarmNotification(context: Context, shiftName: String, shiftTime: String, alarmId: Int) {
@@ -264,5 +271,119 @@ class AlarmReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM_RECEIVER, "Error showing skip notification", e)
         }
+    }
+    
+    /**
+     * 🎨 HUE INTEGRATION: Execute matching light rules for alarm
+     * 
+     * Creates a synthetic ShiftMatch from available alarm data and executes
+     * any applicable Hue rules configured for this shift pattern.
+     */
+    private fun executeHueRulesForAlarm(context: Context, shiftName: String) {
+        try {
+            // Get AppContainer for Hue services
+            val appContainer = (context.applicationContext as CFAlarmApplication).appContainer
+            val hueRuleUseCase = appContainer.hueRuleUseCase
+            val shiftUseCase = appContainer.shiftUseCase
+            
+            Logger.business(LogTags.ALARM_RECEIVER, "🎨 Starting Hue rule execution for shift: $shiftName")
+            
+            // Execute in background coroutine to avoid blocking the alarm
+            runBlocking {
+                try {
+                    // Try to find matching shift definition
+                    val shiftConfigResult = shiftUseCase.getCurrentShiftConfig()
+                    
+                    if (shiftConfigResult.isSuccess) {
+                        val shiftConfig = shiftConfigResult.getOrNull()
+                        val matchingShiftDef = shiftConfig?.definitions?.find { shiftDef ->
+                            // Match by name or keywords
+                            shiftDef.name.equals(shiftName, ignoreCase = true) ||
+                            shiftDef.keywords.any { keyword -> 
+                                shiftName.contains(keyword, ignoreCase = true) ||
+                                keyword.contains(shiftName, ignoreCase = true)
+                            }
+                        }
+                        
+                        if (matchingShiftDef != null) {
+                            // Create synthetic ShiftMatch for Hue rules
+                            val syntheticShiftMatch = createSyntheticShiftMatch(
+                                shiftDefinition = matchingShiftDef,
+                                shiftName = shiftName
+                            )
+                            
+                            // Execute Hue rules for this shift
+                            val currentTime = LocalTime.now()
+                            val executionResult = hueRuleUseCase.executeRulesForAlarm(
+                                shift = syntheticShiftMatch,
+                                alarmTime = currentTime
+                            )
+                            
+                            if (executionResult.isSuccess) {
+                                val result = executionResult.getOrNull()
+                                if (result != null && result.rulesExecuted > 0) {
+                                    Logger.business(
+                                        LogTags.ALARM_RECEIVER, 
+                                        "🎨✅ Hue rules executed successfully: ${result.rulesExecuted} rules, " +
+                                        "${result.successfulActions}/${result.actionsExecuted} actions successful"
+                                    )
+                                    
+                                    if (result.errors.isNotEmpty()) {
+                                        Logger.w(LogTags.ALARM_RECEIVER, "🎨⚠️ Some Hue actions failed: ${result.errors}")
+                                    }
+                                } else {
+                                    Logger.d(LogTags.ALARM_RECEIVER, "🎨💡 No Hue rules configured for shift: $shiftName")
+                                }
+                            } else {
+                                Logger.w(LogTags.ALARM_RECEIVER, "🎨❌ Hue rule execution failed", executionResult.exceptionOrNull())
+                            }
+                        } else {
+                            Logger.d(LogTags.ALARM_RECEIVER, "🎨💡 No shift definition found for: $shiftName (skipping Hue rules)")
+                        }
+                    } else {
+                        Logger.w(LogTags.ALARM_RECEIVER, "🎨⚠️ Could not load shift configuration for Hue rules", shiftConfigResult.exceptionOrNull())
+                    }
+                    
+                } catch (e: Exception) {
+                    Logger.e(LogTags.ALARM_RECEIVER, "🎨❌ Exception during Hue rule execution", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            // Don't let Hue errors crash the alarm
+            Logger.e(LogTags.ALARM_RECEIVER, "🎨❌ Critical error in Hue integration", e)
+        }
+    }
+    
+    /**
+     * Creates a synthetic ShiftMatch from available alarm data
+     * 
+     * Since the AlarmReceiver doesn't have access to the original ShiftMatch,
+     * we reconstruct the essential information needed for Hue rule execution.
+     */
+    private fun createSyntheticShiftMatch(
+        shiftDefinition: ShiftDefinition,
+        shiftName: String
+    ): ShiftMatch {
+        val now = LocalDateTime.now()
+        
+        // Create synthetic calendar event
+        val syntheticCalendarEvent = CalendarEvent(
+            id = "synthetic_$shiftName",
+            title = shiftName,
+            startTime = now,
+            endTime = now.plusHours(8), // Assume 8-hour shift
+            calendarId = "synthetic",
+            isAllDay = false
+        )
+        
+        // Calculate synthetic alarm time (now, since the alarm just triggered)
+        val calculatedAlarmTime = now
+        
+        return ShiftMatch(
+            shiftDefinition = shiftDefinition,
+            calendarEvent = syntheticCalendarEvent,
+            calculatedAlarmTime = calculatedAlarmTime
+        )
     }
 }
