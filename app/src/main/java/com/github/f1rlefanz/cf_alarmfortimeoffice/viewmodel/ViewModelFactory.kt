@@ -75,6 +75,7 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(AlarmViewModel::class.java) -> {
                 AlarmViewModel(
                     alarmUseCase = appContainer.alarmUseCase, // Interface-Abhängigkeit
+                    alarmSkipUseCase = appContainer.alarmSkipUseCase, // NEU: Skip UseCase
                     errorHandler = ErrorHandler
                 ) as T
             }

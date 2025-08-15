@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AlarmInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftInfo
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.state.AppErrorState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmSkipUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.error.ErrorHandler
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 data class AlarmUiState(
@@ -21,6 +24,13 @@ data class AlarmUiState(
     val hasActiveAlarms: Boolean = false,
     val nextAlarmTime: String? = null,
     val error: String? = null
+)
+
+data class AlarmSkipUiState(
+    val isNextAlarmSkipped: Boolean = false,
+    val skippedAlarmId: Int? = null,
+    val isLoading: Boolean = false,
+    val error: AppErrorState? = null
 )
 
 /**
@@ -34,17 +44,22 @@ data class AlarmUiState(
  */
 class AlarmViewModel(
     private val alarmUseCase: IAlarmUseCase,
+    private val alarmSkipUseCase: IAlarmSkipUseCase,
     private val errorHandler: ErrorHandler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AlarmUiState())
     val uiState: StateFlow<AlarmUiState> = _uiState.asStateFlow()
     
+    private val _skipState = MutableStateFlow(AlarmSkipUiState())
+    val skipState: StateFlow<AlarmSkipUiState> = _skipState.asStateFlow()
+    
     // MEMORY LEAK FIX: Track Flow collection job for proper cleanup
     private var alarmObservationJob: Job? = null
 
     init {
         observeAlarmStatus()
+        observeSkipStatus()
         // CLEANUP: Clean expired alarms on startup
         cleanupExpiredAlarmsOnStartup()
     }
@@ -118,6 +133,26 @@ class AlarmViewModel(
                 _uiState.value = _uiState.value.copy(
                     error = errorHandler.getErrorMessage(e)
                 )
+            }
+        }
+    }
+
+    private fun observeSkipStatus() {
+        viewModelScope.launch {
+            try {
+                alarmSkipUseCase.skipStatusFlow
+                    .catch { error ->
+                        Logger.e(LogTags.ALARM_SKIP, "Error observing skip state", error)
+                    }
+                    .collect { skipState ->
+                        _skipState.value = _skipState.value.copy(
+                            isNextAlarmSkipped = skipState.isNextAlarmSkipped,
+                            skippedAlarmId = skipState.skippedAlarmId,
+                            isLoading = false
+                        )
+                    }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM_SKIP, "Error in skip status observation", e)
             }
         }
     }
@@ -220,6 +255,38 @@ class AlarmViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    fun skipNextAlarm() {
+        viewModelScope.launch {
+            _skipState.value = _skipState.value.copy(isLoading = true)
+            
+            alarmSkipUseCase.skipNextAlarm()
+                .onSuccess { result ->
+                    Logger.business(LogTags.ALARM_SKIP, "✅ Next alarm skip activated: ${result.alarmName}")
+                    // State wird automatisch über skipStatusFlow aktualisiert
+                }
+                .onFailure { error ->
+                    _skipState.value = _skipState.value.copy(
+                        isLoading = false,
+                        error = AppErrorState.validationError(error.message ?: "Failed to skip alarm")
+                    )
+                    Logger.e(LogTags.ALARM_SKIP, "❌ Failed to skip next alarm", error)
+                }
+        }
+    }
+
+    fun cancelSkip() {
+        viewModelScope.launch {
+            alarmSkipUseCase.cancelSkip()
+                .onSuccess {
+                    Logger.business(LogTags.ALARM_SKIP, "✅ Skip cancelled by user")
+                    // State wird automatisch über skipStatusFlow aktualisiert
+                }
+                .onFailure { error ->
+                    Logger.e(LogTags.ALARM_SKIP, "❌ Failed to cancel skip", error)
+                }
+        }
     }
     
     /**

@@ -10,7 +10,9 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.calendar.CalendarRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.data.AuthDataStoreRepository
 // ErrorHandler ist jetzt ein Singleton-Object - kein Import nötig
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.AlarmRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.AlarmSkipRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAlarmRepository
+import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAlarmSkipRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IAuthDataStoreRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.ICalendarRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.repository.interfaces.IShiftConfigRepository
@@ -18,11 +20,13 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.service.AlarmManagerService
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftConfigRepository
 import com.github.f1rlefanz.cf_alarmfortimeoffice.shift.ShiftRecognitionEngine
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.AlarmUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.AlarmSkipUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.AuthUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarAuthUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.CalendarUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.ShiftUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmSkipUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAuthUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.ICalendarAuthUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.ICalendarUseCase
@@ -62,6 +66,7 @@ class AppContainer(private val context: Context) {
     // DATASTORE CONFIGURATION
     // ==============================
     private val Context.hueDataStore: DataStore<Preferences> by preferencesDataStore(name = "hue_settings")
+    private val Context.mainDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
     
     // ==============================
     // TOKEN MANAGEMENT & AUTHENTICATION
@@ -119,6 +124,11 @@ class AppContainer(private val context: Context) {
     
     val calendarSelectionRepository: ICalendarSelectionRepository by lazy {
         CalendarSelectionRepository(context)
+    }
+    
+    // Skip Repository
+    private val alarmSkipRepository: IAlarmSkipRepository by lazy {
+        AlarmSkipRepository(context.mainDataStore)
     }
     
     // ==============================
@@ -213,6 +223,14 @@ class AppContainer(private val context: Context) {
             alarmManagerService = alarmManagerService,
             shiftConfigRepository = shiftConfigRepository,
             shiftRecognitionEngine = shiftRecognitionEngine
+        )
+    }
+    
+    // Skip UseCase
+    val alarmSkipUseCase: IAlarmSkipUseCase by lazy {
+        AlarmSkipUseCase(
+            alarmSkipRepository = alarmSkipRepository,
+            alarmRepository = alarmRepository
         )
     }
     

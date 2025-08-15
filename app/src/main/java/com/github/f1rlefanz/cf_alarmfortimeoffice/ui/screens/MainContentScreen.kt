@@ -36,6 +36,7 @@ fun MainContentScreen(
     val calendarState by calendarViewModel.uiState.collectAsState()
     val shiftState by shiftViewModel.uiState.collectAsState()
     val alarmState by alarmViewModel.uiState.collectAsState()
+    val skipState by alarmViewModel.skipState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -90,7 +91,10 @@ fun MainContentScreen(
                         calendarState = calendarState,
                         shiftState = shiftState,
                         alarmState = alarmState,
+                        skipState = skipState,
                         onRefresh = { mainViewModel.forceRefreshCalendarEvents() },
+                        onSkipNextAlarm = alarmViewModel::skipNextAlarm,
+                        onCancelSkip = alarmViewModel::cancelSkip,
                         onShowEventList = onShowEventList
                     )
                 }

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessAlarm
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.CalendarConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AlarmUiState
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AlarmSkipUiState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.CalendarUiState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftUiState
 import java.time.format.DateTimeFormatter
@@ -27,7 +29,10 @@ fun HomeTabContent(
     calendarState: CalendarUiState,
     shiftState: ShiftUiState,
     alarmState: AlarmUiState,
+    skipState: AlarmSkipUiState,
     onRefresh: () -> Unit,
+    onSkipNextAlarm: () -> Unit,
+    onCancelSkip: () -> Unit,
     onShowEventList: (() -> Unit)? = null // LAZY LOADING: Navigation to event details
 ) {
     val daysAhead = shiftState.currentShiftConfig?.daysAhead ?: CalendarConstants.DEFAULT_DAYS_AHEAD
@@ -109,61 +114,13 @@ fun HomeTabContent(
             }
         }
 
-        // Alarm Status Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (alarmState.hasActiveAlarms) 
-                    MaterialTheme.colorScheme.secondaryContainer
-                else 
-                    MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(SpacingConstants.PADDING_CARD),
-                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.AccessAlarm,
-                    contentDescription = null,
-                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE),
-                    tint = if (alarmState.hasActiveAlarms)
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Alarm-Status",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    if (alarmState.hasActiveAlarms) {
-                        Text(
-                            "${alarmState.activeAlarms.size} aktive Alarme",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        alarmState.nextAlarmTime?.let {
-                            Text(
-                                "Nächster Alarm: $it",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    } else {
-                        Text(
-                            "Keine aktiven Alarme",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
+        // Enhanced Alarm Status Card mit Skip-Funktionalität
+        EnhancedAlarmStatusCard(
+            alarmState = alarmState,
+            skipState = skipState,
+            onSkipNextAlarm = onSkipNextAlarm,
+            onCancelSkip = onCancelSkip
+        )
 
         // Kalender Events Summary
         Card(
@@ -269,6 +226,148 @@ fun HomeTabContent(
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnhancedAlarmStatusCard(
+    alarmState: AlarmUiState,
+    skipState: AlarmSkipUiState,
+    onSkipNextAlarm: () -> Unit,
+    onCancelSkip: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                skipState.isNextAlarmSkipped -> MaterialTheme.colorScheme.tertiaryContainer // Orange
+                alarmState.hasActiveAlarms -> MaterialTheme.colorScheme.secondaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header Row (bestehend)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.AccessAlarm,
+                    modifier = Modifier.size(32.dp),
+                    tint = when {
+                        skipState.isNextAlarmSkipped -> MaterialTheme.colorScheme.onTertiaryContainer
+                        alarmState.hasActiveAlarms -> MaterialTheme.colorScheme.onSecondaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    contentDescription = null
+                )
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Alarm-Status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    if (alarmState.hasActiveAlarms) {
+                        Text("${alarmState.activeAlarms.size} aktive Alarme")
+                        alarmState.nextAlarmTime?.let {
+                            Text("Nächster Alarm: $it")
+                        }
+                    } else {
+                        Text(
+                            "Keine aktiven Alarme",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            // Skip-Funktionalität (nur wenn Alarme vorhanden)
+            if (alarmState.hasActiveAlarms) {
+                HorizontalDivider()
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (skipState.isNextAlarmSkipped) {
+                        // Skip ist aktiv
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.SkipNext,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(20.dp),
+                                contentDescription = null
+                            )
+                            Text(
+                                "Nächster Alarm wird übersprungen",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                        
+                        OutlinedButton(
+                            onClick = onCancelSkip,
+                            enabled = !skipState.isLoading,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        ) {
+                            if (skipState.isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Aufheben")
+                            }
+                        }
+                    } else {
+                        // Skip nicht aktiv
+                        Text(
+                            "Nächsten Alarm einmalig überspringen:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Button(
+                            onClick = onSkipNextAlarm,
+                            enabled = alarmState.nextAlarmTime != null && !skipState.isLoading
+                        ) {
+                            if (skipState.isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.SkipNext,
+                                    modifier = Modifier.size(16.dp),
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Überspringen")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -41,6 +41,7 @@ object LogTags {
     const val ALARM = "CFAlarm.Alarm"
     const val ALARM_MANAGER = "CFAlarm.Alarm.Manager"
     const val ALARM_RECEIVER = "CFAlarm.Alarm.Receiver"
+    const val ALARM_SKIP = "CFAlarm.Alarm.Skip"
     const val ALARM_TESTING = "CFAlarm.Alarm.Testing" // 🚨 DEBUG: For alarm testing
     const val ALARM_AUDIO = "CFAlarm.Alarm.Audio"
     const val WAKE_LOCK = "CFAlarm.Alarm.WakeLock"

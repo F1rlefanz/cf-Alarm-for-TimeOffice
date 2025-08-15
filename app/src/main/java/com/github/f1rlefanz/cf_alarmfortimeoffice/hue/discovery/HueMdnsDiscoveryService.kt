@@ -42,7 +42,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
             val discoveredBridges = mutableListOf<HueBridge>()
             
             val discoveryResult = withTimeoutOrNull(DISCOVERY_TIMEOUT_MS) {
-                suspendCancellableCoroutine<List<HueBridge>> { continuation ->
+                suspendCancellableCoroutine { continuation ->
                     
                     val discoveryListener = object : NsdManager.DiscoveryListener {
                         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
@@ -130,7 +130,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                 // Extract hostname/host for logging (backward compatible)
                 val hostInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    serviceInfo.hostname?.hostName ?: "unknown"
+                    serviceInfo.hostAddresses?.firstOrNull()?.hostName ?: "unknown"
                 } else {
                     @Suppress("DEPRECATION")
                     serviceInfo.host?.hostName ?: "unknown"
@@ -155,10 +155,10 @@ class HueMdnsDiscoveryService(private val context: Context) {
      */
     private fun createHueBridgeFromService(serviceInfo: NsdServiceInfo): HueBridge? {
         return try {
-            // Modern approach: Use hostname for API 34+, fallback to host for older versions
+            // Modern approach: Use hostAddresses for API 34+, fallback to host for older versions
             val hostAddress = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // API 34+: Use hostname 
-                serviceInfo.hostname?.hostAddress
+                // API 34+: Use hostAddresses array (first address)
+                serviceInfo.hostAddresses?.firstOrNull()?.hostAddress
             } else {
                 // Legacy API: Use deprecated host property for backward compatibility
                 @Suppress("DEPRECATION")
@@ -194,7 +194,7 @@ class HueMdnsDiscoveryService(private val context: Context) {
             val match = regex.find(serviceName)
             match?.groupValues?.get(1)
         } catch (e: Exception) {
-            Logger.w(LogTags.HUE_DISCOVERY, "Could not extract bridge ID from service name: $serviceName")
+            Logger.w(LogTags.HUE_DISCOVERY, "Could not extract bridge ID from service name: $serviceName", e)
             null
         }
     }

@@ -12,8 +12,10 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.SkipProcessResult
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import kotlinx.coroutines.runBlocking
 
 /**
  * Simplified BroadcastReceiver for alarms - Focus on reliable core functionality.
@@ -43,7 +45,41 @@ class AlarmReceiver : BroadcastReceiver() {
     }
     
     override fun onReceive(context: Context, intent: Intent) {
-        Logger.business(LogTags.ALARM_RECEIVER, "📱 ALARM TRIGGERED! Shift: ${intent.getStringExtra(EXTRA_SHIFT_NAME)}")
+        val alarmId = intent.getIntExtra(EXTRA_ALARM_ID, -1)
+        val shiftName = intent.getStringExtra(EXTRA_SHIFT_NAME) ?: "Schicht"
+        
+        // CRITICAL: Skip-Check VOR Alarm-Trigger
+        val appContainer = (context.applicationContext as CFAlarmApplication).appContainer
+        val skipUseCase = appContainer.alarmSkipUseCase
+        
+        // Skip-Check durchführen
+        try {
+            val skipResult = runBlocking { 
+                skipUseCase.checkAndProcessSkip(alarmId) 
+            }
+            
+            when (skipResult.getOrNull()) {
+                SkipProcessResult.ALARM_SKIPPED -> {
+                    Logger.business(LogTags.ALARM_RECEIVER, "⏭️ Alarm $alarmId ($shiftName) SKIPPED by user")
+                    showSkipNotification(context, shiftName)
+                    return // EARLY RETURN: Alarm nicht ausführen
+                }
+                SkipProcessResult.ALARM_EXECUTED -> {
+                    Logger.business(LogTags.ALARM_RECEIVER, "✅ Alarm $alarmId ($shiftName) EXECUTED normally")
+                    // Continue with normal alarm logic below
+                }
+                null -> {
+                    Logger.w(LogTags.ALARM_RECEIVER, "Skip check failed, executing alarm normally")
+                    // Continue with normal alarm logic
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM_RECEIVER, "Error during skip check, executing alarm normally", e)
+            // Continue with normal alarm logic
+        }
+        
+        // Existing alarm logic continues here...
+        Logger.business(LogTags.ALARM_RECEIVER, "📱 ALARM TRIGGERED! Shift: $shiftName")
         
         // Wake Lock to ensure device wakes up
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -55,9 +91,7 @@ class AlarmReceiver : BroadcastReceiver() {
         }
         
         try {
-            val shiftName = intent.getStringExtra(EXTRA_SHIFT_NAME) ?: "Schicht"
             val shiftTime = intent.getStringExtra(EXTRA_SHIFT_TIME) ?: ""
-            val alarmId = intent.getIntExtra(EXTRA_ALARM_ID, -1)
             
             // Create notification channel (only needed once)
             createNotificationChannel(context)
@@ -209,6 +243,26 @@ class AlarmReceiver : BroadcastReceiver() {
             
         } catch (e: Exception) {
             Logger.e(LogTags.ALARM_RECEIVER, "❌ Error starting full-screen activity", e)
+        }
+    }
+
+    private fun showSkipNotification(context: Context, shiftName: String) {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            val notification = NotificationCompat.Builder(context, "skip_channel")
+                .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
+                .setContentTitle("Alarm übersprungen")
+                .setContentText("$shiftName-Alarm wurde wie gewünscht übersprungen")
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setAutoCancel(true)
+                .setTimeoutAfter(30000) // 30 Sekunden
+                .build()
+            
+            notificationManager.notify(9999, notification)
+            Logger.business(LogTags.ALARM_RECEIVER, "✅ Skip notification shown")
+        } catch (e: Exception) {
+            Logger.e(LogTags.ALARM_RECEIVER, "Error showing skip notification", e)
         }
     }
 }
