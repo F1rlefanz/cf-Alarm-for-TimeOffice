@@ -17,6 +17,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueTimeRange
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueLightAction
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TargetType
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.ActionType
+import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TimeReference
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.AnimatedDiscoveryCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSetupModal
@@ -50,6 +56,7 @@ fun HueTabContent(
     
     // NEW: Rule management state
     var showRuleConfig by remember { mutableStateOf(false) }
+    var showNewRuleDialog by remember { mutableStateOf(false) }
 
     // Handle successful bridge connection
     LaunchedEffect(uiState.bridgeConnectionInfo?.isConnected) {
@@ -63,6 +70,131 @@ fun HueTabContent(
             showSuccessCard = false
         }
     }
+}
+
+/**
+ * Quick Rule Creation Dialog
+ * Simple dialog for creating basic Hue rules quickly
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRuleCreationDialog(
+    onDismiss: () -> Unit,
+    onCreateRule: (HueScheduleRule) -> Unit
+) {
+    var ruleName by remember { mutableStateOf("") }
+    var shiftPattern by remember { mutableStateOf("") }
+    var turnOn by remember { mutableStateOf(true) }
+    var brightness by remember { mutableIntStateOf(200) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("🚀 Schnell-Regel erstellen")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rule Name
+                OutlinedTextField(
+                    value = ruleName,
+                    onValueChange = { ruleName = it },
+                    label = { Text("Regel-Name") },
+                    placeholder = { Text("z.B. Mittags-Alarm") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Shift Pattern  
+                OutlinedTextField(
+                    value = shiftPattern,
+                    onValueChange = { shiftPattern = it },
+                    label = { Text("Shift-Pattern") },
+                    placeholder = { Text("z.B. Spätschicht") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // On/Off Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Lichter einschalten:")
+                    Switch(
+                        checked = turnOn,
+                        onCheckedChange = { turnOn = it }
+                    )
+                }
+                
+                // Brightness (only if turning on)
+                if (turnOn) {
+                    Column {
+                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
+                        Slider(
+                            value = brightness.toFloat(),
+                            onValueChange = { brightness = it.toInt() },
+                            valueRange = 1f..254f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
+                        // Create a simple rule that targets all lights
+                        val lightAction = HueLightAction(
+                            targetType = TargetType.GROUP,
+                            targetId = "0", // Group 0 = All lights
+                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                            on = turnOn,
+                            brightness = if (turnOn) brightness else null
+                        )
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59", 
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = 0,
+                            actions = listOf(lightAction)
+                        )
+                        
+                        val rule = HueScheduleRule(
+                            name = ruleName,
+                            shiftPattern = shiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        
+                        onCreateRule(rule)
+                    }
+                },
+                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
+            ) {
+                Text("Regel erstellen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -126,7 +258,8 @@ fun HueTabContent(
                 showRuleConfig && uiState.bridgeConnectionInfo?.isConnected == true -> {
                     HueRuleManagementScreen(
                         hueViewModel = hueViewModel,
-                        onBack = { showRuleConfig = false }
+                        onBack = { showRuleConfig = false },
+                        onNewRule = { showNewRuleDialog = true }
                     )
                 }
                 
@@ -179,7 +312,143 @@ fun HueTabContent(
                 }
             }
         )
+        
+        // NEW: Quick Rule Creation Dialog
+        if (showNewRuleDialog) {
+            QuickRuleCreationDialog(
+                onDismiss = { showNewRuleDialog = false },
+                onCreateRule = { rule ->
+                    hueViewModel.createRule(rule)
+                    showNewRuleDialog = false
+                }
+            )
+        }
     }
+}
+
+/**
+ * Quick Rule Creation Dialog
+ * Simple dialog for creating basic Hue rules quickly
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRuleCreationDialog(
+    onDismiss: () -> Unit,
+    onCreateRule: (HueScheduleRule) -> Unit
+) {
+    var ruleName by remember { mutableStateOf("") }
+    var shiftPattern by remember { mutableStateOf("") }
+    var turnOn by remember { mutableStateOf(true) }
+    var brightness by remember { mutableIntStateOf(200) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("🚀 Schnell-Regel erstellen")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rule Name
+                OutlinedTextField(
+                    value = ruleName,
+                    onValueChange = { ruleName = it },
+                    label = { Text("Regel-Name") },
+                    placeholder = { Text("z.B. Mittags-Alarm") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Shift Pattern  
+                OutlinedTextField(
+                    value = shiftPattern,
+                    onValueChange = { shiftPattern = it },
+                    label = { Text("Shift-Pattern") },
+                    placeholder = { Text("z.B. Spätschicht") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // On/Off Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Lichter einschalten:")
+                    Switch(
+                        checked = turnOn,
+                        onCheckedChange = { turnOn = it }
+                    )
+                }
+                
+                // Brightness (only if turning on)
+                if (turnOn) {
+                    Column {
+                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
+                        Slider(
+                            value = brightness.toFloat(),
+                            onValueChange = { brightness = it.toInt() },
+                            valueRange = 1f..254f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
+                        // Create a simple rule that targets all lights
+                        val lightAction = HueLightAction(
+                            targetType = TargetType.GROUP,
+                            targetId = "0", // Group 0 = All lights
+                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                            on = turnOn,
+                            brightness = if (turnOn) brightness else null
+                        )
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59", 
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = 0,
+                            actions = listOf(lightAction)
+                        )
+                        
+                        val rule = HueScheduleRule(
+                            name = ruleName,
+                            shiftPattern = shiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        
+                        onCreateRule(rule)
+                    }
+                },
+                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
+            ) {
+                Text("Regel erstellen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 }
 
 /**
@@ -191,6 +460,7 @@ fun HueTabContent(
 private fun HueRuleManagementScreen(
     hueViewModel: HueViewModel,
     onBack: () -> Unit,
+    onNewRule: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by hueViewModel.uiState.collectAsState()
@@ -274,10 +544,7 @@ private fun HueRuleManagementScreen(
                     )
                     
                     Button(
-                        onClick = { 
-                            // TODO: Open HueRuleConfigScreen for new rule
-                            // For now, show instruction
-                        }
+                        onClick = onNewRule
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -420,6 +687,131 @@ private fun HueRuleManagementScreen(
             }
         }
     }
+}
+
+/**
+ * Quick Rule Creation Dialog
+ * Simple dialog for creating basic Hue rules quickly
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRuleCreationDialog(
+    onDismiss: () -> Unit,
+    onCreateRule: (HueScheduleRule) -> Unit
+) {
+    var ruleName by remember { mutableStateOf("") }
+    var shiftPattern by remember { mutableStateOf("") }
+    var turnOn by remember { mutableStateOf(true) }
+    var brightness by remember { mutableIntStateOf(200) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("🚀 Schnell-Regel erstellen")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rule Name
+                OutlinedTextField(
+                    value = ruleName,
+                    onValueChange = { ruleName = it },
+                    label = { Text("Regel-Name") },
+                    placeholder = { Text("z.B. Mittags-Alarm") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Shift Pattern  
+                OutlinedTextField(
+                    value = shiftPattern,
+                    onValueChange = { shiftPattern = it },
+                    label = { Text("Shift-Pattern") },
+                    placeholder = { Text("z.B. Spätschicht") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // On/Off Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Lichter einschalten:")
+                    Switch(
+                        checked = turnOn,
+                        onCheckedChange = { turnOn = it }
+                    )
+                }
+                
+                // Brightness (only if turning on)
+                if (turnOn) {
+                    Column {
+                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
+                        Slider(
+                            value = brightness.toFloat(),
+                            onValueChange = { brightness = it.toInt() },
+                            valueRange = 1f..254f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
+                        // Create a simple rule that targets all lights
+                        val lightAction = HueLightAction(
+                            targetType = TargetType.GROUP,
+                            targetId = "0", // Group 0 = All lights
+                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                            on = turnOn,
+                            brightness = if (turnOn) brightness else null
+                        )
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59", 
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = 0,
+                            actions = listOf(lightAction)
+                        )
+                        
+                        val rule = HueScheduleRule(
+                            name = ruleName,
+                            shiftPattern = shiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        
+                        onCreateRule(rule)
+                    }
+                },
+                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
+            ) {
+                Text("Regel erstellen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -635,6 +1027,131 @@ private fun EnhancedBridgeConnectionCard(
     }
 }
 
+/**
+ * Quick Rule Creation Dialog
+ * Simple dialog for creating basic Hue rules quickly
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRuleCreationDialog(
+    onDismiss: () -> Unit,
+    onCreateRule: (HueScheduleRule) -> Unit
+) {
+    var ruleName by remember { mutableStateOf("") }
+    var shiftPattern by remember { mutableStateOf("") }
+    var turnOn by remember { mutableStateOf(true) }
+    var brightness by remember { mutableIntStateOf(200) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("🚀 Schnell-Regel erstellen")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rule Name
+                OutlinedTextField(
+                    value = ruleName,
+                    onValueChange = { ruleName = it },
+                    label = { Text("Regel-Name") },
+                    placeholder = { Text("z.B. Mittags-Alarm") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Shift Pattern  
+                OutlinedTextField(
+                    value = shiftPattern,
+                    onValueChange = { shiftPattern = it },
+                    label = { Text("Shift-Pattern") },
+                    placeholder = { Text("z.B. Spätschicht") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // On/Off Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Lichter einschalten:")
+                    Switch(
+                        checked = turnOn,
+                        onCheckedChange = { turnOn = it }
+                    )
+                }
+                
+                // Brightness (only if turning on)
+                if (turnOn) {
+                    Column {
+                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
+                        Slider(
+                            value = brightness.toFloat(),
+                            onValueChange = { brightness = it.toInt() },
+                            valueRange = 1f..254f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
+                        // Create a simple rule that targets all lights
+                        val lightAction = HueLightAction(
+                            targetType = TargetType.GROUP,
+                            targetId = "0", // Group 0 = All lights
+                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                            on = turnOn,
+                            brightness = if (turnOn) brightness else null
+                        )
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59", 
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = 0,
+                            actions = listOf(lightAction)
+                        )
+                        
+                        val rule = HueScheduleRule(
+                            name = ruleName,
+                            shiftPattern = shiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        
+                        onCreateRule(rule)
+                    }
+                },
+                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
+            ) {
+                Text("Regel erstellen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
+}
+
 @Composable
 private fun ConnectedStatusCard(
     connectionInfo: BridgeConnectionInfo,
@@ -786,4 +1303,129 @@ private fun ConnectedStatusCard(
             }
         }
     }
+}
+
+/**
+ * Quick Rule Creation Dialog
+ * Simple dialog for creating basic Hue rules quickly
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRuleCreationDialog(
+    onDismiss: () -> Unit,
+    onCreateRule: (HueScheduleRule) -> Unit
+) {
+    var ruleName by remember { mutableStateOf("") }
+    var shiftPattern by remember { mutableStateOf("") }
+    var turnOn by remember { mutableStateOf(true) }
+    var brightness by remember { mutableIntStateOf(200) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("🚀 Schnell-Regel erstellen")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rule Name
+                OutlinedTextField(
+                    value = ruleName,
+                    onValueChange = { ruleName = it },
+                    label = { Text("Regel-Name") },
+                    placeholder = { Text("z.B. Mittags-Alarm") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Shift Pattern  
+                OutlinedTextField(
+                    value = shiftPattern,
+                    onValueChange = { shiftPattern = it },
+                    label = { Text("Shift-Pattern") },
+                    placeholder = { Text("z.B. Spätschicht") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // On/Off Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Lichter einschalten:")
+                    Switch(
+                        checked = turnOn,
+                        onCheckedChange = { turnOn = it }
+                    )
+                }
+                
+                // Brightness (only if turning on)
+                if (turnOn) {
+                    Column {
+                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
+                        Slider(
+                            value = brightness.toFloat(),
+                            onValueChange = { brightness = it.toInt() },
+                            valueRange = 1f..254f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
+                        // Create a simple rule that targets all lights
+                        val lightAction = HueLightAction(
+                            targetType = TargetType.GROUP,
+                            targetId = "0", // Group 0 = All lights
+                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                            on = turnOn,
+                            brightness = if (turnOn) brightness else null
+                        )
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59", 
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = 0,
+                            actions = listOf(lightAction)
+                        )
+                        
+                        val rule = HueScheduleRule(
+                            name = ruleName,
+                            shiftPattern = shiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        
+                        onCreateRule(rule)
+                    }
+                },
+                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
+            ) {
+                Text("Regel erstellen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 }
