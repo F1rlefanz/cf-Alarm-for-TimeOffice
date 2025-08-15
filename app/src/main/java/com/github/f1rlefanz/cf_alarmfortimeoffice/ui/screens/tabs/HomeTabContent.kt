@@ -15,13 +15,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
+import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ManualAlarmCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.CalendarConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AlarmUiState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.AlarmSkipUiState
+import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ManualAlarmUiState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.CalendarUiState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftUiState
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -30,9 +34,15 @@ fun HomeTabContent(
     shiftState: ShiftUiState,
     alarmState: AlarmUiState,
     skipState: AlarmSkipUiState,
+    manualAlarmState: ManualAlarmUiState, // NEU
     onRefresh: () -> Unit,
     onSkipNextAlarm: () -> Unit,
     onCancelSkip: () -> Unit,
+    onSelectManualAlarmDate: (LocalDate) -> Unit, // NEU
+    onSelectManualAlarmShift: (ShiftDefinition) -> Unit, // NEU
+    onCreateManualAlarm: () -> Unit, // NEU
+    onDeleteManualAlarm: () -> Unit, // NEU
+    onClearManualAlarmError: () -> Unit, // NEU
     onShowEventList: (() -> Unit)? = null // LAZY LOADING: Navigation to event details
 ) {
     val daysAhead = shiftState.currentShiftConfig?.daysAhead ?: CalendarConstants.DEFAULT_DAYS_AHEAD
@@ -120,6 +130,16 @@ fun HomeTabContent(
             skipState = skipState,
             onSkipNextAlarm = onSkipNextAlarm,
             onCancelSkip = onCancelSkip
+        )
+
+        // NEU: Manual Alarm Card
+        ManualAlarmCard(
+            manualAlarmState = manualAlarmState,
+            onSelectDate = onSelectManualAlarmDate,
+            onSelectShift = onSelectManualAlarmShift,
+            onCreate = onCreateManualAlarm,
+            onDelete = onDeleteManualAlarm,
+            onClearError = onClearManualAlarmError
         )
 
         // Kalender Events Summary

@@ -4,12 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.AlarmInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftInfo
+import com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftDefinition
 import com.github.f1rlefanz.cf_alarmfortimeoffice.model.state.AppErrorState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IAlarmSkipUseCase
+import com.github.f1rlefanz.cf_alarmfortimeoffice.usecase.interfaces.IShiftUseCase
 import com.github.f1rlefanz.cf_alarmfortimeoffice.error.ErrorHandler
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.Logger
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.LogTags
+import com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.LocalDateTime
+import java.time.Instant
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +42,23 @@ data class AlarmSkipUiState(
 )
 
 /**
+ * MANUAL ALARM UI STATE
+ * 
+ * State für manuelle Alarm-Erstellung nach Schichttausch
+ */
+data class ManualAlarmUiState(
+    val selectedDate: LocalDate = LocalDate.now(),
+    val selectedShift: ShiftDefinition? = null,
+    val availableShifts: List<ShiftDefinition> = emptyList(),
+    val calculatedAlarmTime: String? = null,
+    val hasActiveManualAlarm: Boolean = false,
+    val activeManualAlarm: AlarmInfo? = null,
+    val isCreating: Boolean = false,
+    val isDeleting: Boolean = false,
+    val error: AppErrorState? = null
+)
+
+/**
  * MEMORY LEAK FIXED: AlarmViewModel with proper resource cleanup
  * 
  * CRITICAL FIXES:
@@ -45,6 +70,7 @@ data class AlarmSkipUiState(
 class AlarmViewModel(
     private val alarmUseCase: IAlarmUseCase,
     private val alarmSkipUseCase: IAlarmSkipUseCase,
+    private val shiftUseCase: IShiftUseCase,
     private val errorHandler: ErrorHandler
 ) : ViewModel() {
 
@@ -54,12 +80,17 @@ class AlarmViewModel(
     private val _skipState = MutableStateFlow(AlarmSkipUiState())
     val skipState: StateFlow<AlarmSkipUiState> = _skipState.asStateFlow()
     
+    private val _manualAlarmState = MutableStateFlow(ManualAlarmUiState())
+    val manualAlarmState: StateFlow<ManualAlarmUiState> = _manualAlarmState.asStateFlow()
+    
     // MEMORY LEAK FIX: Track Flow collection job for proper cleanup
     private var alarmObservationJob: Job? = null
 
     init {
         observeAlarmStatus()
         observeSkipStatus()
+        loadAvailableShifts()
+        observeManualAlarms()
         // CLEANUP: Clean expired alarms on startup
         cleanupExpiredAlarmsOnStartup()
     }
@@ -165,20 +196,20 @@ class AlarmViewModel(
                 // Legacy method - wird durch Interface nicht direkt unterstützt
                 // Workaround: Konvertiere zu createAlarmsFromEvents call
                 val alarmTime = shift.alarmTime
-                    .atZone(java.time.ZoneId.systemDefault())
+                    .atZone(ZoneId.systemDefault())
                     .toInstant()
                     .toEpochMilli()
                 
-                val alarmInfo = com.github.f1rlefanz.cf_alarmfortimeoffice.model.AlarmInfo(
+                val alarmInfo = AlarmInfo(
                     id = shift.id.hashCode(), // Convert String to Int
                     shiftId = shift.id,
                     shiftName = shift.shiftType.displayName,
                     triggerTime = alarmTime,
-                    formattedTime = java.time.format.DateTimeFormatter
-                        .ofPattern(com.github.f1rlefanz.cf_alarmfortimeoffice.util.business.DateTimeFormats.STANDARD_DATETIME)
-                        .format(java.time.LocalDateTime.ofInstant(
-                            java.time.Instant.ofEpochMilli(alarmTime), 
-                            java.time.ZoneId.systemDefault()
+                    formattedTime = DateTimeFormatter
+                        .ofPattern(DateTimeFormats.STANDARD_DATETIME)
+                        .format(LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(alarmTime), 
+                            ZoneId.systemDefault()
                         ))
                 )
                 
@@ -289,6 +320,240 @@ class AlarmViewModel(
         }
     }
     
+    // ========================================
+    // MANUAL ALARM FUNCTIONALITY
+    // ========================================
+    
+    /**
+     * Manual Alarm Constants - simplified approach using existing patterns
+     */
+    object ManualAlarmConstants {
+        const val MANUAL_ALARM_PREFIX = "MANUAL_"
+        const val MANUAL_SHIFT_ID_PREFIX = "manual_"
+        
+        fun createManualAlarmId(date: LocalDate, shiftId: String): Int {
+            val dateString = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+            return "$MANUAL_ALARM_PREFIX$dateString$shiftId".hashCode()
+        }
+        
+        fun createManualShiftId(originalShiftId: String, date: LocalDate): String {
+            val dateString = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+            return "$MANUAL_SHIFT_ID_PREFIX${originalShiftId}_$dateString"
+        }
+        
+        fun isManualAlarm(alarmInfo: AlarmInfo): Boolean {
+            return alarmInfo.shiftId.startsWith(MANUAL_SHIFT_ID_PREFIX)
+        }
+    }
+    
+    private fun loadAvailableShifts() {
+        viewModelScope.launch {
+            try {
+                shiftUseCase.getCurrentShiftConfig().getOrNull()?.let { shiftConfig ->
+                    val availableShifts = shiftConfig.definitions.filter { it.isEnabled }
+                    
+                    _manualAlarmState.value = _manualAlarmState.value.copy(
+                        availableShifts = availableShifts,
+                        selectedShift = availableShifts.firstOrNull() // Auto-select first available shift
+                    )
+                    
+                    // Update calculated alarm time
+                    updateCalculatedAlarmTime()
+                    
+                    Logger.d(LogTags.ALARM, "Loaded ${availableShifts.size} user-configured shift definitions")
+                }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "Error loading user's shift definitions", e)
+                _manualAlarmState.value = _manualAlarmState.value.copy(
+                    error = AppErrorState.validationError(e.message ?: "Fehler beim Laden der Schichtdefinitionen")
+                )
+            }
+        }
+    }
+
+    private fun observeManualAlarms() {
+        viewModelScope.launch {
+            try {
+                alarmUseCase.activeAlarms
+                    .distinctUntilChanged()
+                    .collect { alarms ->
+                        // Filter für manuelle Alarme
+                        val manualAlarms = alarms.filter { ManualAlarmConstants.isManualAlarm(it) }
+                        val activeManualAlarm = manualAlarms.firstOrNull() // Nur einer zur Zeit
+                        
+                        _manualAlarmState.value = _manualAlarmState.value.copy(
+                            hasActiveManualAlarm = activeManualAlarm != null,
+                            activeManualAlarm = activeManualAlarm
+                        )
+                        
+                        Logger.d(LogTags.ALARM, "Manual alarms updated: ${manualAlarms.size}")
+                    }
+            } catch (e: Exception) {
+                Logger.e(LogTags.ALARM, "Error observing manual alarms", e)
+            }
+        }
+    }
+
+    fun selectManualAlarmDate(date: LocalDate) {
+        _manualAlarmState.value = _manualAlarmState.value.copy(selectedDate = date)
+        updateCalculatedAlarmTime()
+    }
+
+    fun selectManualAlarmShift(shift: ShiftDefinition) {
+        _manualAlarmState.value = _manualAlarmState.value.copy(selectedShift = shift)
+        updateCalculatedAlarmTime()
+    }
+
+    private fun updateCalculatedAlarmTime() {
+        val state = _manualAlarmState.value
+        val selectedShift = state.selectedShift
+        val selectedDate = state.selectedDate
+        
+        if (selectedShift != null) {
+            // Berechne Alarm-Zeit: Datum + Schicht-Alarmzeit - 30 Min Vorlaufzeit
+            val shiftDateTime = selectedDate.atTime(selectedShift.alarmTime)
+            val alarmDateTime = shiftDateTime.minusMinutes(30) // 30 Min Vorlaufzeit
+            
+            val formattedTime = alarmDateTime.format(
+                DateTimeFormatter.ofPattern(DateTimeFormats.STANDARD_DATETIME)
+            )
+            
+            _manualAlarmState.value = _manualAlarmState.value.copy(
+                calculatedAlarmTime = formattedTime
+            )
+        } else {
+            _manualAlarmState.value = _manualAlarmState.value.copy(
+                calculatedAlarmTime = null
+            )
+        }
+    }
+
+    fun createManualAlarm() {
+        viewModelScope.launch {
+            val state = _manualAlarmState.value
+            val selectedShift = state.selectedShift
+            val selectedDate = state.selectedDate
+            
+            if (selectedShift == null) {
+                _manualAlarmState.value = state.copy(
+                    error = AppErrorState.validationError("Bitte wählen Sie eine Schicht aus")
+                )
+                return@launch
+            }
+            
+            _manualAlarmState.value = state.copy(isCreating = true, error = null)
+            
+            try {
+                // Berechne Alarm-Zeit
+                val shiftDateTime = selectedDate.atTime(selectedShift.alarmTime)
+                val alarmDateTime = shiftDateTime.minusMinutes(30) // 30 Min Vorlaufzeit
+                val alarmTimeMillis = alarmDateTime
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+                
+                // Prüfe ob in der Zukunft
+                if (alarmTimeMillis <= System.currentTimeMillis()) {
+                    _manualAlarmState.value = state.copy(
+                        isCreating = false,
+                        error = AppErrorState.validationError("Alarm-Zeit muss in der Zukunft liegen")
+                    )
+                    return@launch
+                }
+                
+                // Lösche vorherigen manuellen Alarm (nur einer zur Zeit)
+                state.activeManualAlarm?.let { existingAlarm ->
+                    alarmUseCase.deleteAlarm(existingAlarm.id)
+                }
+                
+                // Erstelle AlarmInfo
+                val manualAlarmId = ManualAlarmConstants.createManualAlarmId(selectedDate, selectedShift.id)
+                val manualShiftId = ManualAlarmConstants.createManualShiftId(selectedShift.id, selectedDate)
+                
+                val alarmInfo = AlarmInfo(
+                    id = manualAlarmId,
+                    shiftId = manualShiftId,
+                    shiftName = "${selectedShift.name} (Manuell)",
+                    triggerTime = alarmTimeMillis,
+                    formattedTime = alarmDateTime.format(
+                        DateTimeFormatter.ofPattern(DateTimeFormats.STANDARD_DATETIME)
+                    )
+                )
+                
+                // Speichere Alarm
+                alarmUseCase.saveAlarm(alarmInfo)
+                    .onSuccess {
+                        // Schedule System Alarm
+                        alarmUseCase.scheduleSystemAlarm(alarmInfo)
+                            .onSuccess {
+                                _manualAlarmState.value = _manualAlarmState.value.copy(
+                                    isCreating = false
+                                )
+                                Logger.business(LogTags.ALARM, "✅ Manual alarm created: ${selectedShift.name} for $selectedDate")
+                            }
+                            .onFailure { error ->
+                                _manualAlarmState.value = _manualAlarmState.value.copy(
+                                    isCreating = false,
+                                    error = AppErrorState.networkError(error.message ?: "Fehler beim Schedulen des Alarms")
+                                )
+                                Logger.e(LogTags.ALARM, "❌ Failed to schedule manual alarm", error)
+                            }
+                    }
+                    .onFailure { error ->
+                        _manualAlarmState.value = _manualAlarmState.value.copy(
+                            isCreating = false,
+                            error = AppErrorState.validationError(error.message ?: "Fehler beim Speichern des Alarms")
+                        )
+                        Logger.e(LogTags.ALARM, "❌ Failed to save manual alarm", error)
+                    }
+                
+            } catch (e: Exception) {
+                _manualAlarmState.value = _manualAlarmState.value.copy(
+                    isCreating = false,
+                    error = AppErrorState.validationError(e.message ?: "Unbekannter Fehler beim Erstellen des Alarms")
+                )
+                Logger.e(LogTags.ALARM, "❌ Exception creating manual alarm", e)
+            }
+        }
+    }
+
+    fun deleteManualAlarm() {
+        viewModelScope.launch {
+            val activeAlarm = _manualAlarmState.value.activeManualAlarm
+            if (activeAlarm == null) {
+                Logger.w(LogTags.ALARM, "No active manual alarm to delete")
+                return@launch
+            }
+            
+            _manualAlarmState.value = _manualAlarmState.value.copy(isDeleting = true, error = null)
+            
+            try {
+                alarmUseCase.deleteAlarm(activeAlarm.id)
+                    .onSuccess {
+                        _manualAlarmState.value = _manualAlarmState.value.copy(isDeleting = false)
+                        Logger.business(LogTags.ALARM, "✅ Manual alarm deleted: ${activeAlarm.shiftName}")
+                    }
+                    .onFailure { error ->
+                        _manualAlarmState.value = _manualAlarmState.value.copy(
+                            isDeleting = false,
+                            error = AppErrorState.validationError(error.message ?: "Fehler beim Löschen des Alarms")
+                        )
+                        Logger.e(LogTags.ALARM, "❌ Failed to delete manual alarm", error)
+                    }
+            } catch (e: Exception) {
+                _manualAlarmState.value = _manualAlarmState.value.copy(
+                    isDeleting = false,
+                    error = AppErrorState.validationError(e.message ?: "Unbekannter Fehler beim Löschen des Alarms")
+                )
+                Logger.e(LogTags.ALARM, "❌ Exception deleting manual alarm", e)
+            }
+        }
+    }
+
+    fun clearManualAlarmError() {
+        _manualAlarmState.value = _manualAlarmState.value.copy(error = null)
+    }
+    
     /**
      * MEMORY LEAK PREVENTION: Comprehensive resource cleanup
      * CRITICAL FIX: This was missing and causing memory leaks!
@@ -303,6 +568,8 @@ class AlarmViewModel(
             
             // MEMORY OPTIMIZATION: Clear state to release references
             _uiState.value = AlarmUiState()
+            _skipState.value = AlarmSkipUiState()
+            _manualAlarmState.value = ManualAlarmUiState()
             
             Logger.d(LogTags.LIFECYCLE, "AlarmViewModel cleared - cleaning up alarm observations and resources")
         } catch (e: Exception) {

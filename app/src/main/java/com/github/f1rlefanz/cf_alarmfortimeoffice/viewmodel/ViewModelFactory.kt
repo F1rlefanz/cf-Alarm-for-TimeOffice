@@ -76,6 +76,7 @@ class ViewModelFactory(
                 AlarmViewModel(
                     alarmUseCase = appContainer.alarmUseCase, // Interface-Abhängigkeit
                     alarmSkipUseCase = appContainer.alarmSkipUseCase, // NEU: Skip UseCase
+                    shiftUseCase = appContainer.shiftUseCase, // NEU: Für Manual Alarm Feature
                     errorHandler = ErrorHandler
                 ) as T
             }
