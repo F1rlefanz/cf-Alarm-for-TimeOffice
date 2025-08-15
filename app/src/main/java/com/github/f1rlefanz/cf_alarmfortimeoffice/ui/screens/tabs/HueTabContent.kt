@@ -16,7 +16,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.AnimatedDiscoveryCard
@@ -26,6 +25,8 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ViewModelFactory
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Enhanced Hue Tab Content with modern UX
@@ -46,6 +47,9 @@ fun HueTabContent(
     var showBridgeSetupModal by remember { mutableStateOf(false) }
     var showSuccessCard by remember { mutableStateOf(false) }
     var isConnecting by remember { mutableStateOf(false) }
+    
+    // NEW: Rule management state
+    var showRuleConfig by remember { mutableStateOf(false) }
 
     // Handle successful bridge connection
     LaunchedEffect(uiState.bridgeConnectionInfo?.isConnected) {
@@ -104,15 +108,26 @@ fun HueTabContent(
                 }
                 
                 // 2. Connected Status Card (permanent wenn connected)
-                uiState.bridgeConnectionInfo?.isConnected == true && !showSuccessCard -> {
+                uiState.bridgeConnectionInfo?.isConnected == true && !showSuccessCard && !showRuleConfig -> {
                     uiState.bridgeConnectionInfo?.let { connectionInfo ->
                         ConnectedStatusCard(
                             connectionInfo = connectionInfo,
                             onDisconnect = { 
                                 hueViewModel.clearDiscoveredBridges()
+                            },
+                            onConfigureRules = {
+                                showRuleConfig = true
                             }
                         )
                     }
+                }
+                
+                // 2.5. NEW: Rule Configuration Screen
+                showRuleConfig && uiState.bridgeConnectionInfo?.isConnected == true -> {
+                    HueRuleManagementScreen(
+                        hueViewModel = hueViewModel,
+                        onBack = { showRuleConfig = false }
+                    )
                 }
                 
                 // 3. Discovery Card (nur wenn NICHT connected und NICHT discovering)
@@ -164,6 +179,246 @@ fun HueTabContent(
                 }
             }
         )
+    }
+}
+
+/**
+ * Simple Hue Rule Management Screen
+ * Embedded in HueTabContent for quick access to rule configuration
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HueRuleManagementScreen(
+    hueViewModel: HueViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val uiState by hueViewModel.uiState.collectAsState()
+    
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(SpacingConstants.SPACING_LARGE),
+        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
+    ) {
+        // Header with back button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onBack
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Zurück"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Zurück")
+            }
+            
+            Text(
+                text = "Hue-Regeln",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.width(48.dp)) // Balance the back button
+        }
+
+        // Quick Start Info
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "🚀 Quick Start",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Erstelle deine erste Regel für heute Mittag:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "1. 'Neue Regel' drücken\n2. Shift-Pattern wählen (z.B. 'Spätschicht')\n3. Lichter auswählen\n4. Aktion definieren (Ein/Aus, Helligkeit)",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        // Existing Rules List
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Konfigurierte Regeln",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Button(
+                        onClick = { 
+                            // TODO: Open HueRuleConfigScreen for new rule
+                            // For now, show instruction
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Neue Regel")
+                    }
+                }
+                
+                // Show existing rules or empty state
+                if (uiState.scheduleRules.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Noch keine Regeln konfiguriert",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Erstelle deine erste Regel, um automatische Lichtsteuerung bei Alarmen zu aktivieren",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    // Show rules
+                    uiState.scheduleRules.forEach { rule ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (rule.enabled) 
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                else 
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = rule.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Switch(
+                                        checked = rule.enabled,
+                                        onCheckedChange = { enabled ->
+                                            // TODO: Update rule enabled state
+                                            hueViewModel.updateRule(rule.copy(enabled = enabled))
+                                        }
+                                    )
+                                }
+                                
+                                Text(
+                                    text = "Shift: ${rule.shiftPattern}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                
+                                Text(
+                                    text = "${rule.lightActions.size} Licht-Aktionen konfiguriert",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { 
+                                            // TODO: Edit rule
+                                        }
+                                    ) {
+                                        Text("Bearbeiten")
+                                    }
+                                    
+                                    OutlinedButton(
+                                        onClick = { 
+                                            hueViewModel.deleteRule(rule.id)
+                                        }
+                                    ) {
+                                        Text("Löschen")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Info about manual alarms
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "💡 Info: Manueller Alarm",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Dein manueller Alarm heute Mittag wird automatisch nach passenden Hue-Regeln suchen. Wenn der Shift-Name in deinen Regeln gefunden wird, gehen die Lichter automatisch an!",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
     }
 }
 
@@ -384,6 +639,7 @@ private fun EnhancedBridgeConnectionCard(
 private fun ConnectedStatusCard(
     connectionInfo: BridgeConnectionInfo,
     onDisconnect: () -> Unit,
+    onConfigureRules: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -479,7 +735,7 @@ private fun ConnectedStatusCard(
                         )
                         Text(
                             text = "Verbunden: ${
-                                java.text.SimpleDateFormat("HH:mm:ss").format(timestamp)
+                                SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(timestamp)
                             }",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -489,21 +745,45 @@ private fun ConnectedStatusCard(
             }
         }
 
-        // Disconnect controls
-        OutlinedButton(
-            onClick = onDisconnect,
-            shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
+        // Disconnect controls und REGEL-KONFIGURATION
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = null,
-                modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
-            )
-            Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-            Text(
-                text = "Zurücksetzen",
-                style = MaterialTheme.typography.labelLarge
-            )
+            // NEW: Regeln konfigurieren Button
+            Button(
+                onClick = onConfigureRules,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
+                )
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
+                Text(
+                    text = "Regeln konfigurieren",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onDisconnect,
+                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
+                )
+                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
+                Text(
+                    text = "Zurücksetzen",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
     }
 }
