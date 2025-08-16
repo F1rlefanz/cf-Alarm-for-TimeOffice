@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.NavigationState
 import com.github.f1rlefanz.cf_alarmfortimeoffice.navigation.MainTab
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
@@ -145,6 +146,25 @@ fun MainScreen(
                 )
             }
 
+            is NavigationState.HueRuleConfig -> {
+                val hueRuleState = navigationState as NavigationState.HueRuleConfig
+                com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.hue.HueRuleConfigScreen(
+                    ruleId = hueRuleState.ruleId,
+                    viewModelFactory = viewModelFactory,
+                    onNavigateBack = { navigationViewModel.navigateBackToMain() },
+                    onSaveComplete = { navigationViewModel.navigateBackToMain() }
+                )
+            }
+
+            is NavigationState.HueSettings -> {
+                com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.hue.HueSettingsScreen(
+                    viewModelFactory = viewModelFactory,
+                    onNavigateBack = { navigationViewModel.navigateBackToMain() },
+                    onEditRule = { ruleId -> navigationViewModel.navigateToHueRuleConfig(ruleId) },
+                    onCreateNewRule = { navigationViewModel.navigateToHueRuleConfig() }
+                )
+            }
+
             is NavigationState.MainContent -> {
                 val mainContentState = navigationState as NavigationState.MainContent
                 MainContentScreen(
@@ -158,7 +178,12 @@ fun MainScreen(
                     onSelectedTabChange = { tab -> navigationViewModel.changeTab(tab) },
                     onShowShiftConfig = { navigationViewModel.navigateToShiftConfig(mainContentState.selectedTab) },
                     onShowCalendarSelection = { navigationViewModel.navigateToCalendarSelection(mainContentState.selectedTab) },
-                    onShowEventList = { navigationViewModel.navigateToEventList(mainContentState.selectedTab) }
+                    onShowEventList = { navigationViewModel.navigateToEventList(mainContentState.selectedTab) },
+                    onShowHueRuleConfig = { navigationViewModel.navigateToHueRuleConfig() },
+                    onShowHueSettings = { navigationViewModel.navigateToHueSettings() },
+                    onTestHueConnection = { 
+                        // Test wird direkt in HueTabContent gemacht
+                    }
                 )
             }
         }

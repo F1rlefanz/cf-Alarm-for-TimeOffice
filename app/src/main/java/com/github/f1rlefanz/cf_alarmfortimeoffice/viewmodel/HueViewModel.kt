@@ -280,6 +280,42 @@ class HueViewModel(
         }
     }
     
+    fun loadRuleForEditing(ruleId: String) {
+        Logger.d(LogTags.HUE_VIEWMODEL, "Loading rule for editing: $ruleId")
+        
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        
+        viewModelScope.launch {
+            try {
+                val result = hueRuleUseCase.getRule(ruleId)
+                
+                if (result.isSuccess) {
+                    val rule = result.getOrNull()
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false,
+                            editingRule = rule
+                        )
+                    }
+                    Logger.d(LogTags.HUE_VIEWMODEL, "Rule loaded for editing: ${rule?.name}")
+                } else {
+                    val error = result.exceptionOrNull()?.message ?: "Failed to load rule"
+                    _uiState.update { it.copy(isLoading = false, error = error) }
+                    Logger.w(LogTags.HUE_VIEWMODEL, "Failed to load rule for editing: $error")
+                }
+            } catch (e: Exception) {
+                val error = "Failed to load rule: ${e.message}"
+                _uiState.update { it.copy(isLoading = false, error = error) }
+                Logger.e(LogTags.HUE_VIEWMODEL, "Load rule for editing exception", e)
+            }
+        }
+    }
+    
+    fun clearEditingRule() {
+        Logger.d(LogTags.HUE_VIEWMODEL, "Clearing editing rule")
+        _uiState.update { it.copy(editingRule = null) }
+    }
+    
     fun createRule(rule: HueSchedule) {
         Logger.i(LogTags.HUE_VIEWMODEL, "Creating new rule: ${rule.name}")
         
@@ -416,5 +452,6 @@ data class HueUiState(
     val lightTargets: LightTargets = LightTargets(),
     
     // Rule Management
-    val scheduleRules: List<HueSchedule> = emptyList()
+    val scheduleRules: List<HueSchedule> = emptyList(),
+    val editingRule: HueSchedule? = null
 )

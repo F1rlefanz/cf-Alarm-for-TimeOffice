@@ -2,9 +2,7 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.screens.tabs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,967 +15,209 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueBridge
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.BridgeConnectionInfo
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueScheduleRule
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueTimeRange
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.HueLightAction
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TargetType
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.ActionType
-import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.TimeReference
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.ErrorMessage
 import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.AnimatedDiscoveryCard
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSetupModal
-import com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue.BridgeSuccessCard
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.HueViewModel
 import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ViewModelFactory
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /**
- * Enhanced Hue Tab Content with modern UX
- * Features animated discovery, interactive bridge setup modal, and success celebrations
+ * Fixed Hue Tab Content with proper scrolling and layout
+ * Resolved: UI overflow, scrolling issues, layout problems, missing navigation
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HueTabContent(
     viewModelFactory: ViewModelFactory,
+    onNavigateToRuleConfig: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onTestConnection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hueViewModel: HueViewModel = viewModel(factory = viewModelFactory)
     val uiState by hueViewModel.uiState.collectAsState()
     val discoveryStatus by hueViewModel.discoveryStatus.collectAsState()
 
-    // Modal state management
-    var selectedBridge by remember { mutableStateOf<HueBridge?>(null) }
-    var showBridgeSetupModal by remember { mutableStateOf(false) }
-    var showSuccessCard by remember { mutableStateOf(false) }
-    var isConnecting by remember { mutableStateOf(false) }
-    
-    // NEW: Rule management state
-    var showRuleConfig by remember { mutableStateOf(false) }
-    var showNewRuleDialog by remember { mutableStateOf(false) }
-
-    // Handle successful bridge connection
-    LaunchedEffect(uiState.bridgeConnectionInfo?.isConnected) {
-        if (uiState.bridgeConnectionInfo?.isConnected == true && isConnecting) {
-            isConnecting = false
-            showBridgeSetupModal = false
-            showSuccessCard = true
-            // Clear discovered bridges when connected to avoid UI confusion
-            hueViewModel.clearDiscoveredBridges()
-            kotlinx.coroutines.delay(UIConstants.ERROR_MESSAGE_AUTO_DISMISS_MS) // Show success for 5 seconds
-            showSuccessCard = false
-        }
-    }
-}
-
-/**
- * Quick Rule Creation Dialog
- * Simple dialog for creating basic Hue rules quickly
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun QuickRuleCreationDialog(
-    onDismiss: () -> Unit,
-    onCreateRule: (HueScheduleRule) -> Unit
-) {
-    var ruleName by remember { mutableStateOf("") }
-    var shiftPattern by remember { mutableStateOf("") }
-    var turnOn by remember { mutableStateOf(true) }
-    var brightness by remember { mutableIntStateOf(200) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("🚀 Schnell-Regel erstellen")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Rule Name
-                OutlinedTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it },
-                    label = { Text("Regel-Name") },
-                    placeholder = { Text("z.B. Mittags-Alarm") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Shift Pattern  
-                OutlinedTextField(
-                    value = shiftPattern,
-                    onValueChange = { shiftPattern = it },
-                    label = { Text("Shift-Pattern") },
-                    placeholder = { Text("z.B. Spätschicht") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Text(
-                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // On/Off Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Lichter einschalten:")
-                    Switch(
-                        checked = turnOn,
-                        onCheckedChange = { turnOn = it }
-                    )
-                }
-                
-                // Brightness (only if turning on)
-                if (turnOn) {
-                    Column {
-                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
-                        Slider(
-                            value = brightness.toFloat(),
-                            onValueChange = { brightness = it.toInt() },
-                            valueRange = 1f..254f,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                
-                Text(
-                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
-                        // Create a simple rule that targets all lights
-                        val lightAction = HueLightAction(
-                            targetType = TargetType.GROUP,
-                            targetId = "0", // Group 0 = All lights
-                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                            on = turnOn,
-                            brightness = if (turnOn) brightness else null
-                        )
-                        
-                        val timeRange = HueTimeRange(
-                            startTime = "00:00",
-                            endTime = "23:59", 
-                            relativeTo = TimeReference.ALARM_TIME,
-                            offsetMinutes = 0,
-                            actions = listOf(lightAction)
-                        )
-                        
-                        val rule = HueScheduleRule(
-                            name = ruleName,
-                            shiftPattern = shiftPattern,
-                            enabled = true,
-                            timeRanges = listOf(timeRange)
-                        )
-                        
-                        onCreateRule(rule)
-                    }
-                },
-                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
-            ) {
-                Text("Regel erstellen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(SpacingConstants.SPACING_LARGE),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
-        ) {
-            // Header
+    // Use LazyColumn for proper scrolling and performance
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp), // Single padding point
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header
+        item {
             Text(
                 text = "Philips Hue Integration",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
+        }
 
-            // Error Display
-            uiState.error?.let { error ->
+        // Error Display
+        uiState.error?.let { error ->
+            item {
                 ErrorMessage(
                     message = error,
                     onDismiss = { hueViewModel.clearError() }
                 )
             }
+        }
 
-            // Enhanced Discovery Card (replaces boring loading)
-            AnimatedDiscoveryCard(
-                discoveryStatus = discoveryStatus,
-                onCancel = { 
-                    hueViewModel.clearDiscoveredBridges()
-                }
-            )
-
-            // Success Celebration Card ODER Connected Status ODER Discovery
-            when {
-                // 1. Success Card (temporär für 5 Sekunden)
-                showSuccessCard -> {
-                    uiState.bridgeConnectionInfo?.let { connectionInfo ->
-                        BridgeSuccessCard(
-                            connectionInfo = connectionInfo,
-                            isVisible = showSuccessCard,
-                            onDismiss = { showSuccessCard = false }
-                        )
-                    }
-                }
-                
-                // 2. Connected Status Card (permanent wenn connected)
-                uiState.bridgeConnectionInfo?.isConnected == true && !showSuccessCard && !showRuleConfig -> {
-                    uiState.bridgeConnectionInfo?.let { connectionInfo ->
-                        ConnectedStatusCard(
-                            connectionInfo = connectionInfo,
-                            onDisconnect = { 
-                                hueViewModel.clearDiscoveredBridges()
-                            },
-                            onConfigureRules = {
-                                showRuleConfig = true
-                            }
-                        )
-                    }
-                }
-                
-                // 2.5. NEW: Rule Configuration Screen
-                showRuleConfig && uiState.bridgeConnectionInfo?.isConnected == true -> {
-                    HueRuleManagementScreen(
-                        hueViewModel = hueViewModel,
-                        onBack = { showRuleConfig = false },
-                        onNewRule = { showNewRuleDialog = true }
+        // Connected Features & Next Steps (show first when connected)
+        uiState.bridgeConnectionInfo?.let { connectionInfo ->
+            if (connectionInfo.isConnected) {
+                item {
+                    ConnectedFeaturesCard(
+                        onNavigateToRuleConfig = onNavigateToRuleConfig,
+                        onNavigateToSettings = onNavigateToSettings,
+                        onTestConnection = {
+                            // Test connection using HueViewModel
+                            hueViewModel.refreshLightTargets()
+                        }
                     )
                 }
-                
-                // 3. Discovery Card (nur wenn NICHT connected und NICHT discovering)
-                discoveryStatus?.stage != "N_UPNP_SEARCH" && 
-                discoveryStatus?.stage != "MDNS_SEARCH" && 
-                discoveryStatus?.stage != "STARTING" &&
-                uiState.bridgeConnectionInfo?.isConnected != true -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
-                    ) {
-                        item {
-                            EnhancedBridgeConnectionCard(
-                                connectionInfo = uiState.bridgeConnectionInfo,
-                                discoveredBridges = uiState.discoveredBridges,
-                                onDiscoverBridges = { hueViewModel.discoverBridges() },
-                                onSetupBridge = { bridge -> 
-                                    selectedBridge = bridge
-                                    showBridgeSetupModal = true
-                                },
-                                onDirectConnect = { bridge ->
-                                    isConnecting = true
-                                    hueViewModel.setupBridge(bridge)
-                                },
-                                onValidateConnection = { hueViewModel.validateBridgeConnection() },
-                                onClearBridges = { hueViewModel.clearDiscoveredBridges() }
-                            )
-                        }
-                    }
+                // When connected, skip the rest of the setup UI
+                return@LazyColumn
+            }
+        }
+
+        // Discovery Card (only show when discovering and not connected)
+        discoveryStatus?.let { currentDiscoveryStatus ->
+            if (!currentDiscoveryStatus.isComplete) {
+                item {
+                    AnimatedDiscoveryCard(
+                        discoveryStatus = currentDiscoveryStatus,
+                        onCancel = { hueViewModel.clearDiscoveredBridges() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
 
-        // Interactive Bridge Setup Modal
-        BridgeSetupModal(
-            bridge = selectedBridge,
-            isVisible = showBridgeSetupModal,
-            isConnecting = isConnecting,
-            error = if (uiState.error?.contains("link button", ignoreCase = true) == true) 
-                uiState.error else null,
-            onDismiss = { 
-                showBridgeSetupModal = false
-                selectedBridge = null
-                hueViewModel.clearError()
-            },
-            onConnect = {
-                isConnecting = true
-                selectedBridge?.let { bridge ->
+        // Connection Status Section (only when not connected)
+        item {
+            BridgeConnectionStatusCard(
+                connectionInfo = uiState.bridgeConnectionInfo,
+                onValidateConnection = { hueViewModel.validateBridgeConnection() }
+            )
+        }
+
+        // Bridge Discovery & Connection Section (only when not connected)
+        item {
+            BridgeDiscoveryCard(
+                discoveredBridges = uiState.discoveredBridges,
+                onDiscoverBridges = { hueViewModel.discoverBridges() },
+                onConnectToBridge = { bridge ->
                     hueViewModel.setupBridge(bridge)
-                }
-            }
-        )
-        
-        // NEW: Quick Rule Creation Dialog
-        if (showNewRuleDialog) {
-            QuickRuleCreationDialog(
-                onDismiss = { showNewRuleDialog = false },
-                onCreateRule = { rule ->
-                    hueViewModel.createRule(rule)
-                    showNewRuleDialog = false
-                }
+                },
+                onClearBridges = { hueViewModel.clearDiscoveredBridges() }
             )
+        }
+
+        // Add some bottom padding for better UX
+        item {
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
-/**
- * Quick Rule Creation Dialog
- * Simple dialog for creating basic Hue rules quickly
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickRuleCreationDialog(
-    onDismiss: () -> Unit,
-    onCreateRule: (HueScheduleRule) -> Unit
-) {
-    var ruleName by remember { mutableStateOf("") }
-    var shiftPattern by remember { mutableStateOf("") }
-    var turnOn by remember { mutableStateOf(true) }
-    var brightness by remember { mutableIntStateOf(200) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("🚀 Schnell-Regel erstellen")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Rule Name
-                OutlinedTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it },
-                    label = { Text("Regel-Name") },
-                    placeholder = { Text("z.B. Mittags-Alarm") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Shift Pattern  
-                OutlinedTextField(
-                    value = shiftPattern,
-                    onValueChange = { shiftPattern = it },
-                    label = { Text("Shift-Pattern") },
-                    placeholder = { Text("z.B. Spätschicht") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Text(
-                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // On/Off Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Lichter einschalten:")
-                    Switch(
-                        checked = turnOn,
-                        onCheckedChange = { turnOn = it }
-                    )
-                }
-                
-                // Brightness (only if turning on)
-                if (turnOn) {
-                    Column {
-                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
-                        Slider(
-                            value = brightness.toFloat(),
-                            onValueChange = { brightness = it.toInt() },
-                            valueRange = 1f..254f,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                
-                Text(
-                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
-                        // Create a simple rule that targets all lights
-                        val lightAction = HueLightAction(
-                            targetType = TargetType.GROUP,
-                            targetId = "0", // Group 0 = All lights
-                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                            on = turnOn,
-                            brightness = if (turnOn) brightness else null
-                        )
-                        
-                        val timeRange = HueTimeRange(
-                            startTime = "00:00",
-                            endTime = "23:59", 
-                            relativeTo = TimeReference.ALARM_TIME,
-                            offsetMinutes = 0,
-                            actions = listOf(lightAction)
-                        )
-                        
-                        val rule = HueScheduleRule(
-                            name = ruleName,
-                            shiftPattern = shiftPattern,
-                            enabled = true,
-                            timeRanges = listOf(timeRange)
-                        )
-                        
-                        onCreateRule(rule)
-                    }
-                },
-                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
-            ) {
-                Text("Regel erstellen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-}
-
-/**
- * Simple Hue Rule Management Screen
- * Embedded in HueTabContent for quick access to rule configuration
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HueRuleManagementScreen(
-    hueViewModel: HueViewModel,
-    onBack: () -> Unit,
-    onNewRule: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val uiState by hueViewModel.uiState.collectAsState()
-    
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(SpacingConstants.SPACING_LARGE),
-        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
-    ) {
-        // Header with back button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(
-                onClick = onBack
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Zurück"
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Zurück")
-            }
-            
-            Text(
-                text = "Hue-Regeln",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.width(48.dp)) // Balance the back button
-        }
-
-        // Quick Start Info
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "🚀 Quick Start",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Erstelle deine erste Regel für heute Mittag:",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "1. 'Neue Regel' drücken\n2. Shift-Pattern wählen (z.B. 'Spätschicht')\n3. Lichter auswählen\n4. Aktion definieren (Ein/Aus, Helligkeit)",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        // Existing Rules List
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Konfigurierte Regeln",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Button(
-                        onClick = onNewRule
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Neue Regel")
-                    }
-                }
-                
-                // Show existing rules or empty state
-                if (uiState.scheduleRules.isEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lightbulb,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Noch keine Regeln konfiguriert",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Erstelle deine erste Regel, um automatische Lichtsteuerung bei Alarmen zu aktivieren",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    // Show rules
-                    uiState.scheduleRules.forEach { rule ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (rule.enabled) 
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                else 
-                                    MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = rule.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    
-                                    Switch(
-                                        checked = rule.enabled,
-                                        onCheckedChange = { enabled ->
-                                            // TODO: Update rule enabled state
-                                            hueViewModel.updateRule(rule.copy(enabled = enabled))
-                                        }
-                                    )
-                                }
-                                
-                                Text(
-                                    text = "Shift: ${rule.shiftPattern}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                
-                                Text(
-                                    text = "${rule.lightActions.size} Licht-Aktionen konfiguriert",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { 
-                                            // TODO: Edit rule
-                                        }
-                                    ) {
-                                        Text("Bearbeiten")
-                                    }
-                                    
-                                    OutlinedButton(
-                                        onClick = { 
-                                            hueViewModel.deleteRule(rule.id)
-                                        }
-                                    ) {
-                                        Text("Löschen")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Info about manual alarms
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "💡 Info: Manueller Alarm",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Dein manueller Alarm heute Mittag wird automatisch nach passenden Hue-Regeln suchen. Wenn der Shift-Name in deinen Regeln gefunden wird, gehen die Lichter automatisch an!",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
-
-/**
- * Quick Rule Creation Dialog
- * Simple dialog for creating basic Hue rules quickly
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun QuickRuleCreationDialog(
-    onDismiss: () -> Unit,
-    onCreateRule: (HueScheduleRule) -> Unit
-) {
-    var ruleName by remember { mutableStateOf("") }
-    var shiftPattern by remember { mutableStateOf("") }
-    var turnOn by remember { mutableStateOf(true) }
-    var brightness by remember { mutableIntStateOf(200) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("🚀 Schnell-Regel erstellen")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Rule Name
-                OutlinedTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it },
-                    label = { Text("Regel-Name") },
-                    placeholder = { Text("z.B. Mittags-Alarm") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Shift Pattern  
-                OutlinedTextField(
-                    value = shiftPattern,
-                    onValueChange = { shiftPattern = it },
-                    label = { Text("Shift-Pattern") },
-                    placeholder = { Text("z.B. Spätschicht") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Text(
-                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // On/Off Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Lichter einschalten:")
-                    Switch(
-                        checked = turnOn,
-                        onCheckedChange = { turnOn = it }
-                    )
-                }
-                
-                // Brightness (only if turning on)
-                if (turnOn) {
-                    Column {
-                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
-                        Slider(
-                            value = brightness.toFloat(),
-                            onValueChange = { brightness = it.toInt() },
-                            valueRange = 1f..254f,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                
-                Text(
-                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
-                        // Create a simple rule that targets all lights
-                        val lightAction = HueLightAction(
-                            targetType = TargetType.GROUP,
-                            targetId = "0", // Group 0 = All lights
-                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                            on = turnOn,
-                            brightness = if (turnOn) brightness else null
-                        )
-                        
-                        val timeRange = HueTimeRange(
-                            startTime = "00:00",
-                            endTime = "23:59", 
-                            relativeTo = TimeReference.ALARM_TIME,
-                            offsetMinutes = 0,
-                            actions = listOf(lightAction)
-                        )
-                        
-                        val rule = HueScheduleRule(
-                            name = ruleName,
-                            shiftPattern = shiftPattern,
-                            enabled = true,
-                            timeRanges = listOf(timeRange)
-                        )
-                        
-                        onCreateRule(rule)
-                    }
-                },
-                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
-            ) {
-                Text("Regel erstellen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EnhancedBridgeConnectionCard(
+private fun BridgeConnectionStatusCard(
     connectionInfo: BridgeConnectionInfo?,
-    discoveredBridges: List<HueBridge>,
-    onDiscoverBridges: () -> Unit,
-    onSetupBridge: (HueBridge) -> Unit,
-    onDirectConnect: (HueBridge) -> Unit,
-    onValidateConnection: () -> Unit,
-    onClearBridges: () -> Unit,
-    modifier: Modifier = Modifier
+    onValidateConnection: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(SpacingConstants.SPACING_LARGE),
-        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_EXTRA_LARGE)
-    ) {
-        // Simple Header
-        Text(
-            text = "Bridge-Suche",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (connectionInfo?.isConnected == true) 
+                MaterialTheme.colorScheme.primaryContainer
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
         )
-
-        // Connection Status - Clean and simple
-        if (connectionInfo != null) {
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Status Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
-                    imageVector = if (connectionInfo.isConnected) 
+                    imageVector = if (connectionInfo?.isConnected == true) 
                         Icons.Default.CheckCircle else Icons.Default.Error,
                     contentDescription = null,
-                    tint = if (connectionInfo.isConnected) 
+                    tint = if (connectionInfo?.isConnected == true) 
                         Color.Green else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_LARGE)
+                    modifier = Modifier.size(32.dp)
                 )
-                Column {
+                
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (connectionInfo.isConnected) "✅ Verbunden" else "❌ Nicht verbunden",
+                        text = if (connectionInfo?.isConnected == true) "Verbunden" else "Nicht verbunden",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontWeight = FontWeight.Bold
                     )
-                    connectionInfo.bridgeIp?.let { ip ->
+                    connectionInfo?.bridgeIp?.let { ip ->
                         Text(
                             text = ip,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
                 }
-            }
-        } else {
-            Text(
-                text = "Keine Bridge verbunden",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        }
-
-        // Discovered Bridges - Simplified
-        if (discoveredBridges.isNotEmpty()) {
-            Text(
-                text = "${discoveredBridges.size} Bridge${if (discoveredBridges.size != 1) "s" else ""} gefunden:",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            discoveredBridges.forEach { bridge ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(SpacingConstants.CARD_CORNER_RADIUS),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    tonalElevation = 2.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(SpacingConstants.SPACING_LARGE),
-                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+                
+                if (connectionInfo?.isConnected == true) {
+                    OutlinedButton(
+                        onClick = onValidateConnection
                     ) {
-                        // Bridge info - larger, readable text
-                        Text(
-                            text = bridge.name ?: "Philips Hue Bridge",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Text(
-                            text = bridge.internalipaddress,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-
-                        // Action buttons - CLEAR unterschied zwischen Connect und Direct
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
-                        ) {
-                            // DIRECT Connect - sofort verbinden (für Link Button bereits gedrückt)
-                            Button(
-                                onClick = { onDirectConnect(bridge) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FlashOn,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
-                                )
-                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                                Text(
-                                    text = "Jetzt verbinden",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            
-                            // SETUP Connect - zeigt Modal mit Anleitung
-                            OutlinedButton(
-                                onClick = { onSetupBridge(bridge) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Default.Help,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
-                                )
-                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                                Text(
-                                    text = "Hilfe?",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // KLARE Anleitung - was der User tun soll
-                        Text(
-                            text = "🔗 Link-Taste an der Bridge drücken, dann 'Jetzt verbinden' antippen",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Prüfen")
                     }
                 }
             }
         }
+    }
+}
 
-        // Simple Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+@Composable
+private fun BridgeDiscoveryCard(
+    discoveredBridges: List<HueBridge>,
+    onDiscoverBridges: () -> Unit,
+    onConnectToBridge: (HueBridge) -> Unit,
+    onClearBridges: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (connectionInfo?.isConnected != true) {
+            // Section Header
+            Text(
+                text = "Bridge-Suche",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Discovery Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Button(
                     onClick = onDiscoverBridges,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -985,447 +225,222 @@ private fun EnhancedBridgeConnectionCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Bridges suchen",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("Bridges suchen")
+                }
+
+                if (discoveredBridges.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = onClearBridges
+                    ) {
+                        Text("Löschen")
+                    }
                 }
             }
 
-            if (connectionInfo?.isConnected == true) {
-                OutlinedButton(
-                    onClick = onValidateConnection,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
+            // Discovered Bridges List
+            if (discoveredBridges.isNotEmpty()) {
+                Text(
+                    text = "${discoveredBridges.size} Bridge${if (discoveredBridges.size != 1) "s" else ""} gefunden:",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+
+                discoveredBridges.forEach { bridge ->
+                    BridgeConnectionCard(
+                        bridge = bridge,
+                        onConnect = { onConnectToBridge(bridge) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BridgeConnectionCard(
+    bridge: HueBridge,
+    onConnect: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Bridge Info
+            Text(
+                text = bridge.name ?: "Philips Hue Bridge",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = bridge.internalipaddress,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+            )
+
+            // Connection Instructions
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = "🔗 Link-Taste an der Bridge drücken, dann 'Jetzt verbinden' antippen",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+
+            // Connect Button
+            Button(
+                onClick = onConnect,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FlashOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Jetzt verbinden")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectedFeaturesCard(
+    onNavigateToRuleConfig: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onTestConnection: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp), // Slightly more padding for celebration
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Celebration Header
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color.Green,
+                    modifier = Modifier.size(48.dp) // Bigger celebration icon
+                )
+                Text(
+                    text = "🎉 Erfolgreich verbunden!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Feature Description
+            Text(
+                text = "Ihre Philips Hue Bridge ist jetzt mit der App verbunden. Sie können Lichtregeln für Ihre Alarme erstellen!",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
+            )
+
+            // Quick Start Actions
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Was möchten Sie als nächstes tun?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center
+                )
+
+                // Primary Action - Create Rule
+                Button(
+                    onClick = onNavigateToRuleConfig,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
+                        imageVector = Icons.Default.Add,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Prüfen",
-                        style = MaterialTheme.typography.labelLarge
+                        "Erste Hue-Regel erstellen",
+                        style = MaterialTheme.typography.titleMedium
                     )
                 }
-            }
 
-            if (discoveredBridges.isNotEmpty()) {
-                TextButton(
-                    onClick = onClearBridges,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "Löschen",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Quick Rule Creation Dialog
- * Simple dialog for creating basic Hue rules quickly
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun QuickRuleCreationDialog(
-    onDismiss: () -> Unit,
-    onCreateRule: (HueScheduleRule) -> Unit
-) {
-    var ruleName by remember { mutableStateOf("") }
-    var shiftPattern by remember { mutableStateOf("") }
-    var turnOn by remember { mutableStateOf(true) }
-    var brightness by remember { mutableIntStateOf(200) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("🚀 Schnell-Regel erstellen")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Rule Name
-                OutlinedTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it },
-                    label = { Text("Regel-Name") },
-                    placeholder = { Text("z.B. Mittags-Alarm") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Shift Pattern  
-                OutlinedTextField(
-                    value = shiftPattern,
-                    onValueChange = { shiftPattern = it },
-                    label = { Text("Shift-Pattern") },
-                    placeholder = { Text("z.B. Spätschicht") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Text(
-                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // On/Off Toggle
+                // Secondary Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Lichter einschalten:")
-                    Switch(
-                        checked = turnOn,
-                        onCheckedChange = { turnOn = it }
-                    )
-                }
-                
-                // Brightness (only if turning on)
-                if (turnOn) {
-                    Column {
-                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
-                        Slider(
-                            value = brightness.toFloat(),
-                            onValueChange = { brightness = it.toInt() },
-                            valueRange = 1f..254f,
-                            modifier = Modifier.fillMaxWidth()
+                    OutlinedButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Einstellungen")
                     }
-                }
-                
-                Text(
-                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
-                        // Create a simple rule that targets all lights
-                        val lightAction = HueLightAction(
-                            targetType = TargetType.GROUP,
-                            targetId = "0", // Group 0 = All lights
-                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                            on = turnOn,
-                            brightness = if (turnOn) brightness else null
-                        )
-                        
-                        val timeRange = HueTimeRange(
-                            startTime = "00:00",
-                            endTime = "23:59", 
-                            relativeTo = TimeReference.ALARM_TIME,
-                            offsetMinutes = 0,
-                            actions = listOf(lightAction)
-                        )
-                        
-                        val rule = HueScheduleRule(
-                            name = ruleName,
-                            shiftPattern = shiftPattern,
-                            enabled = true,
-                            timeRanges = listOf(timeRange)
-                        )
-                        
-                        onCreateRule(rule)
-                    }
-                },
-                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
-            ) {
-                Text("Regel erstellen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-}
 
-@Composable
-private fun ConnectedStatusCard(
-    connectionInfo: BridgeConnectionInfo,
-    onDisconnect: () -> Unit,
-    onConfigureRules: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Success Icon
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = "Verbunden",
-            tint = Color.Green,
-            modifier = Modifier.size(48.dp)
-        )
-        
-        Text(
-            text = "🎉 Bridge verbunden!",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
-        
-        Text(
-            text = "Deine Hue Bridge ist bereit für die smarte Lichtsteuerung",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-            textAlign = TextAlign.Center
-        )
-        
-        // Bridge Details - Clean and simple
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            tonalElevation = 2.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                connectionInfo.bridgeName?.let { name ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    OutlinedButton(
+                        onClick = onTestConnection,
+                        modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Router,
+                            imageVector = Icons.Default.Lightbulb,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            modifier = Modifier.size(16.dp)
                         )
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                
-                connectionInfo.bridgeIp?.let { ip ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.NetworkCheck,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = ip,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                
-                connectionInfo.lastValidated?.let { timestamp ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AccessTime,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Verbunden: ${
-                                SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(timestamp)
-                            }",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Test")
                     }
                 }
             }
-        }
 
-        // Disconnect controls und REGEL-KONFIGURATION
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // NEW: Regeln konfigurieren Button
-            Button(
-                onClick = onConfigureRules,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
+            // Help Text
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
-                )
-                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                 Text(
-                    text = "Regeln konfigurieren",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            OutlinedButton(
-                onClick = onDisconnect,
-                shape = RoundedCornerShape(SpacingConstants.SURFACE_CORNER_RADIUS)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
-                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_MEDIUM)
-                )
-                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                Text(
-                    text = "Zurücksetzen",
-                    style = MaterialTheme.typography.labelLarge
+                    text = "💡 Tipp: Erstellen Sie für jede Schicht eine eigene Licht-Regel mit verschiedenen Farben und Helligkeiten.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
         }
     }
-}
-
-/**
- * Quick Rule Creation Dialog
- * Simple dialog for creating basic Hue rules quickly
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun QuickRuleCreationDialog(
-    onDismiss: () -> Unit,
-    onCreateRule: (HueScheduleRule) -> Unit
-) {
-    var ruleName by remember { mutableStateOf("") }
-    var shiftPattern by remember { mutableStateOf("") }
-    var turnOn by remember { mutableStateOf(true) }
-    var brightness by remember { mutableIntStateOf(200) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("🚀 Schnell-Regel erstellen")
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Rule Name
-                OutlinedTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it },
-                    label = { Text("Regel-Name") },
-                    placeholder = { Text("z.B. Mittags-Alarm") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Shift Pattern  
-                OutlinedTextField(
-                    value = shiftPattern,
-                    onValueChange = { shiftPattern = it },
-                    label = { Text("Shift-Pattern") },
-                    placeholder = { Text("z.B. Spätschicht") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Text(
-                    text = "💡 Das Shift-Pattern muss mit dem Namen deines Alarms übereinstimmen!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // On/Off Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Lichter einschalten:")
-                    Switch(
-                        checked = turnOn,
-                        onCheckedChange = { turnOn = it }
-                    )
-                }
-                
-                // Brightness (only if turning on)
-                if (turnOn) {
-                    Column {
-                        Text("Helligkeit: ${(brightness * 100 / 254)}%")
-                        Slider(
-                            value = brightness.toFloat(),
-                            onValueChange = { brightness = it.toInt() },
-                            valueRange = 1f..254f,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                
-                Text(
-                    text = "⚠️ Diese Regel wird ALLE verfügbaren Lichter steuern. Für detaillierte Konfiguration nutze die erweiterte Regel-Erstellung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (ruleName.isNotBlank() && shiftPattern.isNotBlank()) {
-                        // Create a simple rule that targets all lights
-                        val lightAction = HueLightAction(
-                            targetType = TargetType.GROUP,
-                            targetId = "0", // Group 0 = All lights
-                            actionType = if (turnOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                            on = turnOn,
-                            brightness = if (turnOn) brightness else null
-                        )
-                        
-                        val timeRange = HueTimeRange(
-                            startTime = "00:00",
-                            endTime = "23:59", 
-                            relativeTo = TimeReference.ALARM_TIME,
-                            offsetMinutes = 0,
-                            actions = listOf(lightAction)
-                        )
-                        
-                        val rule = HueScheduleRule(
-                            name = ruleName,
-                            shiftPattern = shiftPattern,
-                            enabled = true,
-                            timeRanges = listOf(timeRange)
-                        )
-                        
-                        onCreateRule(rule)
-                    }
-                },
-                enabled = ruleName.isNotBlank() && shiftPattern.isNotBlank()
-            ) {
-                Text("Regel erstellen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
 }

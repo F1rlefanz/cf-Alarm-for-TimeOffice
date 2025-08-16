@@ -30,7 +30,10 @@ fun MainContentScreen(
     onSelectedTabChange: (MainTab) -> Unit,
     onShowShiftConfig: () -> Unit,
     onShowCalendarSelection: () -> Unit,
-    onShowEventList: () -> Unit
+    onShowEventList: () -> Unit,
+    onShowHueRuleConfig: () -> Unit,
+    onShowHueSettings: () -> Unit,
+    onTestHueConnection: () -> Unit
 ) {
     val authState by authViewModel.uiState.collectAsState()
     val calendarState by calendarViewModel.uiState.collectAsState()
@@ -124,7 +127,10 @@ fun MainContentScreen(
                 }
                 MainTab.HUE -> {
                     HueTabContent(
-                        viewModelFactory = viewModelFactory
+                        viewModelFactory = viewModelFactory,
+                        onNavigateToRuleConfig = onShowHueRuleConfig,
+                        onNavigateToSettings = onShowHueSettings,
+                        onTestConnection = onTestHueConnection
                     )
                 }
             }

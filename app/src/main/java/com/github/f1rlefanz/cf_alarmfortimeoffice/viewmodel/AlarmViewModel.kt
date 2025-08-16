@@ -349,23 +349,58 @@ class AlarmViewModel(
     private fun loadAvailableShifts() {
         viewModelScope.launch {
             try {
-                shiftUseCase.getCurrentShiftConfig().getOrNull()?.let { shiftConfig ->
+                // 🔍 CRITICAL DEBUG: Überprüfen was getCurrentShiftConfig() wirklich zurückgibt
+                val shiftConfigResult = shiftUseCase.getCurrentShiftConfig()
+                Logger.business(LogTags.ALARM, "🔍 SHIFT CONFIG RESULT: success=${shiftConfigResult.isSuccess}")
+                
+                shiftConfigResult.getOrNull()?.let { shiftConfig ->
+                    // 🔍 CRITICAL DEBUG: Vergleiche mit Default-Config
+                    com.github.f1rlefanz.cf_alarmfortimeoffice.debug.ShiftConfigDebugger.compareConfigs(
+                        loadedConfig = shiftConfig,
+                        context = "AlarmViewModel.loadAvailableShifts()"
+                    )
+                    
+                    Logger.business(LogTags.ALARM, "🔍 LOADED CONFIG has ${shiftConfig.definitions.size} definitions:")
+                    shiftConfig.definitions.forEach { def ->
+                        Logger.business(LogTags.ALARM, "   ${def.id}: ${def.name} -> ${def.alarmTime} (${def.getAlarmTimeFormatted()})")
+                    }
+                    
                     val availableShifts = shiftConfig.definitions.filter { it.isEnabled }
+                    
+                    // 🔍 DEBUG: Log alle geladenen Schichten mit ihren Zeiten
+                    com.github.f1rlefanz.cf_alarmfortimeoffice.util.ManualAlarmDebugHelper.logShiftDetails(
+                        shifts = availableShifts,
+                        source = "loadAvailableShifts()"
+                    )
                     
                     _manualAlarmState.value = _manualAlarmState.value.copy(
                         availableShifts = availableShifts,
-                        selectedShift = availableShifts.firstOrNull() // Auto-select first available shift
+                        selectedShift = availableShifts.firstOrNull() // Erste verfügbare Schicht
                     )
                     
                     // Update calculated alarm time
                     updateCalculatedAlarmTime()
                     
                     Logger.d(LogTags.ALARM, "Loaded ${availableShifts.size} user-configured shift definitions")
+                } ?: run {
+                    Logger.e(LogTags.ALARM, "🚨 CRITICAL: getCurrentShiftConfig() returned null!")
+                    
+                    // FALLBACK: Versuche direkt die Default-Config zu laden
+                    val defaultConfig = com.github.f1rlefanz.cf_alarmfortimeoffice.model.ShiftConfig.getDefaultConfig()
+                    Logger.w(LogTags.ALARM, "🔄 FALLBACK: Using default config with ${defaultConfig.definitions.size} definitions")
+                    
+                    val availableShifts = defaultConfig.definitions.filter { it.isEnabled }
+                    _manualAlarmState.value = _manualAlarmState.value.copy(
+                        availableShifts = availableShifts,
+                        selectedShift = availableShifts.firstOrNull(),
+                        error = AppErrorState.validationError("Warnung: Default-Konfiguration wird verwendet")
+                    )
+                    updateCalculatedAlarmTime()
                 }
             } catch (e: Exception) {
-                Logger.e(LogTags.ALARM, "Error loading user's shift definitions", e)
+                Logger.e(LogTags.ALARM, "🚨 ERROR loading shift definitions", e)
                 _manualAlarmState.value = _manualAlarmState.value.copy(
-                    error = AppErrorState.validationError(e.message ?: "Fehler beim Laden der Schichtdefinitionen")
+                    error = AppErrorState.validationError("Fehler beim Laden: ${e.message}")
                 )
             }
         }
@@ -400,6 +435,12 @@ class AlarmViewModel(
     }
 
     fun selectManualAlarmShift(shift: ShiftDefinition) {
+        // 🔍 DEBUG: Log die ausgewählte Schicht
+        com.github.f1rlefanz.cf_alarmfortimeoffice.util.ManualAlarmDebugHelper.logSelectedShiftDetails(
+            shift = shift,
+            context = "selectManualAlarmShift()"
+        )
+        
         _manualAlarmState.value = _manualAlarmState.value.copy(selectedShift = shift)
         updateCalculatedAlarmTime()
     }
@@ -410,18 +451,26 @@ class AlarmViewModel(
         val selectedDate = state.selectedDate
         
         if (selectedShift != null) {
-            // Berechne Alarm-Zeit: Datum + Schicht-Alarmzeit - 30 Min Vorlaufzeit
-            val shiftDateTime = selectedDate.atTime(selectedShift.alarmTime)
-            val alarmDateTime = shiftDateTime.minusMinutes(30) // 30 Min Vorlaufzeit
+            // 🔍 DEBUG: Log die verwendete Schicht-Zeit
+            Logger.business(LogTags.ALARM, "🎯 CALCULATING alarm time for shift: ${selectedShift.name}")
+            Logger.business(LogTags.ALARM, "   📅 Date: $selectedDate")
+            Logger.business(LogTags.ALARM, "   ⏰ Shift alarmTime: ${selectedShift.alarmTime}")
+            Logger.business(LogTags.ALARM, "   📋 Shift formatted: ${selectedShift.getAlarmTimeFormatted()}")
+            
+            // ✅ KORRIGIERT: Verwende die User-konfigurierte Zeit OHNE bescheuerten Offset
+            val alarmDateTime = selectedDate.atTime(selectedShift.alarmTime)
             
             val formattedTime = alarmDateTime.format(
                 DateTimeFormatter.ofPattern(DateTimeFormats.STANDARD_DATETIME)
             )
             
+            Logger.business(LogTags.ALARM, "   🚨 FINAL calculated alarm: $formattedTime")
+            
             _manualAlarmState.value = _manualAlarmState.value.copy(
                 calculatedAlarmTime = formattedTime
             )
         } else {
+            Logger.w(LogTags.ALARM, "⚠️ NO SHIFT selected for alarm calculation")
             _manualAlarmState.value = _manualAlarmState.value.copy(
                 calculatedAlarmTime = null
             )
@@ -444,9 +493,8 @@ class AlarmViewModel(
             _manualAlarmState.value = state.copy(isCreating = true, error = null)
             
             try {
-                // Berechne Alarm-Zeit
-                val shiftDateTime = selectedDate.atTime(selectedShift.alarmTime)
-                val alarmDateTime = shiftDateTime.minusMinutes(30) // 30 Min Vorlaufzeit
+                // Berechne Alarm-Zeit - ✅ OHNE bescheuerten Offset
+                val alarmDateTime = selectedDate.atTime(selectedShift.alarmTime)
                 val alarmTimeMillis = alarmDateTime
                     .atZone(ZoneId.systemDefault())
                     .toInstant()

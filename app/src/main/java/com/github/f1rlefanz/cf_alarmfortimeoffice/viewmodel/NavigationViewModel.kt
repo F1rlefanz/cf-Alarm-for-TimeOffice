@@ -39,11 +39,23 @@ class NavigationViewModel : ViewModel() {
                 NavigationState.EventList(action.fromTab)
             }
             
+            is NavigationAction.NavigateToHueRuleConfig -> {
+                Logger.d(LogTags.NAVIGATION, "Main -> Hue Rule Config (from ${action.fromTab}, rule: ${action.ruleId})")
+                NavigationState.HueRuleConfig(action.ruleId, action.fromTab)
+            }
+            
+            is NavigationAction.NavigateToHueSettings -> {
+                Logger.d(LogTags.NAVIGATION, "Main -> Hue Settings (from ${action.fromTab})")
+                NavigationState.HueSettings(action.fromTab)
+            }
+            
             is NavigationAction.NavigateBackToMain -> {
                 val returnTab = when (currentState) {
                     is NavigationState.CalendarSelection -> currentState.returnToTab
                     is NavigationState.ShiftConfig -> currentState.returnToTab
                     is NavigationState.EventList -> currentState.returnToTab
+                    is NavigationState.HueRuleConfig -> currentState.returnToTab
+                    is NavigationState.HueSettings -> currentState.returnToTab
                     else -> MainTab.HOME
                 }
                 Logger.d(LogTags.NAVIGATION, "-> Main ($returnTab tab)")
@@ -79,6 +91,12 @@ class NavigationViewModel : ViewModel() {
     
     fun navigateToEventList(fromTab: MainTab = MainTab.HOME) = 
         handleNavigationAction(NavigationAction.NavigateToEventList(fromTab))
+    
+    fun navigateToHueRuleConfig(ruleId: String? = null, fromTab: MainTab = MainTab.HUE) = 
+        handleNavigationAction(NavigationAction.NavigateToHueRuleConfig(ruleId, fromTab))
+    
+    fun navigateToHueSettings(fromTab: MainTab = MainTab.HUE) = 
+        handleNavigationAction(NavigationAction.NavigateToHueSettings(fromTab))
     
     fun navigateBackToMain() = 
         handleNavigationAction(NavigationAction.NavigateBackToMain)

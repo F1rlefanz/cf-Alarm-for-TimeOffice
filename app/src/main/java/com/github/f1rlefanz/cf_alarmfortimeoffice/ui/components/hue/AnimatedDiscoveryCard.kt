@@ -2,7 +2,6 @@ package com.github.f1rlefanz.cf_alarmfortimeoffice.ui.components.hue
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -21,13 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.f1rlefanz.cf_alarmfortimeoffice.hue.data.DiscoveryStatus
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.timing.UIConstants
-import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.AlphaValues
 
 /**
- * Enhanced animated discovery card with visual progress indicators
- * Replaces boring circular progress with engaging animations
+ * Simplified animated discovery card with optimized layout
+ * Fixed: Layout overflow, scrolling issues, excessive spacing
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,12 +32,12 @@ fun AnimatedDiscoveryCard(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Animation states
+    // Simple pulse animation
     val pulseScale by rememberInfiniteTransition(label = "pulse").animateFloat(
         initialValue = 1f,
-        targetValue = 1.15f,
+        targetValue = 1.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(UIConstants.ANIMATION_DURATION_MS.toInt(), easing = EaseInOut),
+            animation = tween(1000, easing = EaseInOut),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
@@ -55,38 +51,35 @@ fun AnimatedDiscoveryCard(
     ) {
         discoveryStatus?.let { status ->
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(SpacingConstants.SPACING_LARGE),
-                shape = RoundedCornerShape(SpacingConstants.FULLSCREEN_CORNER_RADIUS),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = SpacingConstants.CARD_CORNER_RADIUS
-                )
+                elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(SpacingConstants.SPACING_EXTRA_LARGE),
+                        .padding(16.dp), // Reduced padding
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_EXTRA_LARGE)
+                    verticalArrangement = Arrangement.spacedBy(12.dp) // Reduced spacing
                 ) {
-                    // Animated Icon Section
+                    // Simplified Icon Section
                     Box(
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.height(80.dp) // Fixed height to prevent overflow
                     ) {
-                        // Outer pulsing circle
+                        // Smaller pulsing circle
                         Box(
                             modifier = Modifier
-                                .size(SpacingConstants.APP_ICON_SIZE)
+                                .size(64.dp)
                                 .scale(pulseScale)
                                 .background(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.STRONG),
-                                            MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.LIGHT),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                             Color.Transparent
                                         )
                                     ),
@@ -96,148 +89,104 @@ fun AnimatedDiscoveryCard(
 
                         // Main discovery icon
                         Card(
-                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_GIANT),
+                            modifier = Modifier.size(48.dp),
                             shape = CircleShape,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.primary
-                            ),
-                            elevation = CardDefaults.cardElevation(SpacingConstants.SPACING_SMALL)
+                            )
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                when (status.stage) {
-                                    "STARTING" -> Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier
-                                            .size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
-                                            .scale(pulseScale * 0.8f)
-                                    )
-                                    "N_UPNP_SEARCH" -> Icon(
-                                        imageVector = Icons.Default.CloudSync,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
-                                    )
-                                    "MDNS_SEARCH" -> Icon(
-                                        imageVector = Icons.Default.Router,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
-                                    )
-                                    "VALIDATING" -> Icon(
-                                        imageVector = Icons.Default.Verified,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
-                                    )
-                                    else -> Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(SpacingConstants.ICON_SIZE_EXTRA_LARGE)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Scanning radar effect for mDNS
-                        if (status.stage == "MDNS_SEARCH") {
-                            Canvas(modifier = Modifier.size(SpacingConstants.FULLSCREEN_ELEMENT_SIZE)) {
-                                // Add radar sweep animation here if needed
+                                Icon(
+                                    imageVector = getDiscoveryIcon(status.stage),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
                         }
                     }
 
-                    // Status Text with Typing Animation
+                    // Status Text - Simplified
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = getDiscoveryTitle(status.stage),
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             textAlign = TextAlign.Center
                         )
 
-                        AnimatedTypingText(
+                        Text(
                             text = status.message,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                             textAlign = TextAlign.Center
                         )
                     }
 
-                    // Progress Indicator
+                    // Progress Indicator - Simplified
                     if (status.progress > 0) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             LinearProgressIndicator(
                                 progress = { status.progress },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(SpacingConstants.SPACING_SMALL),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaValues.STRONG)
+                                    .height(4.dp),
+                                color = MaterialTheme.colorScheme.primary
                             )
                             
                             Text(
-                                text = "${(status.progress * 100).toInt()}% complete",
+                                text = "${(status.progress * 100).toInt()}%",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = AlphaValues.SURFACE_VARIANT)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )
                         }
                     }
 
-                    // Bridge Counter with Animation
+                    // Method indicator - Compact
                     status.currentMethod?.let { method ->
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            shape = RoundedCornerShape(SpacingConstants.SPACING_LARGE)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(SpacingConstants.SPACING_MEDIUM),
-                                horizontalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = getMethodIcon(method),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
-                                )
-                                Text(
-                                    text = "Using $method",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
+                            Icon(
+                                imageVector = getMethodIcon(method),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = method,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
 
-                    // Cancel Button
+                    // Cancel Button - Compact
                     OutlinedButton(
                         onClick = onCancel,
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        ),
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = null,
-                            modifier = Modifier.size(SpacingConstants.ICON_SIZE_SMALL)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                        Text("Cancel Discovery")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Cancel", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -245,41 +194,24 @@ fun AnimatedDiscoveryCard(
     }
 }
 
-@Composable
-private fun AnimatedTypingText(
-    text: String,
-    style: androidx.compose.ui.text.TextStyle,
-    color: Color,
-    textAlign: TextAlign,
-    modifier: Modifier = Modifier
-) {
-    var displayedText by remember(text) { mutableStateOf("") }
-    
-    LaunchedEffect(text) {
-        displayedText = ""
-        for (i in text.indices) {
-            displayedText = text.substring(0, i + 1)
-            kotlinx.coroutines.delay(UIConstants.INPUT_DEBOUNCE_MS / 10) // Typing speed
-        }
-    }
-    
-    Text(
-        text = displayedText,
-        style = style,
-        color = color,
-        textAlign = textAlign,
-        modifier = modifier
-    )
+private fun getDiscoveryIcon(stage: String): ImageVector = when (stage) {
+    "STARTING" -> Icons.Default.Search
+    "N_UPNP_SEARCH" -> Icons.Default.CloudSync
+    "MDNS_SEARCH" -> Icons.Default.Router
+    "VALIDATING" -> Icons.Default.Verified
+    "COMPLETED" -> Icons.Default.CheckCircle
+    "FAILED" -> Icons.Default.Error
+    else -> Icons.Default.Search
 }
 
 private fun getDiscoveryTitle(stage: String): String = when (stage) {
-    "STARTING" -> "🔍 Starting Discovery"
-    "N_UPNP_SEARCH" -> "🌐 Searching Online"
-    "MDNS_SEARCH" -> "📡 Scanning Network"
-    "VALIDATING" -> "✅ Validating Bridges"
-    "COMPLETED" -> "🎉 Discovery Complete"
-    "FAILED" -> "❌ Discovery Failed"
-    else -> "🔍 Discovering Bridges"
+    "STARTING" -> "Starte Suche..."
+    "N_UPNP_SEARCH" -> "Online-Suche"
+    "MDNS_SEARCH" -> "Netzwerk-Scan"
+    "VALIDATING" -> "Validierung"
+    "COMPLETED" -> "Fertig!"
+    "FAILED" -> "Fehler"
+    else -> "Bridge-Suche"
 }
 
 private fun getMethodIcon(method: String): ImageVector = when (method.lowercase()) {

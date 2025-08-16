@@ -197,7 +197,7 @@ fun ManualAlarmCard(
                                 contentDescription = null
                             )
                             Text(
-                                text = "Alarm: $alarmTime",
+                                text = "Weckzeit: $alarmTime",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer

@@ -22,28 +22,7 @@ import com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ViewModelFactory
 import com.github.f1rlefanz.cf_alarmfortimeoffice.util.theme.SpacingConstants
 
 /**
- * Hue Rule Configuration Screen - Create and Edit Schedule Rules
- * 
- * Provides comprehensive rule creation and editing interface.
- * Handles shift pattern selection, timing configuration, light targeting, and actions.
- * 
- * Features:
- * - Rule creation and editing (CRUD operations)
- * - Shift pattern selection with validation
- * - Time range configuration with multiple actions
- * - Light and group target selection
- * - Action configuration (on/off, brightness, color)
- * - Rule preview and testing
- * - Form validation and error handling
- * 
- * Architecture:
- * - Form-based UI with validation
- * - Reactive state management
- * - Material Design 3 components
- * - Modular component structure
- * 
- * @author CF-Alarm Development Team
- * @since Hue Integration v2
+ * Hue Regel-Konfiguration Screen - Deutsche Version
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +34,9 @@ fun HueRuleConfigScreen(
     modifier: Modifier = Modifier
 ) {
     val hueViewModel: HueViewModel = viewModel(factory = viewModelFactory)
+    val shiftViewModel: com.github.f1rlefanz.cf_alarmfortimeoffice.viewmodel.ShiftViewModel = viewModel(factory = viewModelFactory)
     val uiState by hueViewModel.uiState.collectAsState()
+    val shiftState by shiftViewModel.uiState.collectAsState()
     
     // Form state
     var ruleName by remember { mutableStateOf("") }
@@ -70,30 +51,61 @@ fun HueRuleConfigScreen(
     // Validation state
     var showValidationErrors by remember { mutableStateOf(false) }
     
-    // Load existing rule if editing
+    // Load rule for editing if ruleId is provided
     LaunchedEffect(ruleId) {
-        ruleId?.let { id ->
-            uiState.scheduleRules.find { it.id == id }?.let { rule ->
-                ruleName = rule.name
-                selectedShiftPattern = rule.shiftPattern
-                isEnabled = rule.enabled
+        if (ruleId != null) {
+            hueViewModel.loadRuleForEditing(ruleId)
+        } else {
+            hueViewModel.clearEditingRule()
+        }
+    }
+    
+    // Initialize form fields when editing rule is loaded
+    LaunchedEffect(uiState.editingRule) {
+        uiState.editingRule?.let { rule ->
+            ruleName = rule.name
+            selectedShiftPattern = rule.shiftPattern
+            isEnabled = rule.enabled
+            
+            // Extract values from first time range and action
+            val firstTimeRange = rule.timeRanges.firstOrNull()
+            if (firstTimeRange != null) {
+                timeOffsetMinutes = firstTimeRange.offsetMinutes
                 
-                // Extract simplified data from timeRanges for editing
-                rule.timeRanges.firstOrNull()?.let { firstRange ->
-                    timeOffsetMinutes = firstRange.offsetMinutes
-                    firstRange.actions.firstOrNull()?.let { firstAction ->
-                        targetOn = firstAction.on ?: true
-                        targetBrightness = firstAction.brightness ?: 128
-                        
-                        // Collect target IDs based on action type
-                        when (firstAction.targetType) {
-                            TargetType.LIGHT -> selectedLightIds = setOf(firstAction.targetId)
-                            TargetType.GROUP, TargetType.ROOM, TargetType.ZONE -> selectedGroupIds = setOf(firstAction.targetId)
-                        }
+                val firstAction = firstTimeRange.actions.firstOrNull()
+                if (firstAction != null) {
+                    targetOn = firstAction.on ?: true
+                    targetBrightness = firstAction.brightness ?: 128
+                }
+                
+                // Separate lights and groups from actions
+                val lightIds = mutableSetOf<String>()
+                val groupIds = mutableSetOf<String>()
+                
+                firstTimeRange.actions.forEach { action ->
+                    when (action.targetType) {
+                        TargetType.LIGHT -> lightIds.add(action.targetId)
+                        TargetType.GROUP -> groupIds.add(action.targetId)
+                        else -> {} // Handle other types if needed
                     }
                 }
+                
+                selectedLightIds = lightIds
+                selectedGroupIds = groupIds
             }
         }
+    }
+    
+    // Clear editing rule when leaving screen
+    DisposableEffect(Unit) {
+        onDispose {
+            hueViewModel.clearEditingRule()
+        }
+    }
+    
+    // Get available shift patterns from ShiftConfig
+    val availableShiftPatterns = remember(shiftState.currentShiftConfig) {
+        shiftState.currentShiftConfig?.definitions?.filter { it.isEnabled }?.map { it.name } ?: emptyList()
     }
     
     Scaffold(
@@ -101,7 +113,7 @@ fun HueRuleConfigScreen(
             TopAppBar(
                 title = { 
                     Text(
-                        if (ruleId != null) "Edit Rule" else "New Rule",
+                        if (ruleId != null) "Regel bearbeiten" else "Neue Regel",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     ) 
@@ -110,19 +122,16 @@ fun HueRuleConfigScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Zurück"
                         )
                     }
                 },
                 actions = {
-                    // Save button
                     TextButton(
                         onClick = {
                             if (validateForm(ruleName, selectedShiftPattern, selectedLightIds, selectedGroupIds)) {
-                                // Create actions from form data
                                 val actions = mutableListOf<HueLightAction>()
                                 
-                                // Add light actions
                                 selectedLightIds.forEach { lightId ->
                                     actions.add(
                                         HueLightAction(
@@ -135,7 +144,6 @@ fun HueRuleConfigScreen(
                                     )
                                 }
                                 
-                                // Add group actions
                                 selectedGroupIds.forEach { groupId ->
                                     actions.add(
                                         HueLightAction(
@@ -152,7 +160,7 @@ fun HueRuleConfigScreen(
                                 val timeRange = HueTimeRange(
                                     startTime = "00:00",
                                     endTime = "23:59",
-                                    relativeTo = TimeReference.SHIFT_START,
+                                    relativeTo = TimeReference.ALARM_TIME,
                                     offsetMinutes = timeOffsetMinutes,
                                     actions = actions
                                 )
@@ -176,288 +184,251 @@ fun HueRuleConfigScreen(
                             }
                         }
                     ) {
-                        Text(
-                            "Save",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Speichern", fontWeight = FontWeight.Bold)
                     }
                 }
             )
         }
     ) { paddingValues ->
-        Box(
+        LazyColumn(
             modifier = modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-                verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_LARGE)
-            ) {
-                // Error display
-                uiState.error?.let { error ->
-                    item {
-                        ErrorMessage(
-                            message = error,
-                            onDismiss = { hueViewModel.clearError() }
-                        )
-                    }
-                }
-                
-                // Rule basic info section
+            uiState.error?.let { error ->
                 item {
-                    RuleBasicInfoSection(
-                        ruleName = ruleName,
-                        onRuleNameChange = { ruleName = it },
-                        isEnabled = isEnabled,
-                        onEnabledChange = { isEnabled = it },
-                        showValidationErrors = showValidationErrors
-                    )
-                }
-                
-                // Shift pattern selection section
-                item {
-                    ShiftPatternSection(
-                        selectedShiftPattern = selectedShiftPattern,
-                        onShiftPatternChange = { selectedShiftPattern = it },
-                        showValidationErrors = showValidationErrors
-                    )
-                }
-                
-                // Time configuration section
-                item {
-                    TimeConfigSection(
-                        timeOffsetMinutes = timeOffsetMinutes,
-                        onTimeOffsetChange = { timeOffsetMinutes = it }
-                    )
-                }
-                
-                // Target selection section
-                item {
-                    TargetSelectionSection(
-                        lightTargets = uiState.lightTargets,
-                        selectedLightIds = selectedLightIds,
-                        selectedGroupIds = selectedGroupIds,
-                        onLightSelectionChange = { selectedLightIds = it },
-                        onGroupSelectionChange = { selectedGroupIds = it },
-                        onRefreshTargets = { hueViewModel.refreshLightTargets() },
-                        showValidationErrors = showValidationErrors
-                    )
-                }
-                
-                // Action configuration section
-                item {
-                    ActionConfigSection(
-                        targetOn = targetOn,
-                        targetBrightness = targetBrightness,
-                        onTargetOnChange = { targetOn = it },
-                        onTargetBrightnessChange = { targetBrightness = it }
-                    )
-                }
-                
-                // Rule preview section
-                item {
-                    RulePreviewSection(
-                        ruleName = ruleName,
-                        selectedShiftPattern = selectedShiftPattern,
-                        timeOffsetMinutes = timeOffsetMinutes,
-                        selectedLightIds = selectedLightIds,
-                        selectedGroupIds = selectedGroupIds,
-                        targetOn = targetOn,
-                        targetBrightness = targetBrightness,
-                        isEnabled = isEnabled,
-                        onTestRule = {
-                            // Create actions from form data for testing
-                            val actions = mutableListOf<HueLightAction>()
-                            
-                            // Add light actions
-                            selectedLightIds.forEach { lightId ->
-                                actions.add(
-                                    HueLightAction(
-                                        targetType = TargetType.LIGHT,
-                                        targetId = lightId,
-                                        actionType = if (targetOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                                        on = targetOn,
-                                        brightness = if (targetOn) targetBrightness else null
-                                    )
-                                )
-                            }
-                            
-                            // Add group actions
-                            selectedGroupIds.forEach { groupId ->
-                                actions.add(
-                                    HueLightAction(
-                                        targetType = TargetType.GROUP,
-                                        targetId = groupId,
-                                        actionType = if (targetOn) ActionType.TURN_ON else ActionType.TURN_OFF,
-                                        on = targetOn,
-                                        brightness = if (targetOn) targetBrightness else null,
-                                        isGroup = true
-                                    )
-                                )
-                            }
-                            
-                            val timeRange = HueTimeRange(
-                                startTime = "00:00",
-                                endTime = "23:59",
-                                relativeTo = TimeReference.SHIFT_START,
-                                offsetMinutes = timeOffsetMinutes,
-                                actions = actions
-                            )
-                            
-                            val testRule = HueScheduleRule(
-                                id = "test_${System.currentTimeMillis()}",
-                                name = ruleName.ifBlank { "Test Rule" },
-                                shiftPattern = selectedShiftPattern,
-                                enabled = true,
-                                timeRanges = listOf(timeRange)
-                            )
-                            hueViewModel.testRuleExecution(testRule)
-                        }
-                    )
+                    ErrorMessage(message = error, onDismiss = { hueViewModel.clearError() })
                 }
             }
             
-            // Loading overlay
-            if (uiState.isLoading) {
-                LoadingScreen()
+            item {
+                RuleBasicInfoCard(
+                    ruleName = ruleName,
+                    onRuleNameChange = { ruleName = it },
+                    isEnabled = isEnabled,
+                    onEnabledChange = { isEnabled = it },
+                    showValidationErrors = showValidationErrors
+                )
             }
+            
+            item {
+                ShiftPatternCard(
+                    selectedShiftPattern = selectedShiftPattern,
+                    onShiftPatternChange = { selectedShiftPattern = it },
+                    availableShiftPatterns = availableShiftPatterns,
+                    showValidationErrors = showValidationErrors
+                )
+            }
+            
+            item {
+                TimeConfigCard(
+                    timeOffsetMinutes = timeOffsetMinutes,
+                    onTimeOffsetChange = { timeOffsetMinutes = it }
+                )
+            }
+            
+            item {
+                TargetSelectionCard(
+                    lightTargets = uiState.lightTargets,
+                    selectedLightIds = selectedLightIds,
+                    selectedGroupIds = selectedGroupIds,
+                    onLightSelectionChange = { selectedLightIds = it },
+                    onGroupSelectionChange = { selectedGroupIds = it },
+                    onRefreshTargets = { hueViewModel.refreshLightTargets() },
+                    showValidationErrors = showValidationErrors
+                )
+            }
+            
+            item {
+                ActionConfigCard(
+                    targetOn = targetOn,
+                    targetBrightness = targetBrightness,
+                    onTargetOnChange = { targetOn = it },
+                    onTargetBrightnessChange = { targetBrightness = it }
+                )
+            }
+            
+            item {
+                RulePreviewCard(
+                    ruleName = ruleName,
+                    selectedShiftPattern = selectedShiftPattern,
+                    timeOffsetMinutes = timeOffsetMinutes,
+                    selectedLightIds = selectedLightIds,
+                    selectedGroupIds = selectedGroupIds,
+                    targetOn = targetOn,
+                    targetBrightness = targetBrightness,
+                    isEnabled = isEnabled,
+                    onTestRule = {
+                        val actions = mutableListOf<HueLightAction>()
+                        
+                        selectedLightIds.forEach { lightId ->
+                            actions.add(
+                                HueLightAction(
+                                    targetType = TargetType.LIGHT,
+                                    targetId = lightId,
+                                    actionType = if (targetOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                                    on = targetOn,
+                                    brightness = if (targetOn) targetBrightness else null
+                                )
+                            )
+                        }
+                        
+                        selectedGroupIds.forEach { groupId ->
+                            actions.add(
+                                HueLightAction(
+                                    targetType = TargetType.GROUP,
+                                    targetId = groupId,
+                                    actionType = if (targetOn) ActionType.TURN_ON else ActionType.TURN_OFF,
+                                    on = targetOn,
+                                    brightness = if (targetOn) targetBrightness else null,
+                                    isGroup = true
+                                )
+                            )
+                        }
+                        
+                        val timeRange = HueTimeRange(
+                            startTime = "00:00",
+                            endTime = "23:59",
+                            relativeTo = TimeReference.ALARM_TIME,
+                            offsetMinutes = timeOffsetMinutes,
+                            actions = actions
+                        )
+                        
+                        val testRule = HueScheduleRule(
+                            id = "test_${System.currentTimeMillis()}",
+                            name = ruleName.ifBlank { "Test-Regel" },
+                            shiftPattern = selectedShiftPattern,
+                            enabled = true,
+                            timeRanges = listOf(timeRange)
+                        )
+                        hueViewModel.testRuleExecution(testRule)
+                    }
+                )
+            }
+        }
+        
+        if (uiState.isLoading) {
+            LoadingScreen()
         }
     }
 }
 
-/**
- * Rule Basic Info Section
- */
 @Composable
-private fun RuleBasicInfoSection(
+private fun RuleBasicInfoCard(
     ruleName: String,
     onRuleNameChange: (String) -> Unit,
     isEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
-    showValidationErrors: Boolean,
-    modifier: Modifier = Modifier
+    showValidationErrors: Boolean
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Card {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Rule Information",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Regel-Informationen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             
-            // Rule name input
             OutlinedTextField(
                 value = ruleName,
                 onValueChange = onRuleNameChange,
-                label = { Text("Rule Name") },
-                placeholder = { Text("e.g., Morning Light Early Shift") },
+                label = { Text("Regel-Name") },
+                placeholder = { Text("z.B. Morgenlicht Frühschicht") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = showValidationErrors && ruleName.isBlank(),
                 supportingText = {
                     if (showValidationErrors && ruleName.isBlank()) {
-                        Text(
-                            "Rule name is required",
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Text("Regel-Name ist erforderlich", color = MaterialTheme.colorScheme.error)
                     }
                 }
             )
             
-            // Enabled switch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    Text("Regel aktivieren", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     Text(
-                        text = "Enable Rule",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "Rule will automatically execute when conditions are met",
+                        "Regel wird automatisch ausgeführt, wenn Bedingungen erfüllt sind",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                
-                Switch(
-                    checked = isEnabled,
-                    onCheckedChange = onEnabledChange
-                )
+                Switch(checked = isEnabled, onCheckedChange = onEnabledChange)
             }
         }
     }
 }
 
-/**
- * Shift Pattern Selection Section
- */
 @Composable
-private fun ShiftPatternSection(
+private fun ShiftPatternCard(
     selectedShiftPattern: String,
     onShiftPatternChange: (String) -> Unit,
-    showValidationErrors: Boolean,
-    modifier: Modifier = Modifier
+    availableShiftPatterns: List<String>,
+    showValidationErrors: Boolean
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Card {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("Schichtmuster", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                text = "Shift Pattern",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Text(
-                text = "Select which shift pattern this rule applies to:",
+                "Wählen Sie aus, für welches Schichtmuster diese Regel gilt:",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Shift pattern options
-            val shiftPatterns = listOf("Early", "Late", "Night", "S1", "S2", "S3", "Weekend")
-            
-            Column(
-                modifier = Modifier.selectableGroup(),
-                verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
-            ) {
-                shiftPatterns.forEach { pattern ->
-                    Row(
+            if (availableShiftPatterns.isEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(12.dp)
                     ) {
-                        RadioButton(
-                            selected = selectedShiftPattern == pattern,
-                            onClick = { onShiftPatternChange(pattern) }
-                        )
-                        Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
                         Text(
-                            text = pattern,
-                            style = MaterialTheme.typography.bodyLarge
+                            "Keine Schichtmuster konfiguriert",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
+                        Text(
+                            "Bitte konfigurieren Sie zunächst Ihre Schichtmuster in den Einstellungen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.selectableGroup()) {
+                    availableShiftPatterns.forEach { pattern ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedShiftPattern == pattern,
+                                onClick = { onShiftPatternChange(pattern) }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(pattern, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
             }
             
             if (showValidationErrors && selectedShiftPattern.isBlank()) {
                 Text(
-                    text = "Please select a shift pattern",
+                    "Bitte wählen Sie ein Schichtmuster aus",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -466,40 +437,28 @@ private fun ShiftPatternSection(
     }
 }
 
-/**
- * Time Configuration Section
- */
 @Composable
-private fun TimeConfigSection(
+private fun TimeConfigCard(
     timeOffsetMinutes: Int,
-    onTimeOffsetChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    onTimeOffsetChange: (Int) -> Unit
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Card {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("Zeitkonfiguration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                text = "Timing Configuration",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Text(
-                text = "When should this rule execute relative to your shift start?",
+                "Wann soll diese Regel relativ zu Ihrer Weckzeit ausgeführt werden?",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Time offset slider
-            Column(
-                verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Time Offset: ${if (timeOffsetMinutes >= 0) "+" else ""}$timeOffsetMinutes minutes",
+                    "Zeitversatz: ${if (timeOffsetMinutes >= 0) "+" else ""}$timeOffsetMinutes Minuten",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium
                 )
@@ -508,7 +467,7 @@ private fun TimeConfigSection(
                     value = timeOffsetMinutes.toFloat(),
                     onValueChange = { onTimeOffsetChange(it.toInt()) },
                     valueRange = -60f..60f,
-                    steps = 23, // Every 5 minutes
+                    steps = 23,
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -516,23 +475,15 @@ private fun TimeConfigSection(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "60 min before",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "60 min after",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("60 Min früher", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("60 Min später", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 Text(
-                    text = when {
-                        timeOffsetMinutes < 0 -> "Execute ${-timeOffsetMinutes} minutes before shift start"
-                        timeOffsetMinutes > 0 -> "Execute $timeOffsetMinutes minutes after shift start"
-                        else -> "Execute exactly at shift start time"
+                    when {
+                        timeOffsetMinutes < 0 -> "Ausführung ${-timeOffsetMinutes} Minuten vor Weckzeit"
+                        timeOffsetMinutes > 0 -> "Ausführung $timeOffsetMinutes Minuten nach Weckzeit"
+                        else -> "Ausführung genau zur Weckzeit"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
@@ -543,154 +494,120 @@ private fun TimeConfigSection(
     }
 }
 
-/**
- * Target Selection Section
- */
 @Composable
-private fun TargetSelectionSection(
+private fun TargetSelectionCard(
     lightTargets: com.github.f1rlefanz.cf_alarmfortimeoffice.hue.usecase.interfaces.LightTargets,
     selectedLightIds: Set<String>,
     selectedGroupIds: Set<String>,
     onLightSelectionChange: (Set<String>) -> Unit,
     onGroupSelectionChange: (Set<String>) -> Unit,
     onRefreshTargets: () -> Unit,
-    showValidationErrors: Boolean,
-    modifier: Modifier = Modifier
+    showValidationErrors: Boolean
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Card {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Target Selection",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
+                Text("Zielauswahl", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 IconButton(onClick = onRefreshTargets) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh lights"
-                    )
+                    Icon(Icons.Default.Refresh, "Lichter aktualisieren")
                 }
             }
             
             Text(
-                text = "Select which lights or groups this rule should control:",
+                "Wählen Sie aus, welche Lichter oder Gruppen diese Regel steuern soll:",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Tab selection for lights vs groups
             var selectedTab by remember { mutableIntStateOf(0) }
             
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Groups (${lightTargets.groups.size})") }
+                    text = { Text("Gruppen (${lightTargets.groups.size})") }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Lights (${lightTargets.lights.size})") }
+                    text = { Text("Lichter (${lightTargets.lights.size})") }
                 )
             }
             
-            // Target selection content
             when (selectedTab) {
                 0 -> {
-                    // Groups selection
                     if (lightTargets.groups.isEmpty()) {
                         Text(
-                            text = "No groups found. Create groups in the Hue app first.",
+                            "Keine Gruppen gefunden. Erstellen Sie zunächst Gruppen in der Hue-App.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         lightTargets.groups.forEach { group ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
                                     checked = selectedGroupIds.contains(group.id),
                                     onCheckedChange = { isChecked ->
                                         onGroupSelectionChange(
-                                            if (isChecked) {
-                                                selectedGroupIds + group.id
-                                            } else {
-                                                selectedGroupIds - group.id
-                                            }
+                                            if (isChecked) selectedGroupIds + group.id else selectedGroupIds - group.id
                                         )
                                     }
                                 )
-                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                                    Column {
-                                        Text(
-                                            text = group.name,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        Text(
-                                            text = "Group • ${if (group.state.any_on) "On" else "Off"}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(group.name, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "Gruppe • ${if (group.state.any_on) "An" else "Aus"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
                 }
                 1 -> {
-                    // Individual lights selection
                     if (lightTargets.lights.isEmpty()) {
                         Text(
-                            text = "No lights found. Make sure your bridge is connected.",
+                            "Keine Lichter gefunden. Stellen Sie sicher, dass Ihre Bridge verbunden ist.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         lightTargets.lights.forEach { light ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
                                     checked = selectedLightIds.contains(light.id),
                                     onCheckedChange = { isChecked ->
                                         onLightSelectionChange(
-                                            if (isChecked) {
-                                                selectedLightIds + light.id
-                                            } else {
-                                                selectedLightIds - light.id
-                                            }
+                                            if (isChecked) selectedLightIds + light.id else selectedLightIds - light.id
                                         )
                                     }
                                 )
-                                Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                                    Column {
-                                        Text(
-                                            text = light.name,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        Text(
-                                            text = "Light • ${if (light.state.on) "On" else "Off"}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(light.name, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "Licht • ${if (light.state.on) "An" else "Aus"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -699,16 +616,15 @@ private fun TargetSelectionSection(
             
             if (showValidationErrors && selectedLightIds.isEmpty() && selectedGroupIds.isEmpty()) {
                 Text(
-                    text = "Please select at least one light or group",
+                    "Bitte wählen Sie mindestens ein Licht oder eine Gruppe aus",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
             }
             
-            // Selection summary
             if (selectedLightIds.isNotEmpty() || selectedGroupIds.isNotEmpty()) {
                 Text(
-                    text = "Selected: ${selectedLightIds.size} lights, ${selectedGroupIds.size} groups",
+                    "Ausgewählt: ${selectedLightIds.size} Lichter, ${selectedGroupIds.size} Gruppen",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium
@@ -718,37 +634,27 @@ private fun TargetSelectionSection(
     }
 }
 
-/**
- * Action Configuration Section
- */
 @Composable
-private fun ActionConfigSection(
+private fun ActionConfigCard(
     targetOn: Boolean,
     targetBrightness: Int,
     onTargetOnChange: (Boolean) -> Unit,
-    onTargetBrightnessChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    onTargetBrightnessChange: (Int) -> Unit
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Card {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("Aktionskonfiguration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                text = "Action Configuration",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Text(
-                text = "Configure what should happen when this rule executes:",
+                "Konfigurieren Sie, was passieren soll, wenn diese Regel ausgeführt wird:",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // On/Off toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -756,30 +662,23 @@ private fun ActionConfigSection(
             ) {
                 Column {
                     Text(
-                        text = "Turn ${if (targetOn) "On" else "Off"}",
+                        if (targetOn) "Einschalten" else "Ausschalten",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "Switch lights ${if (targetOn) "on" else "off"} when rule executes",
+                        "Lichter ${if (targetOn) "einschalten" else "ausschalten"} bei Regelausführung",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                
-                Switch(
-                    checked = targetOn,
-                    onCheckedChange = onTargetOnChange
-                )
+                Switch(checked = targetOn, onCheckedChange = onTargetOnChange)
             }
             
-            // Brightness control (only if turning on)
             if (targetOn) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_SMALL)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Brightness: ${(targetBrightness * 100 / 254)}%",
+                        "Helligkeit: ${(targetBrightness * 100 / 254)}%",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
@@ -795,16 +694,8 @@ private fun ActionConfigSection(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "1%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "100%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("1%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("100%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -812,11 +703,8 @@ private fun ActionConfigSection(
     }
 }
 
-/**
- * Rule Preview Section
- */
 @Composable
-private fun RulePreviewSection(
+private fun RulePreviewCard(
     ruleName: String,
     selectedShiftPattern: String,
     timeOffsetMinutes: Int,
@@ -825,29 +713,23 @@ private fun RulePreviewSection(
     targetOn: Boolean,
     targetBrightness: Int,
     isEnabled: Boolean,
-    onTestRule: () -> Unit,
-    modifier: Modifier = Modifier
+    onTestRule: () -> Unit
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(
-            modifier = Modifier.padding(SpacingConstants.PADDING_SCREEN_HORIZONTAL),
-            verticalArrangement = Arrangement.spacedBy(SpacingConstants.SPACING_MEDIUM)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Rule Preview",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Regel-Vorschau", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 
                 Button(
                     onClick = onTestRule,
@@ -855,53 +737,38 @@ private fun RulePreviewSection(
                             selectedShiftPattern.isNotBlank() && 
                             (selectedLightIds.isNotEmpty() || selectedGroupIds.isNotEmpty())
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(SpacingConstants.SPACING_SMALL))
-                    Text("Test Rule")
+                    Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Regel testen")
                 }
             }
             
-            // Rule summary
             if (ruleName.isNotBlank()) {
-                Text(
-                    text = "\"$ruleName\"",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("\"$ruleName\"", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
             }
             
             if (selectedShiftPattern.isNotBlank()) {
-                Text(
-                    text = "When working $selectedShiftPattern shift:",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("Bei $selectedShiftPattern-Schicht:", style = MaterialTheme.typography.bodyMedium)
             }
             
             if (timeOffsetMinutes != 0 || selectedShiftPattern.isNotBlank()) {
                 val timeText = when {
-                    timeOffsetMinutes < 0 -> "${-timeOffsetMinutes} minutes before shift start"
-                    timeOffsetMinutes > 0 -> "$timeOffsetMinutes minutes after shift start"
-                    else -> "exactly at shift start"
+                    timeOffsetMinutes < 0 -> "${-timeOffsetMinutes} Minuten vor Weckzeit"
+                    timeOffsetMinutes > 0 -> "$timeOffsetMinutes Minuten nach Weckzeit"
+                    else -> "genau zur Weckzeit"
                 }
-                Text(
-                    text = "Execute $timeText",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("Ausführung $timeText", style = MaterialTheme.typography.bodyMedium)
             }
             
             if (selectedLightIds.isNotEmpty() || selectedGroupIds.isNotEmpty()) {
                 Text(
-                    text = "Turn ${if (targetOn) "on" else "off"} ${selectedLightIds.size} lights and ${selectedGroupIds.size} groups${if (targetOn) " at ${(targetBrightness * 100 / 254)}% brightness" else ""}",
+                    "${if (targetOn) "Einschalten" else "Ausschalten"} von ${selectedLightIds.size} Lichtern und ${selectedGroupIds.size} Gruppen${if (targetOn) " mit ${(targetBrightness * 100 / 254)}% Helligkeit" else ""}",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
             
             Text(
-                text = "Status: ${if (isEnabled) "Enabled" else "Disabled"}",
+                "Status: ${if (isEnabled) "Aktiviert" else "Deaktiviert"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -909,9 +776,6 @@ private fun RulePreviewSection(
     }
 }
 
-/**
- * Form validation helper
- */
 private fun validateForm(
     ruleName: String,
     selectedShiftPattern: String,
